@@ -1,0 +1,12 @@
+target
+*.class
+.DS_Store
+.vscode
+.idea
+*.log
+*.bc
+*.o
+*.out
+*.tokens
+*.interp
+src_managed
