@@ -1,0 +1,2 @@
+[ ] desugar operators into list of calls
+[ ] test how diff postfix levels interact

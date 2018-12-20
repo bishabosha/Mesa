@@ -56,10 +56,12 @@ qualId: Id ('.' Id)*;
 expr[int p]:
 	(literal | primary | prefixExpr) (
 		// infixl infixr infix case
-{infix(_input.LT(1).getText(), $p)}? op = OPERATOR expr[nextp($op.text)] {notInfixNoAssoc($op.text)}?
+{infix(_input.LT(1).getText(), $p)}? op = operator expr[nextp($op.text)] {notInfixNoAssoc($op.text)}?
 		// infix case, no assoc, stop trying to match more infix operator
-| {postfix(_input.LT(1).getText(), $p)}? OPERATOR // postfix case
+| {postfix(_input.LT(1).getText(), $p)}? operator // postfix case
 	)*;
+
+operator: OPERATOR;
 
 // atom expr
 prefixExpr:

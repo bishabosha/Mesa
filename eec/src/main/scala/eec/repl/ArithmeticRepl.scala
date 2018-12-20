@@ -9,15 +9,15 @@ class ArithmeticRepl {
   import eec.compiler.exception._
 
   def loop: Unit = {
-    println("starting eec REPL...")
+    println("starting arithmetic REPL...")
     var break = false;
     while (!break) {
-      print("eec> ")
+      print("arithmetic> ")
       val input = readLine
       try {
         val parsed = parseArithmetic(input)
         val ans = evalArithmetic(parsed)
-        println(s"eec> $ans")
+        println(s"arithmetic> $ans")
       } catch {
         case UnexpectedEOF => Console.err.println(s"[ERROR] no valid expression input")
       }
