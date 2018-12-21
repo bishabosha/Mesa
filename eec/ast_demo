@@ -3,35 +3,38 @@
         ModuleInfo(EEC.Prelude)
     ),
     List(
-        FixityStatement(Prefix(6),Operator(-)),
-        FixityStatement(Infixr(6),Operator(^)),
-        FixityStatement(Infixl(3),Operator(+)),
-        FixityStatement(Infixl(5),Operator(*)),
-        FixityStatement(Infixl(5),Operator(%)),
-        FixityStatement(Infixl(5),Operator(/)),
-        FixityStatement(Infix(10),Operator(==)),
-        FixityStatement(Postfix(6),Operator(!)),
-        List(
+        FixityStatement(Prefix,10,Operator(!)),
+        FixityStatement(Infixr,8,Operator(^)),
+        FixityStatement(Infixl,6,Operator(+)),
+        FixityStatement(Infixl,7,Operator(*)),
+        FixityStatement(Infixl,7,Operator(%)),
+        FixityStatement(Infixl,7,Operator(/)),
+        FixityStatement(Infix,4,Operator(==)),
+        FixityStatement(Infix,4,Operator(/=)),
+        FixityStatement(Postfix,4,Operator(?))
+    ),
+    List(
+        Expr(List(
             PrefixExpr(
-                Operator(-),
-                List(
+                Operator(!),
+                IntegerLiteral(-2)
+            ),
+            Operator(-),
+            DoubleLiteral(-3.21),
+            Operator(?),
+            Operator(^),
+            Expr(List(
+                IntegerLiteral(5),
+                Operator(+),
+                Expr(List(
                     IntegerLiteral(2),
-                    Operator(!),
-                    Operator(^),
-                    PrimaryExpr(
-                        List(
-                            IntegerLiteral(5),
-                            Operator(*),
-                            IntegerLiteral(11),
-                            Operator(*),
-                            IntegerLiteral(4)
-                        )
-                    ),
-                )
-            )
-        ),
-        List(
-            IntegerLiteral(1)
-        )
+                    Operator(*),
+                    IntegerLiteral(11)
+                )),
+                Operator(+),
+                IntegerLiteral(4)
+            ))
+        )),
+        IntegerLiteral(1)
     )
 )

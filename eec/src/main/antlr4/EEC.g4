@@ -46,8 +46,9 @@ public boolean notInfixNoAssoc(String op) {
 }
 }
 
-
-literal: IntegerLiteral;
+literal:
+	SUB? IntegerLiteral
+	| SUB? FloatingPointLiteral;
 
 primary: '(' expr[0] ')';
 
@@ -61,22 +62,26 @@ expr[int p]:
 | {postfix(_input.LT(1).getText(), $p)}? operator // postfix case
 	)*;
 
-operator: OPERATOR;
+operator: SUB | OPERATOR;
 
 // atom expr
 prefixExpr:
 	{prefix(_input.LT(1).getText())}? op = OPERATOR expr[nextp($op.text)];
 
 fixity:
-	f = FIXITY p = IntegerLiteral (op += OPERATOR)+ {updateFix($f.text, $p.int, $op);};
+	f = FIXITY p = IntegerLiteral (op += (SUB | OPERATOR))+ {updateFix($f.text, $p.int, $op);};
 
 moduleInfo: 'module' qualId;
 
 topStatSeq: topStat (Sep topStat)*;
 
-topStat: expr[0] | fixity;
+statSeq: stat (Sep stat)*;
 
-translationUnit: (moduleInfo Sep?)* topStatSeq;
+topStat: fixity;
+
+stat: expr[0];
+
+translationUnit: (moduleInfo Sep?)* topStatSeq Sep statSeq Sep?;
 
 //
 // Lexer Defs
@@ -84,12 +89,19 @@ translationUnit: (moduleInfo Sep?)* topStatSeq;
 
 FIXITY: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
 ASSIGN: '=';
+SUB: '-';
 OPERATOR: Op;
 
 Id:
 	Plainid;
 
 IntegerLiteral: DecimalNumeral LongType?;
+
+FloatingPointLiteral:
+	Digit+ '.' Digit+ ExponentPart? FloatType?
+	| '.' Digit+ ExponentPart? FloatType?
+	| Digit ExponentPart FloatType?
+	| Digit+ ExponentPart? FloatType;
 
 fragment WhiteSpace: '\u0020' | '\u0009' | '\u000D' | '\u000A';
 
@@ -118,6 +130,10 @@ fragment Idrest: (Letter | Digit)* ('_' Op)?;
 
 fragment LongType: 'L' | 'l';
 
+fragment FloatType
+   : 'F' | 'f' | 'D' | 'd'
+   ;
+
 fragment Upper: 'A' .. 'Z' | '$' | '_' | UnicodeClass_LU;
 
 fragment Lower: 'a' .. 'z' | UnicodeClass_LL;
@@ -128,6 +144,8 @@ fragment Letter:
 	| UnicodeClass_LO
 	| UnicodeClass_LT // TODO Add category Nl
 	;
+
+fragment ExponentPart: ('E' | 'e') ('+' | '-')? Digit+;
 
 fragment DecimalNumeral: '0' | NonZeroDigit Digit*;
 

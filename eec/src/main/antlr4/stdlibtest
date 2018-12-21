@@ -1,11 +1,12 @@
 module EEC.Prelude
 
-prefix 6 -
-infixr 6 ^
-infixl 3 +
-infixl 5 * % /
-infix 10 ==
-postfix 6 !
+prefix 10 !
+infixr 8 ^
+infixl 6 + -
+infixl 7 * % /
+infix 4 ==
+infix 4 /=
+postfix 4 ?
 
--2! ^ (5 * 11 * 4)
+! - 2 - - 3.21? ^ (5 * 11 * 4)
 1

@@ -5,25 +5,24 @@ package ast
 import EEC._
 
 object EEC {
-  type Ast = (List[ModuleInfo], List[TopStatement])
-  type TopStatement = FixityStatement | Expr
-  type Expr = List[Expressions]
-  type Expressions = Literals | PrefixExpr | Operator | PrimaryExpr
-  type Literals = IntegerLiteral
+  type Ast = (List[ModuleInfo], List[TopStatement], List[Statement])
+  type TopStatement = FixityStatement
+  type Statement = Expression
+  type Expression = Literals | PrefixExpr | Expr
+  type Expressions = Statement | Operator
+  type Literals = IntegerLiteral | LongLiteral | FloatLiteral | DoubleLiteral
 }
 
 enum Fixity {
-  case Infixl(strength: Int)
-  case Infixr(strength: Int)
-  case Infix(strength: Int)
-  case Postfix(strength: Int)
-  case Prefix(strength: Int)
+  case Infixl, Infixr, Infix, Postfix, Prefix
 }
 
-case class FixityStatement(fixity: Fixity, op: Operator)
+case class FixityStatement(fixity: Fixity, strength: Int, op: Operator)
 case class IntegerLiteral(value: Int)
+case class LongLiteral(value: Long)
+case class FloatLiteral(value: Float)
+case class DoubleLiteral(value: Double)
 case class ModuleInfo(symbol: String)
 case class Operator(symbol: String)
-
-case class PrefixExpr(op: Operator, expr: Expr)
-case class PrimaryExpr(expr: Expr)
+case class Expr(expr: List[Expressions])
+case class PrefixExpr(op: Operator, expr: Expression)

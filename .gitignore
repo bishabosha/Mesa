@@ -11,3 +11,4 @@ target
 *.tokens
 *.interp
 src_managed
+eec_*
