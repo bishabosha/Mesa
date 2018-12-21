@@ -17,22 +17,31 @@
         Expr(List(
             PrefixExpr(
                 Operator(!),
-                IntegerLiteral(-2)
+                TupleExpr(Vector(
+                    Expr(List(
+                        IntegerLiteral(-1),
+                        Operator(+),
+                        IntegerLiteral(2)
+                    )),
+                    IntegerLiteral(3)
+                ))
             ),
             Operator(-),
-            DoubleLiteral(-3.21),
-            Operator(?),
-            Operator(^),
             Expr(List(
-                IntegerLiteral(5),
-                Operator(+),
+                DoubleLiteral(-3.21),
+                Operator(?),
+                Operator(^),
                 Expr(List(
-                    IntegerLiteral(2),
-                    Operator(*),
-                    IntegerLiteral(11)
-                )),
-                Operator(+),
-                IntegerLiteral(4)
+                    IntegerLiteral(5),
+                    Operator(+),
+                    Expr(List(
+                        IntegerLiteral(2),
+                        Operator(*),
+                        IntegerLiteral(11)
+                    )),
+                    Operator(+),
+                    IntegerLiteral(4)
+                ))
             ))
         )),
         IntegerLiteral(1)

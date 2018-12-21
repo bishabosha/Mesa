@@ -53,6 +53,10 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
     (ctx: EECParser.PrimaryContext): Expression =
       visitExpr(ctx.expr)
 
+  override def visitTuple
+    (ctx: EECParser.TupleContext): TupleExpr =
+      TupleExpr(ctx.expr.toVector.map[Expression, Vector[Expression]](visitExpr))
+
   override def visitQualId
     (ctx: EECParser.QualIdContext): String =
       ctx.children.map(_.getText).mkString
@@ -63,6 +67,7 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
         Option(ctx.literal).map[Expressions](visitLiteral)
           .orElse[Expressions] { Option(ctx.primary).map(visitPrimary) }
           .orElse[Expressions] { Option(ctx.prefixExpr).map(visitPrefixExpr) }
+          .orElse[Expressions] { Option(ctx.tuple).map(visitTuple) }
       val start: Int = first.fold(0)(_ => 1)
       val exprs = ctx.children.toList.foldLeft(Nil: List[Expressions]){ (acc, o) =>
         o.accept(this) match {
@@ -73,6 +78,7 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
         case List(l: Literals) => l
         case List(p: PrefixExpr) => p
         case List(e: Expr) => e
+        case List(t: TupleExpr) => t
         case _ => Expr(exprs)
       }
     }
@@ -97,7 +103,9 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
       ctx.OPERATOR.view.map { o =>
         FixityStatement(fixity, strength, Operator(o.getText))
       }
-      .toList
+      .toList ++ ctx.SUB.view.map { o =>
+        FixityStatement(fixity, strength, Operator(o.getText))
+      }
     }
 
   override def visitModuleInfo

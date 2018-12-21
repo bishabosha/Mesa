@@ -1,1 +1,1 @@
-module EEC.Prelude; prefix 10 !; infixr 8 ^; infixl 6 + -; infixl 7 * % /; infix 4 ==; infix 4 /=; postfix 4 ?; ! - 2 - - 3.21? ^ (5 + 2 * 11 + 4); 1;
+module EEC.Prelude; prefix 10 !; infixr 8 ^; infixl 6 +,-; infixl 7 *,%,/; infix 4 ==; infix 4 /=; postfix 10 ?; ! (- 1 + 2, 3) - - 3.21? ^ (5 + 2 * 11 + 4); 1;

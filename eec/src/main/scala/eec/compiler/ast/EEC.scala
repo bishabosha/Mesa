@@ -8,7 +8,7 @@ object EEC {
   type Ast = (List[ModuleInfo], List[TopStatement], List[Statement])
   type TopStatement = FixityStatement
   type Statement = Expression
-  type Expression = Literals | PrefixExpr | Expr
+  type Expression = Literals | PrefixExpr| TupleExpr | Expr
   type Expressions = Statement | Operator
   type Literals = IntegerLiteral | LongLiteral | FloatLiteral | DoubleLiteral
 }
@@ -17,6 +17,7 @@ enum Fixity {
   case Infixl, Infixr, Infix, Postfix, Prefix
 }
 
+case class TupleExpr(exprs: Vector[Expression])
 case class FixityStatement(fixity: Fixity, strength: Int, op: Operator)
 case class IntegerLiteral(value: Int)
 case class LongLiteral(value: Long)

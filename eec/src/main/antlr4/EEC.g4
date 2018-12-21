@@ -52,10 +52,12 @@ literal:
 
 primary: '(' expr[0] ')';
 
+tuple: '(' expr[0] ',' expr[0] ')';
+
 qualId: Id ('.' Id)*;
 
 expr[int p]:
-	(literal | primary | prefixExpr) (
+	(literal | primary | prefixExpr | tuple) (
 		// infixl infixr infix case
 {infix(_input.LT(1).getText(), $p)}? op = operator expr[nextp($op.text)] {notInfixNoAssoc($op.text)}?
 		// infix case, no assoc, stop trying to match more infix operator
@@ -69,7 +71,7 @@ prefixExpr:
 	{prefix(_input.LT(1).getText())}? op = OPERATOR expr[nextp($op.text)];
 
 fixity:
-	f = FIXITY p = IntegerLiteral (op += (SUB | OPERATOR))+ {updateFix($f.text, $p.int, $op);};
+	f = FIXITY p = IntegerLiteral op += (SUB | OPERATOR) (',' op += (SUB | OPERATOR))* {updateFix($f.text, $p.int, $op);};
 
 moduleInfo: 'module' qualId;
 
