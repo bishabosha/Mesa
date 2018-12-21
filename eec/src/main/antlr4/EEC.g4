@@ -47,12 +47,12 @@ public boolean notInfixNoAssoc(String op) {
 }
 
 literal:
-	SUB? IntegerLiteral
+	SUB? IntegerLiteral ('L' | 'l')?
 	| SUB? FloatingPointLiteral;
 
 primary: '(' expr[0] ')';
 
-tuple: '(' expr[0] ',' expr[0] ')';
+tuple: UnitLiteral | '(' expr[0] ',' expr[0] ')';
 
 qualId: Id ('.' Id)*;
 
@@ -97,13 +97,15 @@ OPERATOR: Op;
 Id:
 	Plainid;
 
-IntegerLiteral: DecimalNumeral LongType?;
+IntegerLiteral: DecimalNumeral;
 
 FloatingPointLiteral:
 	Digit+ '.' Digit+ ExponentPart? FloatType?
 	| '.' Digit+ ExponentPart? FloatType?
 	| Digit ExponentPart FloatType?
 	| Digit+ ExponentPart? FloatType;
+
+UnitLiteral: '()';
 
 fragment WhiteSpace: '\u0020' | '\u0009' | '\u000D' | '\u000A';
 
@@ -130,7 +132,7 @@ fragment Opchar:
 
 fragment Idrest: (Letter | Digit)* ('_' Op)?;
 
-fragment LongType: 'L' | 'l';
+// LongType: 'L' | 'l';
 
 fragment FloatType
    : 'F' | 'f' | 'D' | 'd'

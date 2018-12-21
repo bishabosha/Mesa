@@ -3,17 +3,16 @@
         ModuleInfo(EEC.Prelude)
     ),
     List(
-        FixityStatement(Prefix,10,Operator(!)),
-        FixityStatement(Infixr,8,Operator(^)),
-        FixityStatement(Infixl,6,Operator(+)),
-        FixityStatement(Infixl,7,Operator(*)),
-        FixityStatement(Infixl,7,Operator(%)),
-        FixityStatement(Infixl,7,Operator(/)),
-        FixityStatement(Infix,4,Operator(==)),
-        FixityStatement(Infix,4,Operator(/=)),
-        FixityStatement(Postfix,4,Operator(?))
+        FixityStatement(Prefix,10,Vector(Operator(!))),
+        FixityStatement(Infixr,8,Vector(Operator(^))),
+        FixityStatement(Infixl,6,Vector(Operator(+), Operator(-))),
+        FixityStatement(Infixl,7,Vector(Operator(*), Operator(%), Operator(/))),
+        FixityStatement(Infix,4,Vector(Operator(==))),
+        FixityStatement(Infix,4,Vector(Operator(/=))),
+        FixityStatement(Postfix,10,Vector(Operator(?)))
     ),
     List(
+        TupleExpr(Vector()),
         Expr(List(
             PrefixExpr(
                 Operator(!),
@@ -23,21 +22,21 @@
                         Operator(+),
                         IntegerLiteral(2)
                     )),
-                    IntegerLiteral(3)
+                    LongLiteral(-8)
                 ))
             ),
             Operator(-),
             Expr(List(
-                DoubleLiteral(-3.21),
+                FloatLiteral(-3.21),
                 Operator(?),
                 Operator(^),
                 Expr(List(
-                    IntegerLiteral(5),
+                    DoubleLiteral(5.9),
                     Operator(+),
                     Expr(List(
                         IntegerLiteral(2),
                         Operator(*),
-                        IntegerLiteral(11)
+                        DoubleLiteral(11200.0)
                     )),
                     Operator(+),
                     IntegerLiteral(4)
