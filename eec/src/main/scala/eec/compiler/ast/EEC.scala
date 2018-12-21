@@ -11,6 +11,7 @@ object EEC {
   type Expression = Literals | PrefixExpr | TupleExpr | Expr
   type Expressions = Statement | Operator
   type Literals = IntegerLiteral | LongLiteral | FloatLiteral | DoubleLiteral
+  val eecUnit = TupleExpr(Vector())
 }
 
 enum Fixity {

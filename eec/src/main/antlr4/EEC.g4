@@ -50,19 +50,20 @@ literal:
 	SUB? IntegerLiteral ('L' | 'l')?
 	| SUB? FloatingPointLiteral;
 
-primary: '(' expr[0] ')';
-
-tuple: UnitLiteral | '(' expr[0] ',' expr[0] ')';
-
 qualId: Id ('.' Id)*;
 
 expr[int p]:
-	(literal | primary | prefixExpr | tuple) (
+	(literal | tuple | prefixExpr) (
 		// infixl infixr infix case
-{infix(_input.LT(1).getText(), $p)}? op = operator expr[nextp($op.text)] {notInfixNoAssoc($op.text)}?
+		{infix(_input.LT(1).getText(), $p)}? op = operator expr[nextp($op.text)] {notInfixNoAssoc($op.text)
+			}?
 		// infix case, no assoc, stop trying to match more infix operator
-| {postfix(_input.LT(1).getText(), $p)}? operator // postfix case
+		| {postfix(_input.LT(1).getText(), $p)}? operator // postfix case
 	)*;
+
+tuple: '(' exprs? ')';
+
+exprs: expr[0] (',' expr[0])*;
 
 operator: SUB | OPERATOR;
 
@@ -91,6 +92,7 @@ translationUnit: (moduleInfo Sep?)* topStatSeq Sep statSeq Sep?;
 
 FIXITY: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
 ASSIGN: '=';
+DASHES: '--';
 SUB: '-';
 OPERATOR: Op;
 
@@ -105,14 +107,15 @@ FloatingPointLiteral:
 	| Digit ExponentPart FloatType?
 	| Digit+ ExponentPart? FloatType;
 
-UnitLiteral: '()';
+Varid: Lower Idrest;
 
 fragment WhiteSpace: '\u0020' | '\u0009' | '\u000D' | '\u000A';
 
-fragment Op: '/' | ('/'? Opchar+);
+fragment Op: Opchar+;
 
 fragment Opchar:
 	'!'
+	| '/'
 	| '#'
 	| '%'
 	| '&'
@@ -679,10 +682,8 @@ NL: '\n';
 
 NEWLINE: NL+ -> skip;
 
-
 WS: WhiteSpace+ -> skip;
 
+COMMENT: '{-|' .*? '-}' -> skip;
 
-COMMENT: '/*' .*? '*/' -> skip;
-
-LINE_COMMENT: '//' (~[\r\n])* -> skip;
+LINE_COMMENT: DASHES (~[\r\n])* -> skip;

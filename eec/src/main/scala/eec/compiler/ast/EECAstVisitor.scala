@@ -67,18 +67,18 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
           }
     }
 
-  override def visitPrimary
-    (ctx: EECParser.PrimaryContext): Expression =
-      visitExpr(ctx.expr)
-
   override def visitTuple
     (ctx: EECParser.TupleContext): TupleExpr =
-      Option(ctx.UnitLiteral)
-        .map(_ => TupleExpr(Vector()))
+      Option(ctx.exprs)
+        .map(visitExprs)
+        .map(TupleExpr)
         .getOrElse {
-          TupleExpr(
-            ctx.expr.toVector.map[Expression, Vector[Expression]](visitExpr))
+          eecUnit
         }
+
+  override def visitExprs
+    (ctx: EECParser.ExprsContext): Vector[Expression] =
+      ctx.expr.toVector.map[Expression, Vector[Expression]](visitExpr)
 
   override def visitQualId
     (ctx: EECParser.QualIdContext): String =
@@ -88,9 +88,8 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
     (ctx: EECParser.ExprContext): Expression = {
       val first =
         Option(ctx.literal).map[Expressions](visitLiteral)
-          .orElse[Expressions] { Option(ctx.primary).map(visitPrimary) }
-          .orElse[Expressions] { Option(ctx.prefixExpr).map(visitPrefixExpr) }
           .orElse[Expressions] { Option(ctx.tuple).map(visitTuple) }
+          .orElse[Expressions] { Option(ctx.prefixExpr).map(visitPrefixExpr) }
       val start: Int = first.fold(0)(_ => 1)
       val exprs =
         ctx.children.toList.foldLeft(Nil: List[Expressions]) { (acc, o) =>
@@ -103,6 +102,7 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
         case List(l: Literals) => l
         case List(p: PrefixExpr) => p
         case List(e: Expr) => e
+        case List(TupleExpr(Vector(p: Expression))) => p
         case List(t: TupleExpr) => t
         case _ => Expr(exprs)
       }
