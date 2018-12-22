@@ -2,6 +2,7 @@ grammar EEC;
 
 @header {
 import java.util.*;
+import org.antlr.v4.runtime.tree.TerminalNode;
 }
 
 @members {
@@ -19,11 +20,12 @@ public int nextp (String op) {
 	return 0;
 }
 
-public void updateFix(String f, int p, Iterable<Token> op) {
-	for (Token t: op) {
-		fmap.put(t.getText(), f);
-		pmap.put(t.getText(), p);
-		System.out.println (String.format("Putting %s as %s %d", t.getText(), f, p));
+public void updateFix(String f, int p, Iterable<EECParser.OperatorContext> op) {
+	for (EECParser.OperatorContext ctx: op) {
+		String t = ctx.getText();
+		fmap.put(t, f);
+		pmap.put(t, p);
+		System.out.println (String.format("Putting %s as %s %d", t, f, p));
 	}
 }
 
@@ -48,12 +50,16 @@ public boolean notInfixNoAssoc(String op) {
 
 literal:
 	SUB? IntegerLiteral ('L' | 'l')?
-	| SUB? FloatingPointLiteral;
+	| SUB? FloatingPointLiteral
+	| Varid;
 
 qualId: Id ('.' Id)*;
 
 expr[int p]:
-	(literal | tuple | prefixExpr) (
+	let
+	| application
+	| lambda
+	| (literal | tuple | prefixExpr) (
 		// infixl infixr infix case
 		{infix(_input.LT(1).getText(), $p)}? op = operator expr[nextp($op.text)] {notInfixNoAssoc($op.text)
 			}?
@@ -61,18 +67,25 @@ expr[int p]:
 		| {postfix(_input.LT(1).getText(), $p)}? operator // postfix case
 	)*;
 
+let:
+	'let !' Varid 'be' expr[0] 'in' expr[0] ;
+
+application: Varid '(' exprs ')';
+
+lambda: '\\' Varid Varid* '->' expr[0];
+
 tuple: '(' exprs? ')';
 
 exprs: expr[0] (',' expr[0])*;
 
-operator: SUB | OPERATOR;
+operator: LAMBDA | SUB | OPERATOR;
 
 // atom expr
 prefixExpr:
-	{prefix(_input.LT(1).getText())}? op = OPERATOR expr[nextp($op.text)];
+{prefix(_input.LT(1).getText())}? op = operator expr[nextp($op.text)];
 
 fixity:
-	f = FIXITY p = IntegerLiteral op += (SUB | OPERATOR) (',' op += (SUB | OPERATOR))* {updateFix($f.text, $p.int, $op);};
+	f = FIXITY p = IntegerLiteral op += operator (',' op += operator)* {updateFix($f.text, $p.int, $op);};
 
 moduleInfo: 'module' qualId;
 
@@ -94,7 +107,10 @@ FIXITY: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
 ASSIGN: '=';
 DASHES: '--';
 SUB: '-';
+LAMBDA: '\\';
 OPERATOR: Op;
+
+Varid: Lower Idrest;
 
 Id:
 	Plainid;
@@ -106,8 +122,6 @@ FloatingPointLiteral:
 	| '.' Digit+ ExponentPart? FloatType?
 	| Digit ExponentPart FloatType?
 	| Digit+ ExponentPart? FloatType;
-
-Varid: Lower Idrest;
 
 fragment WhiteSpace: '\u0020' | '\u0009' | '\u000D' | '\u000A';
 
@@ -126,6 +140,7 @@ fragment Opchar:
 	| '<'
 	| '='
 	| '>'
+	| '$'
 	| '?'
 	| '@'
 	| '\\'
@@ -135,13 +150,11 @@ fragment Opchar:
 
 fragment Idrest: (Letter | Digit)* ('_' Op)?;
 
-// LongType: 'L' | 'l';
-
 fragment FloatType
    : 'F' | 'f' | 'D' | 'd'
    ;
 
-fragment Upper: 'A' .. 'Z' | '$' | '_' | UnicodeClass_LU;
+fragment Upper: 'A' .. 'Z' | '_' | UnicodeClass_LU;
 
 fragment Lower: 'a' .. 'z' | UnicodeClass_LL;
 
@@ -684,6 +697,6 @@ NEWLINE: NL+ -> skip;
 
 WS: WhiteSpace+ -> skip;
 
-COMMENT: '{-|' .*? '-}' -> skip;
+COMMENT: '{-|' .*? '-}' Sep? -> skip;
 
-LINE_COMMENT: DASHES (~[\r\n])* -> skip;
+LINE_COMMENT: DASHES (~[\r\n])* Sep? -> skip;

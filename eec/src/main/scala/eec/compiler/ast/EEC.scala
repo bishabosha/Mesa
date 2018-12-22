@@ -8,9 +8,9 @@ object EEC {
   type Ast = (List[ModuleInfo], List[TopStatement], List[Statement])
   type TopStatement = FixityStatement
   type Statement = Expression
-  type Expression = Literals | PrefixExpr | TupleExpr | Expr
+  type Expression = Literals | PrefixExpr | TupleExpr | Expr | Let | Application | Lambda
   type Expressions = Statement | Operator
-  type Literals = IntegerLiteral | LongLiteral | FloatLiteral | DoubleLiteral
+  type Literals = IntegerLiteral | LongLiteral | FloatLiteral | DoubleLiteral | Ident
   val eecUnit = TupleExpr(Vector())
 }
 
@@ -18,6 +18,10 @@ enum Fixity {
   case Infixl, Infixr, Infix, Postfix, Prefix
 }
 
+case class Let(exp: Ident, be: Expression, in: Expression)
+case class Application(exp: Ident, args: List[Expression])
+case class Lambda(args: List[Ident], expr: Expression)
+case class Ident(name: String)
 case class TupleExpr(exprs: Vector[Expression])
 case class FixityStatement(fixity: Fixity, strength: Int, ops: Vector[Operator])
 case class IntegerLiteral(value: Int)

@@ -20,8 +20,13 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
                               ctx,
                               ctx.getText.last.toUpper == 'L')
         }
+        .orElse[Literals] {
+          Option(ctx.FloatingPointLiteral).map { _ =>
+            visitFloatingPointLiteral(Option(ctx.SUB).isDefined, ctx)
+          }
+        }
         .getOrElse {
-          visitFloatingPointLiteral(Option(ctx.SUB).isDefined, ctx)
+          Ident(ctx.Varid.getText)
         }
 
   def visitIntegerLiteral
@@ -71,20 +76,47 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
     (ctx: EECParser.TupleContext): TupleExpr =
       Option(ctx.exprs)
         .map(visitExprs)
-        .map(TupleExpr)
+        .map(e => TupleExpr(e.toVector))
         .getOrElse {
           eecUnit
         }
 
   override def visitExprs
-    (ctx: EECParser.ExprsContext): Vector[Expression] =
-      ctx.expr.toVector.map[Expression, Vector[Expression]](visitExpr)
+    (ctx: EECParser.ExprsContext): Iterable[Expression] =
+      ctx.expr.view.map[Expression, Iterable[Expression]](visitExpr)
 
   override def visitQualId
     (ctx: EECParser.QualIdContext): String =
       ctx.children.map(_.getText).mkString
 
   override def visitExpr
+    (ctx: EECParser.ExprContext): Expression = {
+      Option(ctx.let)
+        .map[Expression](visitLet)
+        .orElse(Option(ctx.application).map(visitApplication))
+        .orElse(Option(ctx.lambda).map(visitLambda))
+        .getOrElse(visitExprMain(ctx))
+    }
+
+  override def visitLet
+    (ctx: EECParser.LetContext): Let = {
+      ctx.expr.map(visitExpr).toList match {
+        case List(be: Expression, in: Expression) =>
+          Let(Ident(ctx.Varid.getText), be, in)
+        case _ =>
+          throw UnexpectedInput(ctx.getText)
+      }
+    }
+
+  override def visitLambda
+    (ctx: EECParser.LambdaContext): Lambda =
+      Lambda(ctx.Varid.map(_.getText).map(Ident).toList, visitExpr(ctx.expr))
+
+  override def visitApplication
+    (ctx: EECParser.ApplicationContext): Application =
+      Application(Ident(ctx.Varid.getText), visitExprs(ctx.exprs).toList)
+
+  def visitExprMain
     (ctx: EECParser.ExprContext): Expression = {
       val first =
         Option(ctx.literal).map[Expressions](visitLiteral)
@@ -109,11 +141,11 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
     }
 
   override def visitOperator(ctx: EECParser.OperatorContext): Operator =
-    Operator(Option(ctx.OPERATOR).getOrElse(ctx.SUB).getText)
+    Operator(ctx.getText)
 
   override def visitPrefixExpr
     (ctx: EECParser.PrefixExprContext): PrefixExpr =
-      PrefixExpr(Operator(ctx.OPERATOR.getText), visitExpr(ctx.expr))
+      PrefixExpr(visitOperator(ctx.operator), visitExpr(ctx.expr))
 
   override def visitFixity
     (ctx: EECParser.FixityContext): FixityStatement = {
@@ -125,7 +157,7 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
         case "infixr"   => Infixr
         case "postfix"  => Postfix
       }
-      val ops = (ctx.OPERATOR ++ ctx.SUB).toVector.map(o => Operator(o.getText))
+      val ops = ctx.operator.toVector.map(visitOperator)
       FixityStatement(fixity, strength, ops)
     }
 
