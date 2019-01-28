@@ -20,13 +20,8 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
                               ctx,
                               ctx.getText.last.toUpper == 'L')
         }
-        .orElse[Literals] {
-          Option(ctx.FloatingPointLiteral).map { _ =>
-            visitFloatingPointLiteral(Option(ctx.SUB).isDefined, ctx)
-          }
-        }
-        .getOrElse {
-          Ident(ctx.Varid.getText)
+        .getOrElse[Literals] {
+          visitFloatingPointLiteral(Option(ctx.SUB).isDefined, ctx)
         }
 
   def visitIntegerLiteral
@@ -86,8 +81,8 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
       ctx.expr.view.map[Expression, Iterable[Expression]](visitExpr)
 
   override def visitQualId
-    (ctx: EECParser.QualIdContext): String =
-      ctx.children.map(_.getText).mkString
+    (ctx: EECParser.QualIdContext): List[String] =
+      ctx.children.map(_.getText).filterNot(_ == ".").toList
 
   override def visitExpr
     (ctx: EECParser.ExprContext): Expression = {
@@ -95,14 +90,18 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
         .map[Expression](visitLet)
         .orElse(Option(ctx.application).map(visitApplication))
         .orElse(Option(ctx.lambda).map(visitLambda))
+        .orElse(Option(ctx.stableId).map(t => Ident(visitStableId(t))))
         .getOrElse(visitExprMain(ctx))
     }
+
+  override def visitStableId
+    (ctx: EECParser.StableIdContext): String = ctx.getText
 
   override def visitLet
     (ctx: EECParser.LetContext): Let = {
       ctx.expr.map(visitExpr).toList match {
         case List(be: Expression, in: Expression) =>
-          Let(Ident(ctx.Varid.getText), be, in)
+          Let(Ident(ctx.stableId.getText), be, in)
         case _ =>
           throw UnexpectedInput(ctx.getText)
       }
@@ -110,11 +109,11 @@ object EECAstVisitor extends EECBaseVisitor[Any] {
 
   override def visitLambda
     (ctx: EECParser.LambdaContext): Lambda =
-      Lambda(ctx.Varid.map(_.getText).map(Ident).toList, visitExpr(ctx.expr))
+      Lambda(ctx.stableId.map(_.getText).map(Ident).toList, visitExpr(ctx.expr))
 
   override def visitApplication
     (ctx: EECParser.ApplicationContext): Application =
-      Application(Ident(ctx.Varid.getText), visitExprs(ctx.exprs).toList)
+      Application(Ident(ctx.stableId.getText), visitExprs(ctx.exprs).toList)
 
   def visitExprMain
     (ctx: EECParser.ExprContext): Expression = {

@@ -1,52 +1,4 @@
-grammar EEC;
-
-@header {
-import java.util.*;
-import org.antlr.v4.runtime.tree.TerminalNode;
-}
-
-@members {
-Map<String, String> fmap = new HashMap<>();
-Map<String, Integer> pmap = new HashMap<>();
-
-public int nextp (String op) {
-	String fix = fmap.get(op);
-	Integer p = pmap.get(op);
-	if (fix.equals("infixr")) return p;
-	if (fix.equals("infixl")) return p+1;
-	if (fix.equals("prefix")) return p;
-	if (fix.equals("postfix")) return p+1;
-	if (fix.equals("infix")) return p+1;
-	return 0;
-}
-
-public void updateFix(String f, int p, Iterable<EECParser.OperatorContext> op) {
-	for (EECParser.OperatorContext ctx: op) {
-		String t = ctx.getText();
-		fmap.put(t, f);
-		pmap.put(t, p);
-		System.out.println (String.format("Putting %s as %s %d", t, f, p));
-	}
-}
-
-public boolean prefix(String text) {
-	return fmap.get(text).equals("prefix");
-}
-
-public boolean postfix(String text, int p) {
-	return fmap.get(text).equals("postfix")
-		&& pmap.get(text) >= p;
-}
-
-public boolean infix(String text, int p) {
-	return fmap.get(text).contains("infix")
-		&& pmap.get(text) >= p;
-}
-
-public boolean notInfixNoAssoc(String op) {
-	return !fmap.get(op).equals("infix");
-}
-}
+grammar EEC2;
 
 literal:
 	SUB? IntegerLiteral ('L' | 'l')?
@@ -54,64 +6,80 @@ literal:
 
 qualId: Id ('.' Id)*;
 
-stableId: Id;
-
-expr[int p]:
-	let
-	| application
-	| lambda
-	| (literal | stableId | tuple | prefixExpr) (
-		// infixl infixr infix case
-		{infix(_input.LT(1).getText(), $p)}? op = operator expr[nextp($op.text)] {notInfixNoAssoc($op.text)
-			}?
-		// infix case, no assoc, stop trying to match more infix operator
-		| {postfix(_input.LT(1).getText(), $p)}? operator // postfix case
-	)*;
-
-let: 'let !' stableId '=' expr[0] 'in' expr[0] ;
-
-application: stableId '(' exprs? ')';
-
-lambda: '\\' stableId stableId* '->' expr[0];
-
-tuple: '(' exprs? ')';
-
-exprs: expr[0] (',' expr[0])*;
-
 operator: LAMBDA | SUB | OPERATOR;
 
-// atom expr
-prefixExpr:
-{prefix(_input.LT(1).getText())}? op = operator expr[nextp($op.text)];
+fixity: FIXITY IntegerLiteral operator (',' operator)*;
 
-fixity:
-	f = FIXITY p = IntegerLiteral op += operator (',' op += operator)* {updateFix($f.text, $p.int, $op);};
+type
+    :  funArgTypes '=>' type                 //      Function(ts, t)
+    |  infixType
+    ;
+
+funArgTypes
+    :  infixType
+    |  '(' (funArgType (',' funArgType)*)? ')'
+    ;
+
+funArgType
+    :  type
+    |  type '=>' type                                        //        PrefixOp(=>, t)
+    ;
+
+infixType
+    :   prefixType
+    |   infixType ('&' infixType)+       //                 InfixOp(t1, op, t2)
+    ;
+
+prefixType
+    :   simpleType
+    |   compType
+    ;
+
+compType
+    :   '!' simpleType
+    |   '!' '(' type ')'
+    ;
+
+simpleType
+    : qualId
+    | '1'
+    ;
+
+ascription
+    :  ':' type
+    ;
 
 moduleInfo: 'module' qualId;
 
 topStatSeq: topStat (Sep topStat)*;
 
-statSeq: stat (Sep stat)*;
-
 topStat: fixity;
 
-stat: expr[0];
+//statSeq: stat (Sep stat)*;
 
-translationUnit: Sep? moduleInfo Sep? (topStatSeq Sep?)? (statSeq Sep?)?;
+//stat: expr;
+
+translationUnit:
+	Sep? moduleInfo Sep? (topStatSeq Sep?)? ; //(statSeq Sep?)?;
 
 //
 // Lexer Defs
+// 
 //
 
-FIXITY: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
+FIXITY:
+	'infix'
+	| 'infixl'
+	| 'infixr'
+	| 'prefix'
+	| 'postfix';
 ASSIGN: '=';
 DASHES: '--';
 SUB: '-';
 LAMBDA: '\\';
 OPERATOR: Op;
 
-Id:
-	Plainid;
+Id: Plainid;
 
 IntegerLiteral: DecimalNumeral;
 
@@ -121,7 +89,11 @@ FloatingPointLiteral:
 	| Digit ExponentPart FloatType?
 	| Digit+ ExponentPart? FloatType;
 
-fragment WhiteSpace: '\u0020' | '\u0009' | '\u000D' | '\u000A';
+fragment WhiteSpace:
+	'\u0020'
+	| '\u0009'
+	| '\u000D'
+	| '\u000A';
 
 fragment Op: Opchar+;
 
@@ -148,9 +120,7 @@ fragment Opchar:
 
 fragment Idrest: (Letter | Digit)* ('_' Op)?;
 
-fragment FloatType
-   : 'F' | 'f' | 'D' | 'd'
-   ;
+fragment FloatType: 'F' | 'f' | 'D' | 'd';
 
 fragment Upper: 'A' .. 'Z' | '_' | UnicodeClass_LU;
 
@@ -160,8 +130,7 @@ fragment Letter:
 	Upper
 	| Lower
 	| UnicodeClass_LO
-	| UnicodeClass_LT // TODO Add category Nl
-	;
+	| UnicodeClass_LT ; // TODO Add category Nl
 
 fragment ExponentPart: ('E' | 'e') ('+' | '-')? Digit+;
 
@@ -174,7 +143,9 @@ fragment NonZeroDigit: '1' .. '9';
 fragment Plainid: Lower+ | Upper Idrest | Lower Idrest | Op;
 
 //
-// Unicode categories https://github.com/antlr/grammars-v4/blob/master/stringtemplate/LexUnicode.g4
+// Unicode categories
+// https://github.com/antlr/grammars-v4/blob/master/stringtemplate/LexUnicode.g4
+// 
 //
 
 fragment UnicodeClass_LU:
@@ -684,6 +655,8 @@ fragment UnicodeClass_LO:
 
 //
 // Whitespace and comments
+// 
+//
 // 
 //
 

@@ -11,7 +11,7 @@ object Main {
     } else if args.contains("-e") && !args.contains("-a") then {
       new EECRepl().loop
     } else {
-      println("No option specified. See options with -help")
+      println("No valid option specified. See options with -help")
     }
   }
 }
