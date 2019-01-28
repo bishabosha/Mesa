@@ -1,53 +1,101 @@
 grammar EEC2;
 
-literal:
-	SUB? IntegerLiteral ('L' | 'l')?
-	| SUB? FloatingPointLiteral;
+simpleLiteral:
+	Sub? IntegerLiteral
+	| Sub? FloatingPointLiteral
+	| BooleanLiteral
+	| CharacterLiteral
+	| StringLiteral;
+
+literal: simpleLiteral;
 
 qualId: Id ('.' Id)*;
 
-operator: LAMBDA | SUB | OPERATOR;
+stableId: Id | Id '.' Id;
 
-fixity: FIXITY IntegerLiteral operator (',' operator)*;
+operator: OpId;
 
-type
-    :  funArgTypes '=>' type                 //      Function(ts, t)
-    |  infixType
-    ;
+// -- Types
 
-funArgTypes
-    :  infixType
-    |  '(' (funArgType (',' funArgType)*)? ')'
-    ;
+type:
+	infixType '->' type //      Function(ts, t)
+	| infixType;
 
-funArgType
-    :  type
-    |  type '=>' type                                        //        PrefixOp(=>, t)
-    ;
+infixType:
+	prefixType
+	| productType
+	;
 
-infixType
-    :   prefixType
-    |   infixType ('&' infixType)+       //                 InfixOp(t1, op, t2)
-    ;
+productType: '(' type ',' type ')' | '()';
 
-prefixType
-    :   simpleType
-    |   compType
-    ;
+prefixType: simpleType | Bang type;
 
-compType
-    :   '!' simpleType
-    |   '!' '(' type ')'
-    ;
+simpleType: qualId | '(' type ')';
 
-simpleType
-    : qualId
-    | '1'
-    ;
+ascription: ':' type;
 
-ascription
-    :  ':' type
-    ;
+// -- Expressions
+
+expr
+   : lambda
+   | expr1
+   ;
+
+lambda: '\\' bindings '->' expr;
+
+expr1
+   : 'if' expr 'then' expr 'else' expr
+   | infixExpr ascription
+   | infixExpr
+   ;
+
+infixExpr
+   : prefixExpr
+   | infixExpr (Sub | Id) infixExpr
+   ;
+
+prefixExpr
+   : OpId? simpleExpr1
+   ;
+
+simpleExpr1
+   : literal
+   | stableId
+//   | simpleExpr1 '.' Id  // nice for records
+//   | '_'
+   | '(' exprs? ')'
+   | simpleExpr1 argumentExprs
+   ;
+
+exprs
+   : expr (',' expr)*
+   ;
+
+argumentExprs
+   : '(' exprs? ')'
+   | '(' (exprs ',')? infixExpr ':' '_' '*' ')'
+   ;
+
+bindings
+   : bindingsInferred
+   | bindingsTagged
+   ;
+
+bindingsInferred
+   : Id (',' Id)*
+   ;
+
+bindingsTagged
+   : binding (',' binding)*
+   ;
+
+binding
+   : Id ':' type
+   ;
+
+// -- Decls
+
+fixity: Fixity IntegerLiteral operator (',' operator)*;
 
 moduleInfo: 'module' qualId;
 
@@ -55,47 +103,52 @@ topStatSeq: topStat (Sep topStat)*;
 
 topStat: fixity;
 
-//statSeq: stat (Sep stat)*;
+statSeq: stat (Sep stat)*;
 
-//stat: expr;
+stat: expr;
 
 translationUnit:
-	Sep? moduleInfo Sep? (topStatSeq Sep?)? ; //(statSeq Sep?)?;
+	Sep? moduleInfo Sep? (topStatSeq Sep?)? (statSeq Sep?)?;
 
 //
 // Lexer Defs
-// 
 //
 
-FIXITY:
-	'infix'
-	| 'infixl'
-	| 'infixr'
-	| 'prefix'
-	| 'postfix';
-ASSIGN: '=';
-DASHES: '--';
-SUB: '-';
-LAMBDA: '\\';
-OPERATOR: Op;
+Fixity: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
+//ASSIGN: '=';
+Dashes: '--';
+Bang: '!';
+Sub: '-';
 
 Id: Plainid;
+OpId: Op;
 
-IntegerLiteral: DecimalNumeral;
+BooleanLiteral: 'true' | 'false';
+
+CharacterLiteral: '\'' (PrintableChar | CharEscapeSeq) '\'';
+
+IntegerLiteral: Sub? (DecimalNumeral /*| HexNumeral*/) ('L' | 'l')?;
+
+StringLiteral:
+	'"' StringElement* '"'
+	| '"""' MultiLineChars '"""';
 
 FloatingPointLiteral:
 	Digit+ '.' Digit+ ExponentPart? FloatType?
 	| '.' Digit+ ExponentPart? FloatType?
-	| Digit ExponentPart FloatType?
+	| Digit+ ExponentPart FloatType?
 	| Digit+ ExponentPart? FloatType;
 
-fragment WhiteSpace:
-	'\u0020'
-	| '\u0009'
-	| '\u000D'
-	| '\u000A';
+Varid: Lower Idrest;
 
-fragment Op: Opchar+;
+fragment CharNoBackQuoteOrNewline:
+	'\u0020' .. '\u0026'
+	| '\u0028' .. '\u007E';
+
+fragment UnicodeEscape:
+	'\\' 'u' 'u'? HexDigit HexDigit HexDigit HexDigit;
+
+fragment WhiteSpace: '\u0020' | '\u0009' | '\u000D' | '\u000A';
 
 fragment Opchar:
 	'!'
@@ -110,7 +163,6 @@ fragment Opchar:
 	| '<'
 	| '='
 	| '>'
-	| '$'
 	| '?'
 	| '@'
 	| '\\'
@@ -118,11 +170,25 @@ fragment Opchar:
 	| '|'
 	| '~';
 
+fragment Op: '-' | Opchar+;
+
 fragment Idrest: (Letter | Digit)* ('_' Op)?;
+
+fragment StringElement:
+	'\u0020'
+	| '\u0021'
+	| '\u0023' .. '\u005B'
+	| '\u005D' .. '\u007F'
+	| UnicodeEscape
+	| CharEscapeSeq;
+
+fragment MultiLineChars: ('"'? '"'? ~'"')* '"'*;
+
+fragment HexDigit: '0' .. '9' | 'A' .. 'F' | 'a' .. 'f';
 
 fragment FloatType: 'F' | 'f' | 'D' | 'd';
 
-fragment Upper: 'A' .. 'Z' | '_' | UnicodeClass_LU;
+fragment Upper: 'A' .. 'Z' | '$' | '_' | UnicodeClass_LU;
 
 fragment Lower: 'a' .. 'z' | UnicodeClass_LL;
 
@@ -134,19 +200,22 @@ fragment Letter:
 
 fragment ExponentPart: ('E' | 'e') ('+' | '-')? Digit+;
 
+fragment PrintableChar: '\u0020' .. '\u007F';
+
+fragment CharEscapeSeq:
+	'\\' ('b' | 't' | 'n' | 'f' | 'r' | '"' | '\'' | '\\');
+
 fragment DecimalNumeral: '0' | NonZeroDigit Digit*;
+
+//fragment HexNumeral: '0' ('x' | 'X') HexDigit+;
 
 fragment Digit: '0' | NonZeroDigit;
 
 fragment NonZeroDigit: '1' .. '9';
 
-fragment Plainid: Lower+ | Upper Idrest | Lower Idrest | Op;
+fragment Alphaid: Upper Idrest | Varid;
 
-//
-// Unicode categories
-// https://github.com/antlr/grammars-v4/blob/master/stringtemplate/LexUnicode.g4
-// 
-//
+fragment Plainid: Alphaid | Op;
 
 fragment UnicodeClass_LU:
 	'\u0041' ..'\u005a'
@@ -653,11 +722,16 @@ fragment UnicodeClass_LO:
 	| '\uffd2' ..'\uffd7'
 	| '\uffda' ..'\uffdc';
 
+fragment UnicodeClass_NL:
+	'\u16ee' ..'\u16f0'
+	| '\u2160' ..'\u2188'
+	| '\u3007'
+	| '\u3021' ..'\u3029'
+	| '\u3038' ..'\u303a'
+	| '\ua6e6' ..'\ua6ef';
+
 //
 // Whitespace and comments
-// 
-//
-// 
 //
 
 Sep: (Semi | NL)+;
@@ -670,4 +744,4 @@ WS: WhiteSpace+ -> skip;
 
 COMMENT: '{-|' .*? '-}' Sep? -> skip;
 
-LINE_COMMENT: DASHES (~[\r\n])* Sep? -> skip;
+LINE_COMMENT: Dashes (~[\r\n])* Sep? -> skip;

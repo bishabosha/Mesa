@@ -128,9 +128,11 @@ ascription
    ;
 
 expr
-   : (bindings | 'implicit'? Id | '_') '=>' expr
+   : funParams '=>' expr
    | expr1
    ;
+
+funParams:  bindings | Id | '_';
 
 expr1
    : 'if' '(' expr ')' expr (Semi? 'else' expr)?
@@ -631,7 +633,7 @@ fragment StringElement
 
 
 fragment MultiLineChars
-   : ('"'? '"'? .*?)* '"'*
+   : ('"' '"' ~'"')* '"'*
    ;
 
 

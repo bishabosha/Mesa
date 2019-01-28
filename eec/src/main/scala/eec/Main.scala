@@ -1,6 +1,9 @@
 package eec
 
 object Main {
+
+  val a = 0
+
   def main(args: Array[String]): Unit = {
     import eec.repl.EECRepl
     if args.length == 1 && args(0) == "-help" then {
