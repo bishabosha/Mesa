@@ -1,3 +1,19 @@
-module foo
+module Prelude
 
-\x: Bool, b: Bool -> if x then x else y
+\x: Bool, b: Bool => if x then x else y
+
+(fst((0,"")), snd((0,""))) == (0,"")
+
+\f: A -> B, x: !A => let !y = x in f(y)
+
+\p: (A, B) => let !n = !p in
+    \x: Z => case n of
+        !a if a > 3 => a
+        (a, b) | _ if true => c
+        x => 3
+
+fst p: (a, b) -> a = case p of
+    (a, _) => a
+    
+snd p: (a, b) -> a = case p of
+    (_, b) => b

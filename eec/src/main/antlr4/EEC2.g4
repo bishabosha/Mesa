@@ -1,24 +1,28 @@
 grammar EEC2;
 
-simpleLiteral:
-	Sub? IntegerLiteral
-	| Sub? FloatingPointLiteral
-	| BooleanLiteral
-	| CharacterLiteral
-	| StringLiteral;
+literal:
+    IntegerLiteral
+    | FloatingPointLiteral
+    | BooleanLiteral
+    | CharacterLiteral
+    | StringLiteral;
 
-literal: simpleLiteral;
+id: alphaId | OpId;
 
-qualId: Id ('.' Id)*;
+alphaId: Patid | Varid;
 
-stableId: Id | Id '.' Id;
+qualId: id ('.' id)*;
+
+stableId: id | id '.' id;
 
 operator: OpId;
 
+//
 // -- Types
+//
 
 type:
-	infixType '->' type //      Function(ts, t)
+	infixType '->' type  // Function(ts, t)
 	| infixType;
 
 infixType:
@@ -34,14 +38,22 @@ simpleType: qualId | '(' type ')';
 
 ascription: ':' type;
 
+//
 // -- Expressions
+//
 
 expr
    : lambda
+   | let
+   | caseExpr
    | expr1
    ;
 
-lambda: '\\' bindings '->' expr;
+lambda: '\\' bindings '=>' expr;
+
+let: 'let' '!' Varid '=' expr 'in' expr;
+
+caseExpr: 'case' expr 'of' cases;
 
 expr1
    : 'if' expr 'then' expr 'else' expr
@@ -51,49 +63,116 @@ expr1
 
 infixExpr
    : prefixExpr
-   | infixExpr (Sub | Id) infixExpr
+   | infixExpr (OpId | '`' alphaId '`') infixExpr
    ;
 
-prefixExpr
-   : OpId? simpleExpr1
-   ;
+prefixExpr:
+    '!'? simpleExpr;
 
-simpleExpr1
+simpleExpr
    : literal
    | stableId
 //   | simpleExpr1 '.' Id  // nice for records
 //   | '_'
-   | '(' exprs? ')'
-   | simpleExpr1 argumentExprs
+   | exprsInParens
+   | simpleExpr argumentExpr
    ;
 
-exprs
-   : expr (',' expr)*
+cases: case+;
+
+case: pattern guard? '=>' expr;
+
+exprsInParens: '(' (expr (',' expr)?)? ')' | '()';
+
+argumentExpr
+   : '()'
+   | '(' expr? ')'
    ;
 
-argumentExprs
-   : '(' exprs? ')'
-   | '(' (exprs ',')? infixExpr ':' '_' '*' ')'
+//
+// -- Patterns
+//
+
+pattern
+   : pattern1 ('|' pattern1)*
    ;
+
+pattern1
+//   : Varid ':' typePat
+//   | '_' ':' typePat
+   : pattern2
+   ;
+
+pattern2
+   : Varid ('@' pattern3)?
+   | pattern3
+   ;
+
+pattern3
+   : simplePattern
+//   | simplePattern (id simplePattern)* // no infix patterns yet
+   ;
+
+simplePattern
+   : '_'
+   | Varid
+   | literal
+   | '!' simplePattern
+//   | stableId ('(' patterns? ')')?
+//   | stableId '(' (patterns? ',')? (Varid '@')? '_' '*' ')'
+   | '(' upToPairPatten? ')'
+   | '()'
+   ;
+
+upToPairPatten
+   : pattern (',' pattern)?
+   ;
+
+guard
+   : 'if' infixExpr
+   ;
+
+//
+// -- Bindings and imports
+//
 
 bindings
-   : bindingsInferred
-   | bindingsTagged
+//   : bindingsInferred
+   : bindingsTagged
    ;
 
-bindingsInferred
-   : Id (',' Id)*
-   ;
+//bindingsInferred
+//   : id (',' id)*
+//   ;
 
 bindingsTagged
    : binding (',' binding)*
    ;
 
 binding
-   : Id ':' type
+   : id ':' type
    ;
 
-// -- Decls
+//
+// -- Declarations and Definitions
+//
+
+//dcl: defDecl;
+
+def: defDef;
+
+//defDecl: defSig ':' type;     // still require type checking
+
+defDef: defSig (':' type)/*?*/ '=' expr;
+
+defSig:
+    infixDefSig
+    | Varid Varid*
+    ;
+
+infixDefSig:
+    Varid (OpId | '`' Varid '`') Varid
+    |  '(' OpId ')' Varid Varid;
 
 fixity: Fixity IntegerLiteral operator (',' operator)*;
 
@@ -103,9 +182,9 @@ topStatSeq: topStat (Sep topStat)*;
 
 topStat: fixity;
 
-statSeq: stat (Sep stat)*;
+statSeq: stat+;
 
-stat: expr;
+stat: def /*| dcl*/;
 
 translationUnit:
 	Sep? moduleInfo Sep? (topStatSeq Sep?)? (statSeq Sep?)?;
@@ -115,19 +194,19 @@ translationUnit:
 //
 
 Fixity: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
-//ASSIGN: '=';
 Dashes: '--';
 Bang: '!';
-Sub: '-';
-
-Id: Plainid;
-OpId: Op;
+Wildcard: '_';
 
 BooleanLiteral: 'true' | 'false';
 
+Patid: Upper Idrest;
+Varid: Lower Idrest;
+OpId: Op;
+
 CharacterLiteral: '\'' (PrintableChar | CharEscapeSeq) '\'';
 
-IntegerLiteral: Sub? (DecimalNumeral /*| HexNumeral*/) ('L' | 'l')?;
+IntegerLiteral: '-'? (DecimalNumeral /*| HexNumeral*/) ('L' | 'l')?;
 
 StringLiteral:
 	'"' StringElement* '"'
@@ -138,8 +217,6 @@ FloatingPointLiteral:
 	| '.' Digit+ ExponentPart? FloatType?
 	| Digit+ ExponentPart FloatType?
 	| Digit+ ExponentPart? FloatType;
-
-Varid: Lower Idrest;
 
 fragment CharNoBackQuoteOrNewline:
 	'\u0020' .. '\u0026'
@@ -212,10 +289,6 @@ fragment DecimalNumeral: '0' | NonZeroDigit Digit*;
 fragment Digit: '0' | NonZeroDigit;
 
 fragment NonZeroDigit: '1' .. '9';
-
-fragment Alphaid: Upper Idrest | Varid;
-
-fragment Plainid: Alphaid | Op;
 
 fragment UnicodeClass_LU:
 	'\u0041' ..'\u005a'

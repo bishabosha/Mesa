@@ -313,6 +313,8 @@ compilationUnit: ('package' qualId Sep?)* topStatSeq;
 
 // -- Lexer
 
+BooleanLiteral: 'true' | 'false';
+
 Id:
 	Plainid
 	| '`' (
@@ -321,7 +323,6 @@ Id:
 		| CharEscapeSeq
 	)+ '`';
 
-BooleanLiteral: 'true' | 'false';
 
 CharacterLiteral: '\'' (PrintableChar | CharEscapeSeq) '\'';
 
