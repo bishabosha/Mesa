@@ -15,7 +15,7 @@ qualId: id ('.' id)*;
 
 stableId: id | id '.' id;
 
-operator: OpId;
+operator: Bang | OpId;
 
 //
 // -- Types
@@ -78,7 +78,7 @@ simpleExpr
    | simpleExpr argumentExpr
    ;
 
-cases: case+;
+cases: case (Sep? case)*;
 
 case: pattern guard? '=>' expr;
 
@@ -157,13 +157,15 @@ binding
 // -- Declarations and Definitions
 //
 
-//dcl: defDecl;
+dcl: primitiveDcl;
+
+primitiveDcl: 'primitive' defDecl;
+
+defDecl: defSig ':' type; // still require type checking
 
 def: defDef;
 
-//defDecl: defSig ':' type;     // still require type checking
-
-defDef: defSig (':' type)/*?*/ '=' expr;
+defDef: defSig (':' type)/*?*/ '=' expr Sep?;
 
 defSig:
     infixDefSig
@@ -174,20 +176,20 @@ infixDefSig:
     Varid (OpId | '`' Varid '`') Varid
     |  '(' OpId ')' Varid Varid;
 
-fixity: Fixity IntegerLiteral operator (',' operator)*;
+//fixity: Fixity IntegerLiteral operator (',' operator)*;
 
-moduleInfo: 'module' qualId;
+packageInfo: 'package' qualId;
 
-topStatSeq: topStat (Sep topStat)*;
+//topStatSeq: topStat (Sep? topStat)*;
 
-topStat: fixity;
+//topStat: fixity;
 
-statSeq: stat+;
+statSeq: stat (Sep? stat)*;
 
-stat: def /*| dcl*/;
+stat: def | dcl;
 
 translationUnit:
-	Sep? moduleInfo Sep? (topStatSeq Sep?)? (statSeq Sep?)?;
+	Sep? packageInfo Sep? /*(topStatSeq Sep?)? */ (statSeq Sep?)?;
 
 //
 // Lexer Defs
@@ -198,7 +200,7 @@ Dashes: '--';
 Bang: '!';
 Wildcard: '_';
 
-BooleanLiteral: 'true' | 'false';
+BooleanLiteral: 'True' | 'False';
 
 Patid: Upper Idrest;
 Varid: Lower Idrest;

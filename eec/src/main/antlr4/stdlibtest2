@@ -1,6 +1,24 @@
-module Prelude
+package eec.Prelude
 
-\x: Bool, b: Bool => if x then x else y
+primitive a == b: a -> b -> Bool
+primitive x + y: Int -> Int -> Bool
+primitive x + y: Float -> Float -> Bool
+
+fst p: (a, b) -> a = case p of
+    (w, _) => w
+
+snd p: (a, b) -> a = case p of
+    (_, w) => w
+
+thrd t: (a, (b, c)) -> c = snd(snd(t))
+
+thrd t: ((a, b), c) -> c = snd(t)
+
+if_then_else: Bool -> a -> a -> a =
+    \cond: Bool, x: a, y: a => case cond of
+        True => x; False => y
+
+bool_ident c: () = if_then_else(c)(True)(False)
 
 (fst((0,"")), snd((0,""))) == (0,"")
 
