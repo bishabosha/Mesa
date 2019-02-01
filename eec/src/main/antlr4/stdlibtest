@@ -1,16 +1,37 @@
-module prelude
+package eec.Prelude
 
-prefix 10 !
-infixr 8 ^
-infixl 6 +, -
-infixl 7 *, %, /
-infix 4 ==
-infix 4 /=
-postfix 10 ?
-prefix 5 \, \\
+primitive a == b: a -> b -> Bool
+primitive x + y: Int -> Int -> Bool
+primitive x + y: Float -> Float -> Bool
 
-fst((1,2))
-let !a be 47 in \a b -> (!a, b)
-()
-! (- 1 + 2, - 8 l) - - 3.21f? ^ (5.9 + 2 * 11.2e+3 + 4)
-1
+fst p: (a, b) -> a = case p of
+    (w, _) => w
+
+snd p: (a, b) -> a = case p of
+    (_, w) => w
+
+thrd t: (a, (b, c)) -> c = snd(snd(t))
+
+thrd t: ((a, b), c) -> c = snd(t)
+
+if_then_else: Bool -> a -> a -> a =
+    \cond: Bool, x: a, y: a => case cond of
+        True => x; False => y
+
+bool_ident c: () = if_then_else(c)(True)(False)
+
+(fst((0,"")), snd((0,""))) == (0,"")
+
+\f: A -> B, x: !A => let !y = x in f(y)
+
+\p: (A, B) => let !n = !p in
+    \x: Z => case n of
+        !a if a > 3 => a
+        (a, b) | _ if true => c
+        x => 3
+
+fst p: (a, b) -> a = case p of
+    (a, _) => a
+    
+snd p: (a, b) -> a = case p of
+    (_, b) => b
