@@ -1,129 +1,233 @@
-grammar EEC;
-
-@header {
-import java.util.*;
-import org.antlr.v4.runtime.tree.TerminalNode;
-}
-
-@members {
-Map<String, String> fmap = new HashMap<>();
-Map<String, Integer> pmap = new HashMap<>();
-
-public int nextp (String op) {
-	String fix = fmap.get(op);
-	Integer p = pmap.get(op);
-	if (fix.equals("infixr")) return p;
-	if (fix.equals("infixl")) return p+1;
-	if (fix.equals("prefix")) return p;
-	if (fix.equals("postfix")) return p+1;
-	if (fix.equals("infix")) return p+1;
-	return 0;
-}
-
-public void updateFix(String f, int p, Iterable<EECParser.OperatorContext> op) {
-	for (EECParser.OperatorContext ctx: op) {
-		String t = ctx.getText();
-		fmap.put(t, f);
-		pmap.put(t, p);
-		System.out.println (String.format("Putting %s as %s %d", t, f, p));
-	}
-}
-
-public boolean prefix(String text) {
-	return fmap.get(text).equals("prefix");
-}
-
-public boolean postfix(String text, int p) {
-	return fmap.get(text).equals("postfix")
-		&& pmap.get(text) >= p;
-}
-
-public boolean infix(String text, int p) {
-	return fmap.get(text).contains("infix")
-		&& pmap.get(text) >= p;
-}
-
-public boolean notInfixNoAssoc(String op) {
-	return !fmap.get(op).equals("infix");
-}
-}
+grammar EEC2;
 
 literal:
-	SUB? IntegerLiteral ('L' | 'l')?
-	| SUB? FloatingPointLiteral;
+    IntegerLiteral
+    | FloatingPointLiteral
+    | BooleanLiteral
+    | CharacterLiteral
+    | StringLiteral;
 
-qualId: Id ('.' Id)*;
+id: alphaId | OpId;
 
-stableId: Id;
+alphaId: Patid | Varid;
 
-expr[int p]:
-	let
-	| application
-	| lambda
-	| (literal | stableId | tuple | prefixExpr) (
-		// infixl infixr infix case
-		{infix(_input.LT(1).getText(), $p)}? op = operator expr[nextp($op.text)] {notInfixNoAssoc($op.text)
-			}?
-		// infix case, no assoc, stop trying to match more infix operator
-		| {postfix(_input.LT(1).getText(), $p)}? operator // postfix case
-	)*;
+qualId: id ('.' id)*;
 
-let: 'let !' stableId '=' expr[0] 'in' expr[0] ;
+stableId: id | id '.' id;
 
-application: stableId '(' exprs? ')';
+operator: Bang | OpId;
 
-lambda: '\\' stableId stableId* '->' expr[0];
+//
+// -- Types
+//
 
-tuple: '(' exprs? ')';
+type:
+	infixType '->' type  // Function(ts, t)
+	| infixType;
 
-exprs: expr[0] (',' expr[0])*;
+infixType:
+	prefixType
+	| productType
+	;
 
-operator: LAMBDA | SUB | OPERATOR;
+productType: '(' type ',' type ')' | '()';
 
-// atom expr
+prefixType: simpleType | Bang type;
+
+simpleType: qualId | '(' type ')';
+
+ascription: ':' type;
+
+//
+// -- Expressions
+//
+
+expr
+   : lambda
+   | let
+   | caseExpr
+   | expr1
+   ;
+
+lambda: '\\' bindings '=>' expr;
+
+let: 'let' '!' Varid '=' expr 'in' expr;
+
+caseExpr: 'case' expr 'of' cases;
+
+expr1
+   : 'if' expr 'then' expr 'else' expr
+   | infixExpr ascription
+   | infixExpr
+   ;
+
+infixExpr
+   : prefixExpr
+   | infixExpr (OpId | '`' alphaId '`') infixExpr
+   ;
+
 prefixExpr:
-{prefix(_input.LT(1).getText())}? op = operator expr[nextp($op.text)];
+    '!'? simpleExpr;
 
-fixity:
-	f = FIXITY p = IntegerLiteral op += operator (',' op += operator)* {updateFix($f.text, $p.int, $op);};
+simpleExpr
+   : literal
+   | stableId
+//   | simpleExpr1 '.' Id  // nice for records
+//   | '_'
+   | exprsInParens
+   | simpleExpr argumentExpr
+   ;
 
-moduleInfo: 'module' qualId;
+cases: case (Sep? case)*;
 
-topStatSeq: topStat (Sep topStat)*;
+case: pattern guard? '=>' expr;
 
-statSeq: stat (Sep stat)*;
+exprsInParens: '(' (expr (',' expr)?)? ')' | '()';
 
-topStat: fixity;
+argumentExpr
+   : '()'
+   | '(' expr? ')'
+   ;
 
-stat: expr[0];
+//
+// -- Patterns
+//
 
-translationUnit: Sep? moduleInfo Sep? (topStatSeq Sep?)? (statSeq Sep?)?;
+pattern
+   : pattern1 ('|' pattern1)*
+   ;
+
+pattern1
+//   : Varid ':' typePat
+//   | '_' ':' typePat
+   : pattern2
+   ;
+
+pattern2
+   : Varid ('@' pattern3)?
+   | pattern3
+   ;
+
+pattern3
+   : simplePattern
+//   | simplePattern (id simplePattern)* // no infix patterns yet
+   ;
+
+simplePattern
+   : '_'
+   | Varid
+   | literal
+   | '!' simplePattern
+//   | stableId ('(' patterns? ')')?
+//   | stableId '(' (patterns? ',')? (Varid '@')? '_' '*' ')'
+   | '(' upToPairPatten? ')'
+   | '()'
+   ;
+
+upToPairPatten
+   : pattern (',' pattern)?
+   ;
+
+guard
+   : 'if' infixExpr
+   ;
+
+//
+// -- Bindings and imports
+//
+
+bindings
+//   : bindingsInferred
+   : bindingsTagged
+   ;
+
+//bindingsInferred
+//   : id (',' id)*
+//   ;
+
+bindingsTagged
+   : binding (',' binding)*
+   ;
+
+binding
+   : id ':' type
+   ;
+
+//
+// -- Declarations and Definitions
+//
+
+dcl: primitiveDcl;
+
+primitiveDcl: 'primitive' defDecl;
+
+defDecl: defSig ':' type; // still require type checking
+
+def: defDef;
+
+defDef: defSig (':' type)/*?*/ '=' expr Sep?;
+
+defSig:
+    infixDefSig
+    | Varid Varid*
+    ;
+
+infixDefSig:
+    Varid (OpId | '`' Varid '`') Varid
+    |  '(' OpId ')' Varid Varid;
+
+//fixity: Fixity IntegerLiteral operator (',' operator)*;
+
+packageInfo: 'package' qualId;
+
+//topStatSeq: topStat (Sep? topStat)*;
+
+//topStat: fixity;
+
+statSeq: stat (Sep? stat)*;
+
+stat: def | dcl;
+
+translationUnit:
+	Sep? packageInfo Sep? /*(topStatSeq Sep?)? */ (statSeq Sep?)?;
 
 //
 // Lexer Defs
 //
 
-FIXITY: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
-ASSIGN: '=';
-DASHES: '--';
-SUB: '-';
-LAMBDA: '\\';
-OPERATOR: Op;
+Fixity: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
+Dashes: '--';
+Bang: '!';
+Wildcard: '_';
 
-Id:
-	Plainid;
+BooleanLiteral: 'True' | 'False';
 
-IntegerLiteral: DecimalNumeral;
+Patid: Upper Idrest;
+Varid: Lower Idrest;
+OpId: Op;
+
+CharacterLiteral: '\'' (PrintableChar | CharEscapeSeq) '\'';
+
+IntegerLiteral: '-'? (DecimalNumeral /*| HexNumeral*/) ('L' | 'l')?;
+
+StringLiteral:
+	'"' StringElement* '"'
+	| '"""' MultiLineChars '"""';
 
 FloatingPointLiteral:
 	Digit+ '.' Digit+ ExponentPart? FloatType?
 	| '.' Digit+ ExponentPart? FloatType?
-	| Digit ExponentPart FloatType?
+	| Digit+ ExponentPart FloatType?
 	| Digit+ ExponentPart? FloatType;
 
-fragment WhiteSpace: '\u0020' | '\u0009' | '\u000D' | '\u000A';
+fragment CharNoBackQuoteOrNewline:
+	'\u0020' .. '\u0026'
+	| '\u0028' .. '\u007E';
 
-fragment Op: Opchar+;
+fragment UnicodeEscape:
+	'\\' 'u' 'u'? HexDigit HexDigit HexDigit HexDigit;
+
+fragment WhiteSpace: '\u0020' | '\u0009' | '\u000D' | '\u000A';
 
 fragment Opchar:
 	'!'
@@ -138,7 +242,6 @@ fragment Opchar:
 	| '<'
 	| '='
 	| '>'
-	| '$'
 	| '?'
 	| '@'
 	| '\\'
@@ -146,13 +249,25 @@ fragment Opchar:
 	| '|'
 	| '~';
 
+fragment Op: '-' | Opchar+;
+
 fragment Idrest: (Letter | Digit)* ('_' Op)?;
 
-fragment FloatType
-   : 'F' | 'f' | 'D' | 'd'
-   ;
+fragment StringElement:
+	'\u0020'
+	| '\u0021'
+	| '\u0023' .. '\u005B'
+	| '\u005D' .. '\u007F'
+	| UnicodeEscape
+	| CharEscapeSeq;
 
-fragment Upper: 'A' .. 'Z' | '_' | UnicodeClass_LU;
+fragment MultiLineChars: ('"'? '"'? ~'"')* '"'*;
+
+fragment HexDigit: '0' .. '9' | 'A' .. 'F' | 'a' .. 'f';
+
+fragment FloatType: 'F' | 'f' | 'D' | 'd';
+
+fragment Upper: 'A' .. 'Z' | '$' | '_' | UnicodeClass_LU;
 
 fragment Lower: 'a' .. 'z' | UnicodeClass_LL;
 
@@ -160,22 +275,22 @@ fragment Letter:
 	Upper
 	| Lower
 	| UnicodeClass_LO
-	| UnicodeClass_LT // TODO Add category Nl
-	;
+	| UnicodeClass_LT ; // TODO Add category Nl
 
 fragment ExponentPart: ('E' | 'e') ('+' | '-')? Digit+;
 
+fragment PrintableChar: '\u0020' .. '\u007F';
+
+fragment CharEscapeSeq:
+	'\\' ('b' | 't' | 'n' | 'f' | 'r' | '"' | '\'' | '\\');
+
 fragment DecimalNumeral: '0' | NonZeroDigit Digit*;
+
+//fragment HexNumeral: '0' ('x' | 'X') HexDigit+;
 
 fragment Digit: '0' | NonZeroDigit;
 
 fragment NonZeroDigit: '1' .. '9';
-
-fragment Plainid: Lower+ | Upper Idrest | Lower Idrest | Op;
-
-//
-// Unicode categories https://github.com/antlr/grammars-v4/blob/master/stringtemplate/LexUnicode.g4
-//
 
 fragment UnicodeClass_LU:
 	'\u0041' ..'\u005a'
@@ -682,9 +797,16 @@ fragment UnicodeClass_LO:
 	| '\uffd2' ..'\uffd7'
 	| '\uffda' ..'\uffdc';
 
+fragment UnicodeClass_NL:
+	'\u16ee' ..'\u16f0'
+	| '\u2160' ..'\u2188'
+	| '\u3007'
+	| '\u3021' ..'\u3029'
+	| '\u3038' ..'\u303a'
+	| '\ua6e6' ..'\ua6ef';
+
 //
 // Whitespace and comments
-// 
 //
 
 Sep: (Semi | NL)+;
@@ -697,4 +819,4 @@ WS: WhiteSpace+ -> skip;
 
 COMMENT: '{-|' .*? '-}' Sep? -> skip;
 
-LINE_COMMENT: DASHES (~[\r\n])* Sep? -> skip;
+LINE_COMMENT: Dashes (~[\r\n])* Sep? -> skip;

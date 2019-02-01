@@ -1,133 +1,360 @@
-grammar EEC;
+grammar Dotty;
 
-@header {
-import java.util.*;
-import org.antlr.v4.runtime.tree.TerminalNode;
-}
+// -- Parser
 
-@members {
-Map<String, String> fmap = new HashMap<>();
-Map<String, Integer> pmap = new HashMap<>();
+simpleLiteral:
+	'-'? IntegerLiteral
+	| '-'? FloatingPointLiteral
+	| BooleanLiteral
+	| CharacterLiteral
+	| StringLiteral;
 
-public int nextp (String op) {
-	String fix = fmap.get(op);
-	Integer p = pmap.get(op);
-	if (fix.equals("infixr")) return p;
-	if (fix.equals("infixl")) return p+1;
-	if (fix.equals("prefix")) return p;
-	if (fix.equals("postfix")) return p+1;
-	if (fix.equals("infix")) return p+1;
-	return 0;
-}
-
-public void updateFix(String f, int p, Iterable<EECParser.OperatorContext> op) {
-	for (EECParser.OperatorContext ctx: op) {
-		String t = ctx.getText();
-		fmap.put(t, f);
-		pmap.put(t, p);
-		System.out.println (String.format("Putting %s as %s %d", t, f, p));
-	}
-}
-
-public boolean prefix(String text) {
-	return fmap.get(text).equals("prefix");
-}
-
-public boolean postfix(String text, int p) {
-	return fmap.get(text).equals("postfix")
-		&& pmap.get(text) >= p;
-}
-
-public boolean infix(String text, int p) {
-	return fmap.get(text).contains("infix")
-		&& pmap.get(text) >= p;
-}
-
-public boolean notInfixNoAssoc(String op) {
-	return !fmap.get(op).equals("infix");
-}
-}
-
-literal:
-	SUB? IntegerLiteral ('L' | 'l')?
-	| SUB? FloatingPointLiteral;
+literal: simpleLiteral;
 
 qualId: Id ('.' Id)*;
 
-stableId: Id;
+ids: Id (',' Id)*;
 
-expr[int p]:
-	let
-	| application
-	| lambda
-	| (literal | stableId | tuple | prefixExpr) (
-		// infixl infixr infix case
-		{infix(_input.LT(1).getText(), $p)}? op = operator expr[nextp($op.text)] {notInfixNoAssoc($op.text)
-			}?
-		// infix case, no assoc, stop trying to match more infix operator
-		| {postfix(_input.LT(1).getText(), $p)}? operator // postfix case
-	)*;
+path: stableId | (Id '.')? 'this';
 
-let: 'let !' stableId '=' expr[0] 'in' expr[0] ;
+stableId: Id | (Id | (Id '.')? 'this') '.' Id;
 
-application: stableId '(' exprs? ')';
+// -- Types
 
-lambda: '\\' stableId stableId* '->' expr[0];
+type:
+	funArgTypes '=>' type //      Function(ts, t)
+	// | hkTypeParamClause '=>' type // TypeLambda(ps, t) | matchType
+	| infixType;
 
-tuple: '(' exprs? ')';
+funArgTypes:
+	infixType
+	| '(' (funArgType (',' funArgType)*)? ')'
+	| '(' typedFunParam (',' typedFunParam)* ')';
 
-exprs: expr[0] (',' expr[0])*;
+typedFunParam: Id ':' type;
 
-operator: LAMBDA | SUB | OPERATOR;
+funArgType:
+	type
+	| '=>' type ; //        PrefixOp(=>, t)
 
-// atom expr
-prefixExpr:
-{prefix(_input.LT(1).getText())}? op = operator expr[nextp($op.text)];
+paramType: '=>'? paramValueType;
 
-fixity:
-	f = FIXITY p = IntegerLiteral op += operator (',' op += operator)* {updateFix($f.text, $p.int, $op);};
+paramValueType: type '*'?;
 
-moduleInfo: 'module' qualId;
+infixType:
+	simpleType (Id Semi? simpleType)* ; //                 InfixOp(t1, op, t2)
 
-topStatSeq: topStat (Sep topStat)*;
+simpleType:
+	simpleType typeArgs //   AppliedTypeTree(t, args)
+	| stableId
+	| '(' argTypes ')' //      Tuple(ts)
+	| simpleLiteral ; //       SingletonTypeTree(l)
 
-statSeq: stat (Sep stat)*;
+argTypes: type (',' type)* | namedTypeArg (',' namedTypeArg)*;
 
-topStat: fixity;
+typeArgs: '[' argTypes ']';
 
-stat: expr[0];
+namedTypeArg:
+	Id '=' type ; //                                        NamedArg(id, t)
 
-translationUnit: Sep? moduleInfo Sep? (topStatSeq Sep?)? (statSeq Sep?)?;
+namedTypeArgs:
+	'[' namedTypeArg (',' namedTypeArg)* ']' ; //                  nts
 
-//
-// Lexer Defs
-//
+typeParamBounds: (':' type)* ; //    ContextBounds(typeBounds, tps)
 
-FIXITY: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
-ASSIGN: '=';
-DASHES: '--';
-SUB: '-';
-LAMBDA: '\\';
-OPERATOR: Op;
+// -- Expressions
+
+expr: funParams '=>' expr | expr1;
+
+funParams: bindings | Id | '_';
+
+expr1:
+	'if' expr 'then' expr 'else' expr
+	| (simpleExpr1 '.')? Id '=' expr
+	| simpleExpr1 argumentExprs '=' expr
+	| postfixExpr ascription?;
+
+ascription: ':' infixType;
+
+postfixExpr: infixExpr Id?;
+
+infixExpr: prefixExpr | infixExpr Id infixExpr;
+
+prefixExpr: ('-' | '+' | '~' | '!')? (caseExpr | simpleExpr1);
+
+simpleExpr1:
+	literal
+	| path
+	| '_'
+	| '(' exprsInParens? ')'
+	| simpleExpr1 '.' Id //                                      Select(expr, id)
+	| simpleExpr1 (
+		typeArgs
+		| namedTypeArgs
+	) //                  TypeApply(expr, args)
+	| simpleExpr1 argumentExprs ; //                    Apply(expr, args)
+
+exprsInParens: exprInParens (',' exprInParens)*;
+
+exprInParens: postfixExpr ':' type | expr;
+
+parArgumentExprs:
+	'(' exprsInParens ')' //                                   exprs
+	| '(' exprsInParens? postfixExpr ':' '_' '*' ')'
+		; //          exprs :+ Typed(expr, Ident(wildcardStar))
+
+argumentExprs: parArgumentExprs;
+
+block: expr1;
+
+blockStat: import_ | def | localModifier* tmplDef | expr1;
+
+caseExpr: '{' caseClauses '}';
+
+caseClauses: caseClause+;
+
+guard: 'if' postfixExpr;
+
+caseClause:
+	'case' pattern guard? '=>' block ; //    CaseDef(pat, guard?, block)   // block starts at =>
+
+pattern: pattern1 ('|' pattern1)*;
+
+pattern1:
+	patVar ':' simpleType //                       Bind(name, Typed(Ident(wildcard), tpe))
+	| pattern2;
+
+pattern2: (Id '@')? infixPattern ; //                         Bind(name, pat)
+
+infixPattern:
+	simplePattern (Id Sep? simplePattern)? ; //       InfixOp(pat, op, pat)
+
+simplePattern:
+	patVar //                               Ident(wildcard)
+	| literal //                                      Bind(name, Ident(wildcard))
+	| '(' patterns? ')' //                                 Parens(pats) Tuple(pats)
+	| simplePattern1 typeArgs? argumentPatterns?;
+
+simplePattern1: path | simplePattern1 '.' Id;
+
+patVar: Varid | '_';
+
+patterns: pattern (',' pattern)*;
+
+argumentPatterns:
+	'(' patterns? ')' //                   Apply(fn, pats)
+	| '(' (patterns ',')? pattern2 ':' '_' '*' ')';
+
+// -- Type and Value Parameters
+
+clsTypeParamClause: '[' clsTypeParam (',' clsTypeParam)* ']';
+
+clsTypeParam:
+	Id hkTypeParamClause? typeParamBounds ; //           Bound(below, above, context)
+
+defTypeParamClause: '[' defTypeParam (',' defTypeParam)* ']';
+
+defTypeParam: Id hkTypeParamClause? typeParamBounds;
+
+typTypeParamClause: '[' typTypeParam (',' typTypeParam)* ']';
+
+typTypeParam: Id hkTypeParamClause?;
+
+hkTypeParamClause: '[' hkTypeParam (',' hkTypeParam)* ']';
+
+hkTypeParam: (Id hkTypeParamClause? | '_');
+
+clsParamClauses: clsParamClause (Sep? '(' clsParams ')')?;
+
+clsParamClause: Sep? '(' clsParams? ')';
+
+clsParams: clsParam (',' clsParam)*;
+
+clsParam: (modifier* 'val')? param
+		; //              ValDef(mods, id, tpe, expr) -- point of mods on val/var
+
+param: Id ':' paramType ('=' expr)?;
+
+defParamClauses: defParamClause* (Sep? '(' defParams ')')?;
+
+defParamClause: Sep? '(' defParams? ')';
+
+defParams: defParam (',' defParam)*;
+
+defParam:
+	'inline'? param ; //        ValDef(mods, id, tpe, expr) -- point of mods at id.
+
+// -- Bindings and Imports
+
+bindings: '(' binding (',' binding)* ')';
+
+binding: (Id | '_') (':' type)? ; //                 ValDef(_, id, tpe, EmptyTree)
+
+modifier: localModifier | 'override';
+
+localModifier:
+	'abstract'
+	| 'final'
+	| 'sealed'
+	| 'implicit'
+	| 'lazy'
+	| 'opaque'
+	| 'inline'
+	| 'erased';
+
+import_: 'import' importExpr (',' importExpr)*;
+
+importExpr:
+	stableId '.' (
+		Id
+		| '_'
+		| importSelectors
+	) ; //       Import(expr, sels)
+
+importSelectors:
+	'{' (importSelector ',')? (importSelector | '_') '}';
+
+importSelector:
+	Id ('=>' Id | '=>' '_')? ; //                               Ident(name), Pair(id, id)
+
+// -- Declarations and Definitions
+
+refineDcl: 'val' valDcl | 'def' defDcl | 'type' Sep? typeDcl;
+
+dcl: refineDcl;
+
+valDcl:
+	ids ':' type ; //    PatDef(_, ids, tpe, EmptyTree)
+
+defDcl:
+	defSig (':' type)? ; //     DefDef(_, name, tparams, vparamss, tpe, EmptyTree)
+
+defSig
+: //    :   '(' defParam ')' Sep? Id defTypeParamClause? defParamClauses
+	Id defTypeParamClause? defParamClauses;
+
+typeDcl:
+	Id typTypeParamClause? (
+		'=' type
+	) ; //     TypeDefTree(_, name, tparams, bounds)
+
+def: 'val' patDef | 'def' defDef | 'type' {nl} typeDcl | tmplDef;
+
+patDef:
+	pattern2 (',' pattern2)* (':' type)? '=' expr ; //       PatDef(_, pats, tpe?, expr)
+
+defDef:
+	defSig (':' type)? '=' expr //               DefDef(_, name, tparams, vparamss, tpe, expr)
+	// | 'this' defParamClause defParamClauses // DefDef(_, <init>, Nil, vparamss, EmptyTree, expr |
+	// Block) ('=' constrExpr | Sep? constrBlock);
+    ;
+
+tmplDef: ('case'? 'class' | 'trait') classDef
+	| 'case'? 'object' objectDef
+	| 'enum' enumDef;
+
+classDef:
+	Id classConstr template? ; //  ClassDef(mods, name, tparams, templ)
+
+classConstr:
+	clsTypeParamClause? clsParamClauses
+		; //  with DefDef(_, <init>, Nil, vparamss, EmptyTree, EmptyTree) as first stat
+
+objectDef:
+	Id template ; //   ModuleDef(mods, name, template)  // no constructor
+
+enumDef:
+	Id classConstr? inheritClauses? enumBody ; //    EnumDef(mods, name, tparams, template)
+
+template:
+	inheritClauses
+	| ('extends'? templateBody)? ; //   Template(constr, parents, self, stats)
+
+inheritClauses: 'extends' constrApps;
+
+constrApps: constrApp (',' constrApp)*;
+
+constrApp:
+	simpleType argumentExprs* ; //    Apply(tp, args)
+
+constrExpr: selfInvocation | constrBlock;
+
+selfInvocation: 'this' argumentExprs+;
+
+constrBlock: '{' selfInvocation (Sep? blockStat)* '}';
+
+templateBody:
+	Sep? '{' templateStat (Sep? templateStat)* Sep? '}' ; // (self, stats)
+
+templateStat: import_ | modifier* def | modifier* dcl | expr1;
+
+enumBody: Sep? '{' enumStat (Sep? enumStat)* '}';
+
+enumStat: templateStat | modifier* enumCase;
+
+enumCase:
+	'case' ((Id classConstr ('extends' constrApps)?) | ids);
+
+topStatSeq: topStat (Sep? topStat)*;
+
+topStat:
+	modifier* tmplDef
+	| import_
+	| packaging
+	| packageObject;
+
+packaging:
+	'package' qualId '{' topStatSeq '}' ; //    Package(qid, stats)
+
+packageObject:
+	'package' 'object' objectDef ; //     object with package in mods.
+
+compilationUnit: ('package' qualId Sep?)* topStatSeq;
+
+// -- Lexer
+
+BooleanLiteral: 'true' | 'false';
 
 Id:
-	Plainid;
+	Plainid
+	| '`' (
+		CharNoBackQuoteOrNewline
+		| UnicodeEscape
+		| CharEscapeSeq
+	)+ '`';
 
-IntegerLiteral: DecimalNumeral;
+
+CharacterLiteral: '\'' (PrintableChar | CharEscapeSeq) '\'';
+
+IntegerLiteral: (DecimalNumeral | HexNumeral) ('L' | 'l')?;
+
+StringLiteral:
+	'"' StringElement* '"'
+	| '"""' MultiLineChars '"""';
 
 FloatingPointLiteral:
 	Digit+ '.' Digit+ ExponentPart? FloatType?
 	| '.' Digit+ ExponentPart? FloatType?
-	| Digit ExponentPart FloatType?
+	| Digit+ ExponentPart FloatType?
 	| Digit+ ExponentPart? FloatType;
+
+Varid: Lower Idrest;
+
+Paren: '(' | ')' | '[' | ']' | '{' | '}';
+
+Delim: '`' | '\'' | '"' | '.' | ';' | ',';
+
+fragment CharNoBackQuoteOrNewline:
+	'\u0020' .. '\u0026'
+	| '\u0028' .. '\u007E';
+
+fragment UnicodeEscape:
+	'\\' 'u' 'u'? HexDigit HexDigit HexDigit HexDigit;
 
 fragment WhiteSpace: '\u0020' | '\u0009' | '\u000D' | '\u000A';
 
-fragment Op: Opchar+;
-
 fragment Opchar:
 	'!'
-	| '/'
 	| '#'
 	| '%'
 	| '&'
@@ -138,7 +365,6 @@ fragment Opchar:
 	| '<'
 	| '='
 	| '>'
-	| '$'
 	| '?'
 	| '@'
 	| '\\'
@@ -146,13 +372,25 @@ fragment Opchar:
 	| '|'
 	| '~';
 
+fragment Op: '/'? Opchar+;
+
 fragment Idrest: (Letter | Digit)* ('_' Op)?;
 
-fragment FloatType
-   : 'F' | 'f' | 'D' | 'd'
-   ;
+fragment StringElement:
+	'\u0020'
+	| '\u0021'
+	| '\u0023' .. '\u005B'
+	| '\u005D' .. '\u007F'
+	| UnicodeEscape
+	| CharEscapeSeq;
 
-fragment Upper: 'A' .. 'Z' | '_' | UnicodeClass_LU;
+fragment MultiLineChars: ('"'? '"'? ~'"')* '"'*;
+
+fragment HexDigit: '0' .. '9' | 'A' .. 'F' | 'a' .. 'f';
+
+fragment FloatType: 'F' | 'f' | 'D' | 'd';
+
+fragment Upper: 'A' .. 'Z' | '$' | '_' | UnicodeClass_LU;
 
 fragment Lower: 'a' .. 'z' | UnicodeClass_LL;
 
@@ -160,22 +398,26 @@ fragment Letter:
 	Upper
 	| Lower
 	| UnicodeClass_LO
-	| UnicodeClass_LT // TODO Add category Nl
-	;
+	| UnicodeClass_LT ; // TODO Add category Nl
 
 fragment ExponentPart: ('E' | 'e') ('+' | '-')? Digit+;
 
+fragment PrintableChar: '\u0020' .. '\u007F';
+
+fragment CharEscapeSeq:
+	'\\' ('b' | 't' | 'n' | 'f' | 'r' | '"' | '\'' | '\\');
+
 fragment DecimalNumeral: '0' | NonZeroDigit Digit*;
+
+fragment HexNumeral: '0' ('x' | 'X') HexDigit+;
 
 fragment Digit: '0' | NonZeroDigit;
 
 fragment NonZeroDigit: '1' .. '9';
 
-fragment Plainid: Lower+ | Upper Idrest | Lower Idrest | Op;
+fragment Alphaid: Upper Idrest | Varid;
 
-//
-// Unicode categories https://github.com/antlr/grammars-v4/blob/master/stringtemplate/LexUnicode.g4
-//
+fragment Plainid: Alphaid | Op;
 
 fragment UnicodeClass_LU:
 	'\u0041' ..'\u005a'
@@ -682,19 +924,24 @@ fragment UnicodeClass_LO:
 	| '\uffd2' ..'\uffd7'
 	| '\uffda' ..'\uffdc';
 
-//
-// Whitespace and comments
-// 
-//
-
-Sep: (Semi | NL)+;
-Semi: ';';
-NL: '\n';
+fragment UnicodeClass_NL:
+	'\u16ee' ..'\u16f0'
+	| '\u2160' ..'\u2188'
+	| '\u3007'
+	| '\u3021' ..'\u3029'
+	| '\u3038' ..'\u303a'
+	| '\ua6e6' ..'\ua6ef';
 
 NEWLINE: NL+ -> skip;
 
+Sep: (Semi | NL)+;
+
+Semi: ';';
+
 WS: WhiteSpace+ -> skip;
 
-COMMENT: '{-|' .*? '-}' Sep? -> skip;
+NL: '\n';
 
-LINE_COMMENT: DASHES (~[\r\n])* Sep? -> skip;
+COMMENT: '/*' .*? '*/' -> skip;
+
+LINE_COMMENT: '//' (~[\r\n])* -> skip;
