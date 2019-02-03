@@ -5,8 +5,9 @@ object Commands {
   import Command._
 
   enum Command {
-    case PrintAst(code: String)
-    case PrintFile(path: String)
+    case AstExpr(code: String)
+    case TypeExpr(code: String)
+    case AstFile(path: String)
     case SetPrompt(prompt: String)
     case Quit
     case ShowHelp
@@ -18,21 +19,24 @@ object Commands {
       |Commands
       |========
       | :help           => Show this help
-      | :p      <code>  => Print the AST for the given code
-      | :loadp  <file>  => Print the AST for the given code loaded from file
+      | :ast    <expr>  => Print the AST for the given expression
+      | :t      <expr>  => Print the Type for the given expression
+      | :astf   <file>  => Print the AST for the given code loaded from file
       | :prompt /(\S*)/ => Change the REPL prompt
       | :q              => Quit the REPL""".stripMargin
 
   private val quitCommand = ":q".r
-  private val printAst = """:p\s+?(.*)""".r
-  private val printFile = """:loadp\s+((?:\S(?:\s*)?)*)""".r
+  private val astExpr = """:ast\s+?(.*)""".r
+  private val typeExpr = """:t\s+?(.*)""".r
+  private val astFile = """:astf\s+((?:\S(?:\s*)?)*)""".r
   private val setPrompt = """:prompt\s*?(\S*)""".r
   private val showHelp = ":help".r
 
   def parseCommand(line: String): Command = line match {
     case quitCommand() => Quit
-    case printAst(code) => PrintAst(code)
-    case printFile(file) => PrintFile(file)
+    case astExpr(code) => AstExpr(code)
+    case typeExpr(code) => TypeExpr(code)
+    case astFile(file) => AstFile(file)
     case setPrompt(newPrompt) => SetPrompt(newPrompt)
     case showHelp() => ShowHelp
     case _ => Unknown

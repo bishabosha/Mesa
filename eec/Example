@@ -30,10 +30,10 @@ succ x: Integer -> !Integer =
 
 succM: !Integer -> !Integer = lift(succ)
 
-a && b: Boolean -> Boolean -> !Boolean =
+a `and` b: Boolean -> Boolean -> !Boolean =
   if a then !b else !False
 
-a || b: Boolean -> Boolean -> !Boolean =
+a `or` b: Boolean -> Boolean -> !Boolean =
   if a then !True else !b
 
 not b: Boolean -> !Boolean =

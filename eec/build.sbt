@@ -6,8 +6,6 @@ antlr4PackageName in Antlr4 := Some("eec.compiler.ast")
 antlr4GenListener in Antlr4 := false // default: true
 antlr4GenVisitor in Antlr4 := true // default: false
 
-
-
 lazy val root = project
   .in(file("."))
   .settings(
