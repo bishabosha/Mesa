@@ -15,7 +15,7 @@ qualId: id ('.' id)*;
 
 stableId: id | id '.' id;
 
-operator: Bang | OpId;
+//operator: Bang | OpId;
 
 //
 // -- Types
@@ -41,13 +41,13 @@ expr: lambda | letExpr | caseExpr | expr1;
 
 lambda: '\\' bindings '=>' expr;
 
-letExpr: 'let' '!' Varid '=' expr 'in' expr;
+letExpr: 'let' '!' (Varid | Wildcard) '=' expr 'in' expr;
 
 caseExpr: 'case' expr 'of' cases;
 
 expr1
    : 'if' expr 'then' expr 'else' expr
-   | infixExpr ascription
+//   | infixExpr ascription
    | infixExpr
    ;
 
@@ -56,7 +56,7 @@ infixExpr
    | infixExpr (OpId | '`' alphaId '`') infixExpr
    ;
 
-prefixExpr: '!'? simpleExpr;
+prefixExpr: Bang? simpleExpr;
 
 simpleExpr
    : literal
@@ -95,7 +95,7 @@ pattern3
    ;
 
 simplePattern
-   : '_'
+   : Wildcard
    | Varid
    | literal
    | '!' simplePattern
@@ -144,7 +144,11 @@ defSig: infixDefSig | Varid Varid*;
 
 infixDefSig:
 	Varid (OpId | '`' Varid '`') Varid
-	| '(' OpId ')' Varid Varid;
+	| prefixOpSig;
+
+
+prefixOpSig: '(' OpId ')' Varid Varid;
+
 
 //fixity: Fixity IntegerLiteral operator (',' operator)*;
 

@@ -1,0 +1,30 @@
+package com.example
+
+{-| example expressions to try:
+    (fst((0,"")), snd((0,""))) == (0,"")
+    * still need to try guards and other literals
+-}
+
+primitive x +! y: Integer -> Integer -> !Integer
+primitive debug x: a -> !()
+primitive readInteger: !Integer
+
+fst p: (a, b) -> !a = case p of (l, _) => !l
+
+snd p: (a, b) -> !b = case p of (_, r) => !r
+
+lift f: (a -> !a) -> (!a -> !a) = \c: !a => let !x = c in f(x)
+
+succ x: Integer -> !Integer = x +! 1
+
+a `or` b: Boolean -> Boolean -> !Boolean = if a then !True else !b
+
+a `and` b: Boolean -> Boolean -> !Boolean = if a then !b else !False
+
+main: !() =
+    let !x = readInteger    in
+    let !y = readInteger    in
+    let !pair = !(x, y)     in
+    let !_ = debug(pair)    in
+    let !total = x +! y     in
+        debug(total)

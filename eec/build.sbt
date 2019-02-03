@@ -20,6 +20,10 @@ lazy val root = project
 
     libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
 
+    libraryDependencies += ("com.lihaoyi" %% "pprint" % "0.5.3").withDottyCompat(scalaVersion.value),
+
+    libraryDependencies += "org.scala-lang" % "scala-reflect" % "2.12.8",
+
     libraryDependencies ++= Seq(
       "org.antlr" % "antlr4-runtime" % "4.7.1",
       "org.antlr" % "stringtemplate" % "4.0.2"
