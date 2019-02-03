@@ -25,13 +25,12 @@ object Trees {
     case Def(modifiers: Set[Modifier], sig: SigTree, typ: TypeTree, value: ExprTree) extends MemberDefTree
     case DefSig(name: Name, args: List[Name]) extends SigTree
     case FunctionType(arg: TypeTree, body: TypeTree) extends TypeTree
+    case TypeApply(id: RefTree, args: List[TypeTree]) extends TypeTree
     case Function(args: List[ValDefTree], body: ExprTree) extends ExprTree
     case Let(name: Name, value: ExprTree, continuation: ExprTree) extends ExprTree
     case IfThenElse(cond: ExprTree, ifTrue: ExprTree, orElse: ExprTree) extends ExprTree
     case Apply(lhs: ExprTree, arg: ExprTree) extends ExprTree
-    case CompExpr(value: ExprTree) extends ExprTree
     case Literal(constant: Constant) extends ExprTree with PatTree
-    case TupleExpr(args: List[ExprTree]) extends ExprTree
     case CaseExpr(value: ExprTree, cases: List[CaseClause]) extends ExprTree
     case CaseClauses(cases: List[CaseClause])
     case CaseClause(pat: PatTree, guard: ExprTree, body: ExprTree)
@@ -40,8 +39,6 @@ object Trees {
     case Unapply(id: RefTree, args: List[PatTree]) extends PatTree
     case Bindings(args: List[ValDefTree]) extends ValDefTree
     case Tagged(arg: Name, tpe: TypeTree) extends ValDefTree
-    case TupleType(args: List[TypeTree]) extends TypeTree
-    case CompType(arg: TypeTree) extends TypeTree
     case EmptyTree extends TypeTree with ExprTree with MemberDefTree with SigTree with RefTree with ValDefTree with PatTree
   }
 

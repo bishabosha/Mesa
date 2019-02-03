@@ -20,14 +20,13 @@ class EECRepl {
         parseCommand(input) match {
           case PrintAst(code) =>
             val parsed = parseEEC(code)
-            println(s"$prompt> ${pprint(parsed)}")
+            pprintln(parsed, height = Int.MaxValue)
           case PrintFile(name) =>
             val file = scala.io.Source.fromFile(s"$pwd/$name")
             val code = file.getLines.mkString("\n")
             file.close()
             val parsed = parseEEC(code)
-            val pretty = pprint.apply(parsed, height = Int.MaxValue)
-            println(s"$prompt> $pretty")
+            pprintln(parsed, height = Int.MaxValue)
           case SetPrompt(newPrompt) =>
             prompt = newPrompt
           case Quit =>
@@ -39,8 +38,10 @@ class EECRepl {
             println(s"[ERROR] unrecognised command: `$input`. Try `:help`")
         }
       } catch {
-        case UnexpectedEOF => Console.err.println(s"[ERROR] no valid expression input")
-        case UnexpectedInput(msg) => Console.err.println(s"[ERROR] unexpected input: $msg")
+        case UnexpectedEOF =>
+          Console.err.println(s"[ERROR] no valid expression input")
+        case UnexpectedInput(msg) =>
+          Console.err.println(s"[ERROR] unexpected input: $msg")
       }
     }
   }

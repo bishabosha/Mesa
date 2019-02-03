@@ -1,30 +1,61 @@
 package com.example
 
-{-| example expressions to try:
-    (fst((0,"")), snd((0,""))) == (0,"")
-    * still need to try guards and other literals
--}
-
-primitive x +! y: Integer -> Integer -> !Integer
-primitive debug x: a -> !()
+primitive x + y: Integer -> Integer -> Integer
+primitive s1 ++ s2: String -> String -> String
+primitive debug x: a -> String
+primitive putStrLn s: String -> !()
 primitive readInteger: !Integer
 
-fst p: (a, b) -> !a = case p of (l, _) => !l
+earthDiameter: Decimal = 12.742e+10
 
-snd p: (a, b) -> !b = case p of (_, r) => !r
+movie: String = "12 Monkeys"
 
-lift f: (a -> !a) -> (!a -> !a) = \c: !a => let !x = c in f(x)
+json: String = """{
+    "title": "12 Monkeys",
+    "director": "Terry Gilliam",
+    "length": 129
+}"""
 
-succ x: Integer -> !Integer = x +! 1
+nl: Char = '\n'
 
-a `or` b: Boolean -> Boolean -> !Boolean = if a then !True else !b
+e: Char = 'e'
 
-a `and` b: Boolean -> Boolean -> !Boolean = if a then !b else !False
+unit: () = ()
+
+lift f: (a -> !a) -> !a -> !a =
+  \c: !a => let !x = c in f(x)
+
+succ x: Integer -> !Integer =
+  !(x + 1)
+
+succM: !Integer -> !Integer = lift(succ)
+
+a && b: Boolean -> Boolean -> !Boolean =
+  if a then !b else !False
+
+a || b: Boolean -> Boolean -> !Boolean =
+  if a then !True else !b
+
+not b: Boolean -> !Boolean =
+  if True then !False else !True
+
+isZero x : Integer -> !Boolean =
+  case x of
+    0 => !True
+    _ => !False
 
 main: !() =
-    let !x = readInteger    in
-    let !y = readInteger    in
-    let !pair = !(x, y)     in
-    let !_ = debug(pair)    in
-    let !total = x +! y     in
-        debug(total)
+  let !x = readInteger  in
+  let !zero = isZero(x) in
+    if zero then
+      putStrLn("Entered Zero")
+    else
+      let !y = succM(readInteger) in
+        putStrLn("paired: " ++ debug((x, y)))
+
+{-| example expressions to try:
+    primitive fst p: (a, b) -> a
+    primitive snd p: (a, b) -> b
+    primitive x == y: a -> a -> Boolean
+    (fst((0,"")), snd((0,""))) == (0,"")
+-}
