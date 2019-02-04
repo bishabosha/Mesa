@@ -1,6 +1,6 @@
 package eec
 package compiler
-package ast
+package core
 
 object Modifiers {
 

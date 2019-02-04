@@ -37,7 +37,7 @@ ascription: ':' type;
 // -- Expressions
 //
 
-expr: lambda | letExpr | caseExpr | expr1;
+expr: lambda | letExpr | caseExpr | expr1 | expr expr;
 
 lambda: '\\' bindings '=>' expr;
 
@@ -64,7 +64,7 @@ simpleExpr
 //   | simpleExpr1 '.' Id  // nice for records
 //   | '_'
    | exprsInParens
-   | simpleExpr argumentExpr
+//   | simpleExpr argumentExpr
    ;
 
 cases: caseClause (Sep? caseClause)*;
@@ -73,7 +73,7 @@ caseClause: pattern guard? '=>' expr;
 
 exprsInParens: '(' (expr (',' expr)?)? ')' | '()';
 
-argumentExpr: '()' | '(' expr? ')';
+//argumentExpr: '()' | '(' expr? ')';
 
 //
 // -- Patterns

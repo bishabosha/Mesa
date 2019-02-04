@@ -4,77 +4,66 @@ package ast
 
 import Trees._
 import Tree._
-import Names._
-import Constants._
-import Modifiers._
+import core.Names._
+import core.Names.Name._
+import core.Constants._
+import core.Modifiers._
 
 object Trees {
 
-  sealed trait ValDefTree extends Tree
-  sealed trait RefTree extends ExprTree with TypeTree
-  sealed trait TypeTree extends Tree
-  sealed trait ExprTree extends Tree
-  sealed trait SigTree extends Tree
-  sealed trait MemberDefTree extends Tree
-  sealed trait PatTree extends Tree
-
   enum Tree {
-    case Select(tree: Tree, name: Name) extends RefTree
-    case Ident(name: Name) extends RefTree with PatTree
-    case PackageDef(pid: RefTree, stats: List[Tree])
-    case Def(modifiers: Set[Modifier], sig: SigTree, typ: TypeTree, value: ExprTree) extends MemberDefTree
-    case DefSig(name: Name, args: List[Name]) extends SigTree
-    case FunctionType(arg: TypeTree, body: TypeTree) extends TypeTree
-    case TypeApply(id: RefTree, args: List[TypeTree]) extends TypeTree
-    case Function(args: List[ValDefTree], body: ExprTree) extends ExprTree
-    case Let(name: Name, value: ExprTree, continuation: ExprTree) extends ExprTree
-    case IfThenElse(cond: ExprTree, ifTrue: ExprTree, orElse: ExprTree) extends ExprTree
-    case Apply(lhs: ExprTree, arg: ExprTree) extends ExprTree
-    case Literal(constant: Constant) extends ExprTree with PatTree
-    case CaseExpr(value: ExprTree, cases: List[CaseClause]) extends ExprTree
-    case CaseClauses(cases: List[CaseClause])
-    case CaseClause(pat: PatTree, guard: ExprTree, body: ExprTree)
-    case Alternative(bodys: List[PatTree]) extends PatTree
-    case Bind(name: Name, body: PatTree) extends PatTree
-    case Unapply(id: RefTree, args: List[PatTree]) extends PatTree
-    case Bindings(args: List[ValDefTree]) extends ValDefTree
-    case Tagged(arg: Name, tpe: TypeTree) extends ValDefTree
-    case EmptyTree extends TypeTree with ExprTree with MemberDefTree with SigTree with RefTree with ValDefTree with PatTree
+    case Select(tree: Tree, name: Name)
+    case Ident(name: Name)
+    case PackageDef(pid: Tree, stats: List[Tree])
+    case Def(modifiers: Set[Modifier], sig: Tree, typ: Tree, value: Tree)
+    case DefSig(name: Name, args: List[Name])
+    case FunctionType(arg: Tree, body: Tree)
+    case Apply(id: Tree, args: List[Tree])
+    case Function(args: List[Tree], body: Tree)
+    case Let(name: Name, value: Tree, continuation: Tree)
+    case IfThenElse(cond: Tree, ifTrue: Tree, orElse: Tree)
+    case Literal(constant: Constant)
+    case CaseExpr(value: Tree, cases: List[Tree])
+    case CaseClause(pat: Tree, guard: Tree, body: Tree)
+    case Alternative(bodys: List[Tree])
+    case Bind(name: Name, body: Tree)
+    case Unapply(id: Tree, args: List[Tree])
+    case Tagged(arg: Name, tpe: Tree)
+    case TreeSeq(args: List[Tree])
+    case EmptyTree
   }
 
-  val emptyIdent = new Ident(Name.Empty)
-  val wildcardIdent = new Ident(Name.Wildcard)
-
-  object ValDefTreeOps {
-    def (tree: ValDefTree) toList: List[ValDefTree] = tree match {
-      case EmptyTree => Nil
-      case Bindings(args) => args
-      case t: Tagged => t :: Nil
-    }
-
-    def (trees: List[ValDefTree]) toTree: ValDefTree = trees match {
-      case Nil => EmptyTree
-      case (t: Tagged) :: Nil => t
-      case ts => new Bindings(ts)
-    }
-  }
+  val emptyIdent = Ident(EmptyName)
+  val wildcardIdent = Ident(Wildcard)
 
   object TreeOps {
+    import scala.annotation._
 
     def (tree: Tree) toList: List[Tree] = tree match {
       case EmptyTree => Nil
       case PackageDef(`emptyIdent`, stats) => stats
+      case TreeSeq(args) => args
       case t => t :: Nil
     }
 
     def (trees: List[Tree]) toTree: Tree = trees match {
       case Nil => EmptyTree
-      case t => PackageDef(emptyIdent, t)
+      case t :: Nil => t
+      case ts => PackageDef(emptyIdent, ts)
     }
 
-    def (tree: MemberDefTree) addModifiers(mods: Set[Modifier]): MemberDefTree =
-      tree match {
-        case d: Def => d.copy(modifiers = (d.modifiers ++ mods))
+    def (tree: Tree) toNames: List[Name] = {
+      @tailrec def inner(acc: List[Name], t: Tree): List[Name] = t match {
+        case Ident(name) => name :: acc
+        case Select(tree, name) => inner(name :: acc, tree)
+        case _ => acc
       }
+      inner(Nil, tree).reverse
+    }
+
+    def (tree: Tree) addModifiers(mods: Set[Modifier]): Tree = tree match {
+      case d: Def => d.copy(modifiers = (d.modifiers ++ mods))
+      case otherwise => otherwise
+    }
   }
 }

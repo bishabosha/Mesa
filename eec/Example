@@ -11,9 +11,9 @@ earthDiameter: Decimal = 12.742e+10
 movie: String = "12 Monkeys"
 
 json: String = """{
-    "title": "12 Monkeys",
-    "director": "Terry Gilliam",
-    "length": 129
+  "title": "12 Monkeys",
+  "director": "Terry Gilliam",
+  "length": 129
 }"""
 
 nl: Char = '\n'
@@ -23,12 +23,12 @@ e: Char = 'e'
 unit: () = ()
 
 lift f: (a -> !a) -> !a -> !a =
-  \c: !a => let !x = c in f(x)
+  \c: !a => let !x = c in f x
 
 succ x: Integer -> !Integer =
   !(x + 1)
 
-succM: !Integer -> !Integer = lift(succ)
+succM: !Integer -> !Integer = lift succ
 
 a `and` b: Boolean -> Boolean -> !Boolean =
   if a then !b else !False
@@ -46,12 +46,12 @@ isZero x : Integer -> !Boolean =
 
 main: !() =
   let !x = readInteger  in
-  let !zero = isZero(x) in
+  let !zero = isZero x in
     if zero then
-      putStrLn("Entered Zero")
+      putStrLn "Entered Zero"
     else
-      let !y = succM(readInteger) in
-        putStrLn("paired: " ++ debug((x, y)))
+      let !y = succM readInteger in
+        putStrLn ("paired: " ++ (debug (x, y)))
 
 {-| example expressions to try:
     primitive fst p: (a, b) -> a
