@@ -13,6 +13,7 @@ object Names {
   val emptyString: String = "<empty>"
 
   object NameOps {
+
     import Name._
     import eec.util.{Showable, Readable}
 
@@ -43,7 +44,7 @@ object Names {
         case "Boolean"  => BooleanTag
         case "String"   => StringTag
         case "Char"     => CharTag
-        case otherwise  => From(otherwise)
+        case _          => From(str)
       }
     }
   }

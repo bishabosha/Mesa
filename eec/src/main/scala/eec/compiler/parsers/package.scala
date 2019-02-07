@@ -4,7 +4,7 @@ package object parsers {
 
   import ast.Trees._
   import Parsers._
-  import errors.ParserErrors._
+  import error.ParserErrors._
 
   class ParserSyntaxException(msg: String) extends Exception(msg)
 

@@ -15,14 +15,13 @@ object Commands {
   }
 
   val helpText =
-    """REPL: Read Eval Print Loop
-      |Commands
-      |========
+    """The REPL has several commands available:
+      |
       | :help           => Show this help
       | :ast    <expr>  => Print the AST for the given expression
       | :t      <expr>  => Print the Type for the given expression
       | :astf   <file>  => Print the AST for the given code loaded from file
-      | :prompt /(\S*)/ => Change the REPL prompt
+      | :prompt <word>  => Change the REPL prompt
       | :q              => Quit the REPL""".stripMargin
 
   private val quitCommand = ":q".r

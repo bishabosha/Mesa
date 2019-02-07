@@ -6,12 +6,12 @@ object Parsers {
 
   import ast.Trees._
   import ast.Trees.Tree._
+  import ast.Trees.untyped._
   import core.Names._
-  import core.Names.Name._
   import core.Constants._
   import core.Constants.Constant._
-  import errors.ParserErrors._
-  import errors.ParserErrors.ParserError._
+  import error.ParserErrors._
+  import error.ParserErrors.ParserError._
   import org.antlr.v4.runtime.tree.TerminalNode
   import org.antlr.v4.runtime._
   import scala.collection.JavaConversions._
@@ -51,20 +51,20 @@ object Parsers {
 
     override def visitLiteral(ctx: EECParser.LiteralContext): Tree =
       if ctx.IntegerLiteral != null then {
-        Literal(BigIntConstant(BigInt(ctx.IntegerLiteral.getText)))
+        Literal(uTpe, BigIntConstant(BigInt(ctx.IntegerLiteral.getText)))
       } else if ctx.FloatingPointLiteral != null then {
-        Literal(BigDecConstant(BigDecimal(ctx.FloatingPointLiteral.getText)))
+        Literal(uTpe, BigDecConstant(BigDecimal(ctx.FloatingPointLiteral.getText)))
       } else if ctx.BooleanLiteral != null then {
         val bool = ctx.BooleanLiteral.getText match {
           case "True" => true
           case _ => false
         }
-        Literal(BooleanConstant(bool))
+        Literal(uTpe, BooleanConstant(bool))
       } else if ctx.CharacterLiteral != null then {
         val charStr = ctx.CharacterLiteral.getText
           .stripPrefix("'").stripSuffix("'")
         val char = if charStr.length == 0 then 0 else charStr.charAt(0)
-        Literal(CharConstant(char))
+        Literal(uTpe, CharConstant(char))
       } else { // StringLiteral
         val text = ctx.StringLiteral.getText
         val string =
@@ -72,25 +72,25 @@ object Parsers {
             text stripPrefix "\"\"\"" stripSuffix "\"\"\""
           else
             text stripPrefix "\"" stripSuffix "\""
-        Literal(StringConstant(string))
+        Literal(uTpe, StringConstant(string))
       }
 
     override def visitId(ctx: EECParser.IdContext): Tree = {
       import NameOps._
-      Ident(ctx.getText.readAs)
+      Ident(uTpe, ctx.getText.readAs)
     }
 
     override def visitAlphaId(ctx: EECParser.AlphaIdContext): Tree = {
       import NameOps._
-      Ident(ctx.getText.readAs)
+      Ident(uTpe, ctx.getText.readAs)
     }
 
     override def visitQualId(ctx: EECParser.QualIdContext): Tree = {
       import scala.language.implicitConversions
       import NameOps._
       def listToRefId(lst: List[String]): Tree = lst match {
-        case n :: Nil => Ident(n.readAs)
-        case n :: tail => Select(listToRefId(tail), n.readAs)
+        case n :: Nil => Ident(uTpe, n.readAs)
+        case n :: tail => Select(uTpe, listToRefId(tail), n.readAs)
         case Nil => EmptyTree
       }
       listToRefId(ctx.id.reverse.map(_.getText).toList)
@@ -107,7 +107,7 @@ object Parsers {
         import TreeOps._
         val src = ids(0)
         val List(select) = ids(1).toNames
-        Select(src, select)
+        Select(uTpe, src, select)
       }
     }
 
@@ -115,7 +115,7 @@ object Parsers {
       if ctx.`type` != null then {
         val arg = visitInfixType(ctx.infixType)
         val body = visitType(ctx.`type`)
-        FunctionType(arg, body)
+        Function(uTpe, List(arg), body)
       } else {
         visitInfixType(ctx.infixType)
       }
@@ -131,17 +131,16 @@ object Parsers {
       val types = ctx.`type`
         .map(visitType)
         .ensuring(l => l.size == 0 || l.size == 2)
-      val tag = if types.size == 0 then UnitTag else Tuple2Tag
-      Apply(Ident(tag), types.toList)
+      Parens(uTpe, types.toList)
     }
 
     override def visitPrefixType(ctx: EECParser.PrefixTypeContext): Tree =
       if ctx.simpleType != null then {
         visitSimpleType(ctx.simpleType)
       } else {
-        val tag = Ident(ComputationTag)
+        val tag = Ident(uTpe, Name.ComputationTag)
         val args = visitType(ctx.`type`) :: Nil
-        Apply(tag, args)
+        Apply(uTpe, tag, args)
       }
 
     override def visitSimpleType(ctx: EECParser.SimpleTypeContext): Tree =
@@ -149,9 +148,6 @@ object Parsers {
         visitQualId(ctx.qualId)
       else
         visitType(ctx.`type`)
-
-    // override def visitAscription(ctx: EECParser.AscriptionContext): Tree =
-    //   EmptyTree
 
     override def visitExpr(ctx: EECParser.ExprContext): Tree =
       if ctx.lambda != null then
@@ -168,15 +164,16 @@ object Parsers {
     def visitExprSeqAsApply(
       exprs: java.util.List[EECParser.ExprContext]): Tree = {
         import scala.language.implicitConversions
+        import TreeOps._
         val Seq(expr, arg) = exprs.map(visitExpr).ensuring(_.size == 2)
-        Apply(expr, List(arg))
+        Apply(uTpe, expr, arg.toList)
       }
 
     override def visitLambda(ctx: EECParser.LambdaContext): Tree = {
       import TreeOps._
       val bindings = visitBindings(ctx.bindings).toList
       val body = visitExpr(ctx.expr)
-      Function(bindings, body)
+      Function(uTpe, bindings, body)
     }
 
     override def visitLetExpr(ctx: EECParser.LetExprContext): Tree = {
@@ -189,14 +186,14 @@ object Parsers {
       var exprs = ctx.expr.ensuring(_.size == 2)
       var value = visitExpr(exprs.get(0))
       var continuation = visitExpr(exprs.get(1))
-      Let(name, value, continuation)
+      Let(uTpe, name, value, continuation)
     }
 
     override def visitCaseExpr(ctx: EECParser.CaseExprContext): Tree = {
       import TreeOps._
       val expr = visitExpr(ctx.expr)
       val cases = visitCases(ctx.cases).toList
-      CaseExpr(expr, cases)
+      CaseExpr(uTpe, expr, cases)
     }
 
     override def visitExpr1(ctx: EECParser.Expr1Context): Tree =
@@ -207,7 +204,7 @@ object Parsers {
         val exprs = ctx.expr
           .ensuring(_.size == 3)
           .map(visitExpr)
-        IfThenElse(exprs(0), exprs(1), exprs(2))
+        If(uTpe, exprs(0), exprs(1), exprs(2))
       }
 
     override def visitInfixExpr(ctx: EECParser.InfixExprContext): Tree =
@@ -217,7 +214,7 @@ object Parsers {
         val id =
           if ctx.OpId != null then {
             import NameOps._
-            Ident(ctx.OpId.getText.readAs)
+            Ident(uTpe, ctx.OpId.getText.readAs)
           } else {
             visitAlphaId(ctx.alphaId)
           }
@@ -225,15 +222,16 @@ object Parsers {
         val infixes = ctx.infixExpr
           .ensuring(_.size == 2)
           .map(visitInfixExpr)
-        val firstApply = Apply(id, List(infixes(0)))
-        Apply(firstApply, List(infixes(1)))
+        val firstApply = Apply(uTpe, id, List(infixes(0)))
+        Apply(uTpe, firstApply, List(infixes(1)))
       }
 
     override def visitPrefixExpr(ctx: EECParser.PrefixExprContext): Tree = {
       val simpleExpr = visitSimpleExpr(ctx.simpleExpr)
       if ctx.Bang != null then {
-        val tag = Ident(ComputationTag)
-        Apply(tag, List(simpleExpr))
+        import NameOps._
+        val tag = Ident(uTpe, Name.ComputationTag)
+        Apply(uTpe, tag, List(simpleExpr))
       } else {
         simpleExpr
       }
@@ -246,11 +244,6 @@ object Parsers {
         visitStableId(ctx.stableId)
       else
         visitExprsInParens(ctx.exprsInParens)
-      // else {
-      //   val simpleExpr = visitSimpleExpr(ctx.simpleExpr)
-      //   val argExpr = visitArgumentExpr(ctx.argumentExpr)
-      //   Apply(simpleExpr, argExpr)
-      // }
 
     override def visitCases(ctx: EECParser.CasesContext): Tree = {
       import scala.language.implicitConversions
@@ -266,7 +259,7 @@ object Parsers {
         else
           EmptyTree
       val body = visitExpr(ctx.expr)
-      CaseClause(pat, guard, body)
+      CaseClause(uTpe, pat, guard, body)
     }
 
     override def visitExprsInParens(
@@ -275,25 +268,11 @@ object Parsers {
           import scala.language.implicitConversions
           ctx.expr.map(visitExpr)
         }
-        if expr.size == 1 then {
+        if expr.size == 1 then
           expr(0)
-        } else {
-          assert(expr.size <= 2)
-          if expr.size == 0 then {
-            val tag = Ident(UnitTag)
-            Apply(tag, Nil)
-          } else {
-            val tag = Ident(Tuple2Tag)
-            Apply(tag, List(expr(0), expr(1)))
-          }
-        }
+        else
+          Parens(uTpe, expr.toList)
       }
-
-    // override def visitArgumentExpr(ctx: EECParser.ArgumentExprContext): ExprTree =
-    //   if ctx.expr != null then
-    //     visitExpr(ctx.expr)
-    //   else
-    //     EmptyTree
 
     override def visitPattern(ctx: EECParser.PatternContext): Tree = {
       val patterns = {
@@ -303,7 +282,7 @@ object Parsers {
       if patterns.size == 1 then
         patterns(0)
       else
-        Alternative(patterns.toList)
+        Alternative(uTpe, patterns.toList)
     }
 
     override def visitPattern1(ctx: EECParser.Pattern1Context): Tree =
@@ -316,9 +295,9 @@ object Parsers {
           ctx.Varid.getText.readAs
         }
         if ctx.pattern3 != null then {
-          Bind(name, visitPattern3(ctx.pattern3))
+          Bind(uTpe, name, visitPattern3(ctx.pattern3))
         } else {
-          Ident(name)
+          Ident(uTpe, name)
         }
       } else {
         visitPattern3(ctx.pattern3)
@@ -332,17 +311,16 @@ object Parsers {
         if ctx.Wildcard != null then {
           wildcardIdent
         } else if ctx.getText == "()" then {
-          val unitTag = Ident(UnitTag)
-          Unapply(unitTag, Nil)
+          Parens(uTpe, Nil)
         } else if ctx.Varid != null then {
           import NameOps._
-          Ident(ctx.Varid.getText.readAs)
+          Ident(uTpe, ctx.Varid.getText.readAs)
         } else if ctx.literal != null then {
           visitLiteral(ctx.literal)
         } else if ctx.simplePattern != null then { // Bang present
           val simplePat = visitSimplePattern(ctx.simplePattern)
-          val computation = Ident(ComputationTag)
-          Unapply(computation, List(simplePat))
+          val computation = Ident(uTpe, Name.ComputationTag)
+          Unapply(uTpe, computation, List(simplePat))
         } else { // tuple
           visitUpToPairPatten(ctx.upToPairPatten)
         }
@@ -357,8 +335,7 @@ object Parsers {
             patterns(0)
           } else {
             assert(patterns.size == 2)
-            val tuple2Tag = Ident(Tuple2Tag)
-            Unapply(tuple2Tag, patterns.toList)
+            Parens(uTpe, patterns.toList)
           }
         }
 
@@ -379,7 +356,7 @@ object Parsers {
       import TreeOps._
       val List(name) = visitId(ctx.id).toNames
       val typ = visitType(ctx.`type`)
-      Tagged(name, typ)
+      Tagged(uTpe, name, typ)
     }
 
     override def visitDcl(ctx: EECParser.DclContext): Tree =
@@ -388,14 +365,16 @@ object Parsers {
     override def visitPrimitiveDcl(
       ctx: EECParser.PrimitiveDclContext): Tree = {
         import TreeOps._
+        import NameOps._
         import eec.compiler.core.Modifiers._
-        visitDefDecl(ctx.defDecl).addModifiers(Set(Modifier.Primitive))
+        val modifiers: Set[Modifier] = Set(Modifier.Primitive)
+        visitDefDecl(ctx.defDecl).addModifiers(modifiers)
       }
 
     override def visitDefDecl(ctx: EECParser.DefDeclContext): Tree = {
       val sig = visitDefSig(ctx.defSig)
       val typ = visitType(ctx.`type`)
-      Def(Set(), sig, typ, EmptyTree)
+      DefDef(uTpe, Set(), sig, typ, EmptyTree)
     }
 
     override def visitDef(ctx: EECParser.DefContext): Tree =
@@ -405,7 +384,7 @@ object Parsers {
       val defSig = visitDefSig(ctx.defSig)
       val typ = visitType(ctx.`type`)
       val expr = visitExpr(ctx.expr)
-      Def(Set(), defSig, typ, expr)
+      DefDef(uTpe, Set(), defSig, typ, expr)
     }
 
     override def visitDefSig(ctx: EECParser.DefSigContext): Tree =
@@ -417,36 +396,33 @@ object Parsers {
           import NameOps._
           ctx.Varid.map(_.getText.readAs).toList
         }
-        DefSig(varids.head, varids.tail)
+        DefSig(uTpe, varids.head, varids.tail)
       }
 
-    override def visitInfixDefSig(ctx: EECParser.InfixDefSigContext): Tree =
+    override def visitInfixDefSig(ctx: EECParser.InfixDefSigContext): Tree = {
+      import scala.language.implicitConversions
+      import NameOps._
       if ctx.prefixOpSig != null then {
         visitPrefixOpSig(ctx.prefixOpSig)
       } else if ctx.OpId != null then {
-        import scala.language.implicitConversions
-        import NameOps._
         var args = ctx.Varid
           .ensuring(_.size == 2)
           .map(_.getText.readAs)
           .toList
-        DefSig(ctx.OpId.getText.readAs, args)
+        DefSig(uTpe, ctx.OpId.getText.readAs, args)
       } else {
-        import scala.language.implicitConversions
-        import NameOps._
         var varids = ctx.Varid
           .ensuring(_.size == 3)
           .map(_.getText.readAs)
-        DefSig(varids(1), List(varids(0), varids(2)))
+        DefSig(uTpe, varids(1), List(varids(0), varids(2)))
       }
+    }
 
     override def visitPrefixOpSig(ctx: EECParser.PrefixOpSigContext): Tree = {
+      import scala.language.implicitConversions
       import NameOps._
-      var args = {
-        import scala.language.implicitConversions
-        ctx.Varid.map(_.getText.readAs).toList
-      }
-      DefSig(ctx.OpId.getText.readAs, args)
+      var args = ctx.Varid.map(_.getText.readAs).toList
+      DefSig(uTpe, ctx.OpId.getText.readAs, args)
     }
 
     override def visitPackageInfo(ctx: EECParser.PackageInfoContext): Tree =
@@ -457,7 +433,7 @@ object Parsers {
         import scala.language.implicitConversions
         ctx.stat.map(visitStat).toList
       }
-      PackageDef(emptyIdent, stats)
+      TreeSeq(stats)
     }
 
     override def visitStat(ctx: EECParser.StatContext): Tree =
@@ -465,10 +441,10 @@ object Parsers {
 
     override def visitTranslationUnit(
       ctx: EECParser.TranslationUnitContext): Tree = {
+        import TreeOps._
         val pkgId = visitPackageInfo(ctx.packageInfo)
         val stats = visitStatSeq(ctx.statSeq)
-        import TreeOps._
-        PackageDef(pkgId, stats.toList)
+        PackageDef(uTpe, pkgId, stats.toList)
       }
   }
 }

@@ -5,8 +5,8 @@ class EECRepl {
   
   import compiler.types._
   import compiler.parsers._
-  import compiler.errors.ParserErrors.ParserError
-  import compiler.errors.TyperErrors.TyperError
+  import compiler.error.ParserErrors.ParserError
+  import compiler.error.TyperErrors.TyperError
   import compiler.types.Types._
   import compiler.types.Types.Type
   import scala.annotation._
@@ -16,16 +16,25 @@ class EECRepl {
   val defaultPrompt = "eec"
 
   def loop: Unit = {
+
+    def (prompt: String) asPrompt: String = s"$prompt> "
+
     @tailrec
     def inner(state: LoopState): Unit = state match {
       case s @ LoopState(prompt, false) =>
-        print(s"$prompt> ")
-        inner(command(s, readLine))
+        println
+        print(prompt.asPrompt)
+        val nextState = command(s, readLine)
+        inner(nextState)
       case LoopState(_, true) =>
         // exit
     }
+
+    val initial = LoopState(defaultPrompt, false)
     println("starting eec REPL...")
-    inner(LoopState(defaultPrompt, false))
+    print(defaultPrompt.asPrompt)
+    val state = command(initial, readLine)
+    inner(state)
   }
 
   private[this] case class LoopState(prompt: String, break: Boolean)
@@ -34,6 +43,7 @@ class EECRepl {
       import Commands._
       import Commands.Command._
       import compiler.ast.Trees._
+      import compiler.types.Typers._
 
       parseCommand(input) match {
         case AstExpr(code) =>
@@ -51,13 +61,16 @@ class EECRepl {
               println(s"[ERROR] ${e.userString}")
               state
             case expr: Tree =>
-              expr.typ match {
-                case e: TyperError =>
-                  println(s"[ERROR] ${e.userString}")
-                  state
-                case t: Type =>
-                  println(t.userString)
-                  state
+              import TypeOps._
+              import TyperError._
+              implicit val m: Mode = Mode.Term
+              expr.typd.fold { error =>
+                println(s"[ERROR] ${error.userString}")
+                state
+              }{ typed =>
+                val tpe = typed.tpe
+                println(tpe.userString)
+                state
               }
           }
         case AstFile(name) =>

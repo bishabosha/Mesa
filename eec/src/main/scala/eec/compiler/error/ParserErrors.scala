@@ -1,6 +1,6 @@
 package eec
 package compiler
-package errors
+package error
 
 object ParserErrors {
   
@@ -10,6 +10,7 @@ object ParserErrors {
   }
 
   object ParserError {
+
     import eec.util.Showable
 
     implicit val EECErrorShowable: Showable[ParserError] = new {
@@ -20,8 +21,10 @@ object ParserErrors {
     }
     
     def (f: => O) recover[O]: O | ParserError = {
+
       import scala.util.control._
       import parsers.ParserSyntaxException
+
       try {
         f
       } catch {
