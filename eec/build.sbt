@@ -4,7 +4,7 @@ enablePlugins(Antlr4Plugin)
 
 antlr4PackageName in Antlr4 := Some("eec.compiler.parsers")
 antlr4GenListener in Antlr4 := false // default: true
-antlr4GenVisitor in Antlr4 := true // default: false
+antlr4GenVisitor in Antlr4 := false // default: false
 
 lazy val root = project
   .in(file("."))

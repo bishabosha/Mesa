@@ -4,11 +4,14 @@ package object parsers {
 
   import ast.Trees._
   import Parsers._
+  import Parsers.TreeParsers._
   import error.ParserErrors._
 
   class ParserSyntaxException(msg: String) extends Exception(msg)
 
-  def parseEEC(input: String): Tree | ParserError = eecParser(input)
+  val parseEEC: String => Tree | ParserError =
+    eecParser toTreeParser fromTranslationUnit
 
-  def parseExpr(input: String): Tree | ParserError = exprParser(input)
+  val parseExpr: String => Tree | ParserError =
+    exprParser toTreeParser fromExpr
 }

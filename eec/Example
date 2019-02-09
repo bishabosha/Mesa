@@ -45,7 +45,7 @@ isZero x : Integer -> !Boolean =
     _ => !False
 
 main: !() =
-  let !x = readInteger  in
+  let !x = readInteger in
   let !zero = isZero x in
     if zero then
       putStrLn "Entered Zero"

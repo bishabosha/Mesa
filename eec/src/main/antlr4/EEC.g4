@@ -21,6 +21,48 @@ stableId: id | id '.' id;
 // -- Types
 //
 
+
+//
+// -- Brandon's types for project
+//
+
+// transform: typet '=>' typet;
+
+// typet: bType | function;
+
+// function: bType ('->' bType)+;
+
+// bType: aType | functor;
+
+// functor: id fvar+;
+
+// fvar: aType polarity?;
+
+// polarity: '+' | '-';
+
+// aType: id | '(' typet ')';
+
+
+//
+// -- Revised rules for parser update
+//
+
+// typeN: bType | func;
+
+// func: bType ('->' bType)+;
+
+// bType: aType | pType | tType;
+
+// tType: '(' typeN (',' typeN)* ')' | '()';
+
+// pType: (Bang | qualId) aType+;
+
+// aType: qualId | '(' typeN ')';
+
+//
+//
+//
+
 type: infixType '->' type | infixType;
 
 infixType: prefixType | productType;

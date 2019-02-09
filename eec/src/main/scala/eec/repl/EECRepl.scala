@@ -39,7 +39,8 @@ class EECRepl {
 
   private[this] case class LoopState(prompt: String, break: Boolean)
 
-  private def command(state: LoopState, input: String): LoopState = {
+  private[this] def command(state: LoopState, input: String): LoopState = {
+
       import Commands._
       import Commands.Command._
       import compiler.ast.Trees._
@@ -52,7 +53,8 @@ class EECRepl {
               println(s"[ERROR] ${e.userString}")
               state
             case expr =>
-              pprintln(expr, height = Int.MaxValue)
+              import Printing.untyped.AstOps._
+              pprintln(expr.asInstanceOf[Tree].toAst, height = Int.MaxValue)
               state
           }
         case TypeExpr(code) =>
@@ -82,7 +84,8 @@ class EECRepl {
               println(s"[ERROR] ${e.userString}")
               state
             case ast =>
-              pprintln(ast, height = Int.MaxValue)
+              import Printing.untyped.AstOps._
+              pprintln(ast.asInstanceOf[Tree].toAst, height = Int.MaxValue)
               state
           }
         case SetPrompt(newPrompt) =>

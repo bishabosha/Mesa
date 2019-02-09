@@ -19,8 +19,10 @@ object ParserErrors {
         case SyntaxError(msg: String) => msg
       }
     }
+
+    type Parsed[O] = O | ParserError
     
-    def (f: => O) recover[O]: O | ParserError = {
+    def (f: => O) recover[O]: Parsed[O] = {
 
       import scala.util.control._
       import parsers.ParserSyntaxException
