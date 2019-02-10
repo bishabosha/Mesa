@@ -4,9 +4,9 @@ package repl
 class EECRepl {
   
   import compiler.types._
-  import compiler.parsers._
-  import compiler.error.ParserErrors.ParserError
-  import compiler.error.TyperErrors.TyperError
+  import compiler.parsing._
+  import compiler.error.CompilerErrors.CompilerError
+  import compiler.error.CompilerErrors.CompilerError
   import compiler.types.Types._
   import compiler.types.Types.Type
   import scala.annotation._
@@ -46,50 +46,61 @@ class EECRepl {
       import compiler.ast.Trees._
       import compiler.types.Typers._
 
+      def guarded(string: String)(body: => LoopState): LoopState =
+        if string.isBlank then {
+          println(s"[ERROR] empty input")
+          state
+        } else {
+          body
+        }
+
       parseCommand(input) match {
-        case AstExpr(code) =>
+        case AstExpr(code) => guarded(code) {
           parseExpr(code) match {
-            case e: ParserError =>
+            case e: CompilerError =>
               println(s"[ERROR] ${e.userString}")
               state
             case expr =>
-              import Printing.untyped.AstOps._
+              import compiler.core.Printing.untyped.AstOps._
               pprintln(expr.asInstanceOf[Tree].toAst, height = Int.MaxValue)
               state
           }
-        case TypeExpr(code) =>
+        }
+        case TypeExpr(code) => guarded(code) {
           parseExpr(code) match {
-            case e: ParserError =>
+            case e: CompilerError =>
               println(s"[ERROR] ${e.userString}")
               state
             case expr: Tree =>
-              import TypeOps._
-              import TyperError._
-              implicit val m: Mode = Mode.Term
-              expr.typd.fold { error =>
+              import CompilerError._
+              expr.typedAsExpr(Type.WildcardType).fold { error =>
                 println(s"[ERROR] ${error.userString}")
                 state
               }{ typed =>
+                import TypeOps._
                 val tpe = typed.tpe
                 println(tpe.userString)
                 state
               }
           }
-        case AstFile(name) =>
+        }
+        case AstFile(name) => guarded(name) {
           val file = scala.io.Source.fromFile(s"$pwd/$name")
           val code = file.getLines.mkString("\n")
           file.close()
           parseEEC(code) match {
-            case e: ParserError =>
+            case e: CompilerError =>
               println(s"[ERROR] ${e.userString}")
               state
             case ast =>
-              import Printing.untyped.AstOps._
+              import compiler.core.Printing.untyped.AstOps._
               pprintln(ast.asInstanceOf[Tree].toAst, height = Int.MaxValue)
               state
           }
-        case SetPrompt(newPrompt) =>
+        }
+        case SetPrompt(newPrompt) => guarded(newPrompt) {
           state.copy(prompt = newPrompt)
+        }
         case Quit =>
           println("Quitting...")
           state.copy(break = true)

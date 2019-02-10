@@ -25,18 +25,18 @@ object Commands {
       | :q              => Quit the REPL""".stripMargin
 
   private val quitCommand = ":q".r
-  private val astExpr = """:ast\s+?(.*)""".r
-  private val typeExpr = """:t\s+?(.*)""".r
-  private val astFile = """:astf\s+((?:\S(?:\s*)?)*)""".r
-  private val setPrompt = """:prompt\s*?(\S*)""".r
+  private val astExpr = """:ast(?:\s+?(.*))?""".r
+  private val typeExpr = """:t(?:\s+?(.*))?""".r
+  private val astFile = """:astf(?:\s+((?:\S(?:\s*)?)*))?""".r
+  private val setPrompt = """:prompt(?:\s*?(\S*))?""".r
   private val showHelp = ":help".r
 
-  def parseCommand(line: String): Command = line match {
+  def parseCommand(line: String): Command = line.trim match {
     case quitCommand() => Quit
-    case astExpr(code) => AstExpr(code)
-    case typeExpr(code) => TypeExpr(code)
-    case astFile(file) => AstFile(file)
-    case setPrompt(newPrompt) => SetPrompt(newPrompt)
+    case astExpr(code) => AstExpr(Option(code).getOrElse(""))
+    case typeExpr(code) => TypeExpr(Option(code).getOrElse(""))
+    case astFile(file) => AstFile(Option(file).getOrElse(""))
+    case setPrompt(newPrompt) => SetPrompt(Option(newPrompt).getOrElse(""))
     case showHelp() => ShowHelp
     case _ => Unknown
   }

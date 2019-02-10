@@ -231,7 +231,7 @@ StringLiteral:
 	| '"""' MultiLineChars '"""';
 
 FloatingPointLiteral:
-	Digit+ '.' Digit+ ExponentPart? FloatType?
+	'-'? Digit+ '.' Digit+ ExponentPart? FloatType?
 	| '.' Digit+ ExponentPart? FloatType?
 	| Digit+ ExponentPart FloatType?
 	| Digit+ ExponentPart? FloatType;

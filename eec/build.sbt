@@ -2,7 +2,7 @@ val dottyVersion = "0.12.0-RC1"
 
 enablePlugins(Antlr4Plugin)
 
-antlr4PackageName in Antlr4 := Some("eec.compiler.parsers")
+antlr4PackageName in Antlr4 := Some("eec.compiler.parsing")
 antlr4GenListener in Antlr4 := false // default: true
 antlr4GenVisitor in Antlr4 := false // default: false
 

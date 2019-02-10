@@ -1,6 +1,6 @@
 package eec
 package compiler
-package parsers
+package parsing
 
 object Parsers {
 
@@ -11,37 +11,44 @@ object Parsers {
   import core.Names._
   import core.Constants._
   import core.Constants.Constant._
-  import error.ParserErrors._
+  import error.CompilerErrors._
   import org.antlr.v4.runtime.tree.TerminalNode
   import org.antlr.v4.runtime._
   import scala.collection.JavaConversions._
 
-  private[parsers] val eecParser =
+  private[parsing] val eecParser =
     genParser andThen { _.translationUnit }
 
-  private[parsers] val exprParser =
+  private[parsing] val exprParser =
     genParser andThen { _.expr }
 
-  private[parsers] object TreeParsers {
+  private[parsing] val typeParser =
+    genParser andThen { _.`type` }
 
-    private[parsers] def (o: String => O) toTreeParser[O](f: O => Tree): (
-      String => Tree | ParserError) = {
-        import error.ParserErrors.ParserError._
-        f compose o andThen recover
+  private[Parsers] class ParserSyntaxException(msg: String) extends Exception(msg)
+
+  private[parsing] object TreeParsers {
+
+    def (o: String => O) toTreeParser[O](f: O => Tree): (
+      String => Checked[Tree]) = {
+        import error.CompilerErrors.CompilerError._
+        input => f(o(input)).recover {
+          case e: ParserSyntaxException => SyntaxError(e.getMessage)
+        }
       }
 
     def fromLiteral(ctx: EECParser.LiteralContext): Tree =
-      if ctx.IntegerLiteral != null then {
+      if ctx.IntegerLiteral ne null then {
         Literal(uTpe, BigIntConstant(BigInt(ctx.IntegerLiteral.getText)))
-      } else if ctx.FloatingPointLiteral != null then {
+      } else if ctx.FloatingPointLiteral ne null then {
         Literal(uTpe, BigDecConstant(BigDecimal(ctx.FloatingPointLiteral.getText)))
-      } else if ctx.BooleanLiteral != null then {
+      } else if ctx.BooleanLiteral ne null then {
         val bool = ctx.BooleanLiteral.getText match {
           case "True" => true
           case _ => false
         }
         Literal(uTpe, BooleanConstant(bool))
-      } else if ctx.CharacterLiteral != null then {
+      } else if ctx.CharacterLiteral ne null then {
         val charStr = ctx.CharacterLiteral.getText
           .stripPrefix("'").stripSuffix("'")
         val char = if charStr.length == 0 then 0 else charStr.charAt(0)
@@ -93,7 +100,7 @@ object Parsers {
     }
 
     def fromType(ctx: EECParser.TypeContext): Tree =
-      if ctx.`type` != null then {
+      if ctx.`type` ne null then {
         val arg = fromInfixType(ctx.infixType)
         val body = fromType(ctx.`type`)
         Function(uTpe, List(arg), body)
@@ -102,7 +109,7 @@ object Parsers {
       }
 
     def fromInfixType(ctx: EECParser.InfixTypeContext): Tree =
-      if ctx.prefixType != null then
+      if ctx.prefixType ne null then
         fromPrefixType(ctx.prefixType)
       else
         fromProductType(ctx.productType)
@@ -116,7 +123,7 @@ object Parsers {
     }
 
     def fromPrefixType(ctx: EECParser.PrefixTypeContext): Tree =
-      if ctx.simpleType != null then {
+      if ctx.simpleType ne null then {
         fromSimpleType(ctx.simpleType)
       } else {
         val tag = Ident(uTpe, Name.ComputationTag)
@@ -125,19 +132,19 @@ object Parsers {
       }
 
     def fromSimpleType(ctx: EECParser.SimpleTypeContext): Tree =
-      if ctx.qualId != null then
+      if ctx.qualId ne null then
         fromQualId(ctx.qualId)
       else
         fromType(ctx.`type`)
 
     def fromExpr(ctx: EECParser.ExprContext): Tree =
-      if ctx.lambda != null then
+      if ctx.lambda ne null then
         fromLambda(ctx.lambda)
-      else if ctx.letExpr != null then
+      else if ctx.letExpr ne null then
         fromLetExpr(ctx.letExpr)
-      else if ctx.caseExpr != null then
+      else if ctx.caseExpr ne null then
         fromCaseExpr(ctx.caseExpr)
-      else if ctx.expr1 != null then
+      else if ctx.expr1 ne null then
         fromExpr1(ctx.expr1)
       else
         fromExprSeqAsApply(ctx.expr)
@@ -160,7 +167,7 @@ object Parsers {
     def fromLetExpr(ctx: EECParser.LetExprContext): Tree = {
       import NameOps._
       var name =
-        if ctx.Varid != null then
+        if ctx.Varid ne null then
           ctx.Varid.getText.readAs
         else
           ctx.Wildcard.getText.readAs
@@ -172,13 +179,13 @@ object Parsers {
 
     def fromCaseExpr(ctx: EECParser.CaseExprContext): Tree = {
       import TreeOps._
-      val expr = fromExpr(ctx.expr)
+      val selector = fromExpr(ctx.expr)
       val cases = fromCases(ctx.cases).toList
-      CaseExpr(uTpe, expr, cases)
+      CaseExpr(uTpe, selector, cases)
     }
 
     def fromExpr1(ctx: EECParser.Expr1Context): Tree =
-      if ctx.infixExpr != null then {
+      if ctx.infixExpr ne null then {
         fromInfixExpr(ctx.infixExpr)
       } else {
         import scala.language.implicitConversions
@@ -189,11 +196,11 @@ object Parsers {
       }
 
     def fromInfixExpr(ctx: EECParser.InfixExprContext): Tree =
-      if ctx.prefixExpr != null then {
+      if ctx.prefixExpr ne null then {
         fromPrefixExpr(ctx.prefixExpr)
       } else {
         val id =
-          if ctx.OpId != null then {
+          if ctx.OpId ne null then {
             import NameOps._
             Ident(uTpe, ctx.OpId.getText.readAs)
           } else {
@@ -209,7 +216,7 @@ object Parsers {
 
     def fromPrefixExpr(ctx: EECParser.PrefixExprContext): Tree = {
       val simpleExpr = fromSimpleExpr(ctx.simpleExpr)
-      if ctx.Bang != null then {
+      if ctx.Bang ne null then {
         import NameOps._
         val tag = Ident(uTpe, Name.ComputationTag)
         Apply(uTpe, tag, List(simpleExpr))
@@ -219,9 +226,9 @@ object Parsers {
     }
 
     def fromSimpleExpr(ctx: EECParser.SimpleExprContext): Tree =
-      if ctx.literal != null then
+      if ctx.literal ne null then
         fromLiteral(ctx.literal)
-      else if ctx.stableId != null then
+      else if ctx.stableId ne null then
         fromStableId(ctx.stableId)
       else
         fromExprsInParens(ctx.exprsInParens)
@@ -235,7 +242,7 @@ object Parsers {
     def fromCaseClause(ctx: EECParser.CaseClauseContext): Tree = {
       val pat = fromPattern(ctx.pattern)
       val guard =
-        if ctx.guard != null then
+        if ctx.guard ne null then
           fromGuard(ctx.guard)
         else
           EmptyTree
@@ -270,12 +277,12 @@ object Parsers {
       fromPattern2(ctx.pattern2)
 
     def fromPattern2(ctx: EECParser.Pattern2Context): Tree =
-      if ctx.Varid != null then {
+      if ctx.Varid ne null then {
         val name = {
           import NameOps._
           ctx.Varid.getText.readAs
         }
-        if ctx.pattern3 != null then {
+        if ctx.pattern3 ne null then {
           Bind(uTpe, name, fromPattern3(ctx.pattern3))
         } else {
           Ident(uTpe, name)
@@ -289,16 +296,16 @@ object Parsers {
 
     def fromSimplePattern(
       ctx: EECParser.SimplePatternContext): Tree =
-        if ctx.Wildcard != null then {
+        if ctx.Wildcard ne null then {
           wildcardIdent
         } else if ctx.getText == "()" then {
           Parens(uTpe, Nil)
-        } else if ctx.Varid != null then {
+        } else if ctx.Varid ne null then {
           import NameOps._
           Ident(uTpe, ctx.Varid.getText.readAs)
-        } else if ctx.literal != null then {
+        } else if ctx.literal ne null then {
           fromLiteral(ctx.literal)
-        } else if ctx.simplePattern != null then { // Bang present
+        } else if ctx.simplePattern ne null then { // Bang present
           val simplePat = fromSimplePattern(ctx.simplePattern)
           val computation = Ident(uTpe, Name.ComputationTag)
           Unapply(uTpe, computation, List(simplePat))
@@ -369,7 +376,7 @@ object Parsers {
     }
 
     def fromDefSig(ctx: EECParser.DefSigContext): Tree =
-      if ctx.infixDefSig != null then {
+      if ctx.infixDefSig ne null then {
         fromInfixDefSig(ctx.infixDefSig)
       } else {
         var varids = {
@@ -383,9 +390,9 @@ object Parsers {
     def fromInfixDefSig(ctx: EECParser.InfixDefSigContext): Tree = {
       import scala.language.implicitConversions
       import NameOps._
-      if ctx.prefixOpSig != null then {
+      if ctx.prefixOpSig ne null then {
         fromPrefixOpSig(ctx.prefixOpSig)
-      } else if ctx.OpId != null then {
+      } else if ctx.OpId ne null then {
         var args = ctx.Varid
           .ensuring(_.size == 2)
           .map(_.getText.readAs)
@@ -418,7 +425,7 @@ object Parsers {
     }
 
     def fromStat(ctx: EECParser.StatContext): Tree =
-      if ctx.`def` != null then fromDef(ctx.`def`) else fromDcl(ctx.dcl)
+      if ctx.`def` ne null then fromDef(ctx.`def`) else fromDcl(ctx.dcl)
 
     def fromTranslationUnit(
       ctx: EECParser.TranslationUnitContext): Tree = {
@@ -443,10 +450,10 @@ object Parsers {
   }
 
   private[Parsers] def genParser[C](input: String): EECParser = {
-    val charStream = new ANTLRInputStream(input)
-    val lexer = new EECLexer(charStream)
-    val tokens = new CommonTokenStream(lexer)
-    val parser = new EECParser(tokens)
+    val charStream  = new ANTLRInputStream(input)
+    val lexer       = new EECLexer(charStream)
+    val tokens      = new CommonTokenStream(lexer)
+    val parser      = new EECParser(tokens)
     parser.removeErrorListeners
     parser.addErrorListener(eecErrorListener)
     parser

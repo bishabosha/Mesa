@@ -7,6 +7,18 @@ object Types {
   import core.Names._
   import ast.Trees._
 
+  object Bootstraps {
+
+    import Type._
+    import Name._
+
+    val BooleanType = TypeRef(BooleanTag)
+    val DecimalType = TypeRef(DecimalTag)
+    val IntegerType = TypeRef(IntegerTag)
+    val CharType    = TypeRef(CharTag)
+    val StringType  = TypeRef(StringTag)
+  }
+
   enum Type {
     case TypeRef(name: Name)
     case FunctionType(arg: Type, body: Type)
@@ -14,7 +26,50 @@ object Types {
     case AppliedType(typ: Type, args: List[Type])
     // case HKTypeLambda(args: List[Name], body: Type)
     case NoType
+    case WildcardType
     case Untyped
+  }
+
+  object Type {
+
+    import Type._
+    import eec.util.Showable
+
+    implicit val TypeShowable: Showable[Type] = new {
+      import Tree._
+
+      private def (tree: Tree) named: String = {
+        import TreeOps._
+        import NameOps._
+        tree.toNames.map(_.userString).mkString(".")
+      }
+
+      override def (typ: Type) userString: String = typ match {
+        case FunctionType(f: FunctionType, b) =>
+          s"(${f.userString}) -> ${b.userString}"
+        case FunctionType(t, b) =>
+          s"${t.userString} -> ${b.userString}"
+        case Product(ts) =>
+          ts.map(_.userString).mkString("(", ", ", ")")
+        case AppliedType(t, ts) =>
+          val args = ts.map {
+            case f @ FunctionType(_,_) => s"(${f.userString})"
+            case f => f.userString
+          }.mkString(" ")
+          if args.isEmpty then
+            t.userString
+          else
+            s"${t.userString} $args"
+        case TypeRef(t) =>
+          import NameOps._
+          t.userString
+        // case Derived(tree) =>
+        //   s"<derived from: `${tree.named}`>"
+        case WildcardType => "<anytype>"
+        case Untyped => "<untyped>"
+        case NoType => "<notype>"
+      }
+    }
   }
 
   object TypeOps {
@@ -66,46 +121,4 @@ object Types {
       case EmptyTree => Type.NoType
     }
   }
-
-  object Type {
-
-    import Type._
-    import eec.util.Showable
-
-    implicit val TypeShowable: Showable[Type] = new {
-      import Tree._
-
-      private def (tree: Tree) named: String = {
-        import TreeOps._
-        import NameOps._
-        tree.toNames.map(_.userString).mkString(".")
-      }
-
-      override def (typ: Type) userString: String = typ match {
-        case FunctionType(f: FunctionType, b) =>
-          s"(${f.userString}) -> ${b.userString}"
-        case FunctionType(t, b) =>
-          s"${t.userString} -> ${b.userString}"
-        case Product(ts) =>
-          ts.map(_.userString).mkString("(", ", ", ")")
-        case AppliedType(t, ts) =>
-          val args = ts.map {
-            case f @ FunctionType(_,_) => s"(${f.userString})"
-            case f => f.userString
-          }.mkString(" ")
-          if args.isEmpty then
-            t.userString
-          else
-            s"${t.userString} $args"
-        case TypeRef(t) =>
-          import NameOps._
-          t.userString
-        // case Derived(tree) =>
-        //   s"<derived from: `${tree.named}`>"
-        case Untyped => "<untyped>"
-        case NoType => "<notype>"
-      }
-    }
-  }
-
 }

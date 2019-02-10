@@ -1,5 +1,6 @@
 package eec
-package repl
+package compiler
+package core
 
 object Printing {
 
@@ -19,9 +20,9 @@ object Printing {
       case Apply(id: Ast, args: List[Ast])
       case Function(args: List[Ast], body: Ast)
       case Let(name: Name, value: Ast, continuation: Ast)
-      case If(cond: Ast, ifTrue: Ast, orElse: Ast)
+      case If(cond: Ast, thenp: Ast, elsep: Ast)
       case Literal(constant: Constant)
-      case CaseExpr(value: Ast, cases: List[Ast])
+      case CaseExpr(selector: Ast, cases: List[Ast])
       case CaseClause(pat: Ast, guard: Ast, body: Ast)
       case Alternative(bodys: List[Ast])
       case Parens(exprs: List[Ast])
@@ -43,9 +44,9 @@ object Printing {
         case Tree.Apply(_, id, args) => Apply(id.toAst, args.map(_.toAst))
         case Tree.Function(_, args, body) => Function(args.map(_.toAst), body.toAst)
         case Tree.Let(_, name, value, continuation) => Let(name, value.toAst, continuation.toAst)
-        case Tree.If(_, cond, ifTrue, orElse) => If(cond.toAst, ifTrue.toAst, orElse.toAst)
+        case Tree.If(_, cond, thenp, elsep) => If(cond.toAst, thenp.toAst, elsep.toAst)
         case Tree.Literal(_, constant) => Literal(constant)
-        case Tree.CaseExpr(_, value, cases) => CaseExpr(value.toAst, cases.map(_.toAst))
+        case Tree.CaseExpr(_, selector, cases) => CaseExpr(selector.toAst, cases.map(_.toAst))
         case Tree.CaseClause(_, pat, guard, body) => CaseClause(pat.toAst, guard.toAst, body.toAst)
         case Tree.Alternative(_, bodys) => Alternative(bodys.map(_.toAst))
         case Tree.Parens(_, exprs) => Parens(exprs.map(_.toAst))
