@@ -19,14 +19,23 @@ class TyperTest {
 
   @Test def typecheckInteger(): Unit = {
     passesTypeCheck(
-      "2".typed   -> "Integer",
-      "-10".typed -> "Integer")
+      "0".typed   -> "Integer",
+      "-0".typed  -> "Integer")
+    failsTypeCheck(
+      "0l".typed, // no Longs
+      "0L".typed // no Longs
+    )
   }
 
   @Test def typecheckDecimal(): Unit = {
     passesTypeCheck(
-      "3.14159".typed   -> "Decimal",
-      "-2.75e-10".typed -> "Decimal")
+      "3.14159265358979323846264338328".typed -> "Decimal", // PI
+      "6.62607004e-34".typed                  -> "Decimal", // Planck's constant
+      "−273.15".typed                         -> "Decimal") // 0 degrees Kelvin
+    failsTypeCheck(
+      "3.14159f".typed, // no Floats
+      "3.14159F".typed // no Floats
+    )
   }
 
   @Test def typecheckBoolean(): Unit = {
@@ -37,7 +46,11 @@ class TyperTest {
 
   @Test def typecheckChar(): Unit = {
     passesTypeCheck(
-      "'a'".typed  -> "Char")
+      "'a'".typed   -> "Char",
+      "'\\n'".typed -> "Char")
+    failsTypeCheck(
+      "''".typed,
+      "'ab'".typed)
   }
 
   @Test def typecheckString(): Unit = {
@@ -48,68 +61,80 @@ class TyperTest {
 
   @Test def typecheckProducts(): Unit = {
     passesTypeCheck(
-      "()".typed          -> "()",
-      "(1)".typed         -> "Integer",
-      "(1, False)".typed  -> "(Integer, Boolean)")
+      "()".typed      -> "()",
+      "(())".typed    -> "()",
+      "((),())".typed -> "((), ())")
   }
 
   @Test def typecheckCompute(): Unit = {
     passesTypeCheck(
-      "!1".typed          -> "! Integer",
-      "!(1)".typed        -> "! Integer",
-      "!(1, False)".typed -> "! (Integer, Boolean)")
+      "!()".typed       -> "! ()",
+      "!((),())".typed  -> "! ((), ())")
   }
 
   @Test def typecheckIf(): Unit = {
     passesTypeCheck(
-      "if True then 1 else 0".typed -> "Integer")
+      "if True then () else ()".typed -> "()")
     failsTypeCheck(
       "if 0 then () else ()".typed, // non Boolean condition
-      "if True then 1 else 'x'".typed) // disjoint branches
+      "if True then 0 else ()".typed) // disjoint branches
   }
 
   @Test def typecheckCase(): Unit = {
     passesTypeCheck(
-      """case "" of
-           _ => 0""".typed          -> "Integer",
-      """case "" of
-           x @ _ => 0""".typed      -> "Integer",
-      """case "" of
-           x => 0""".typed          -> "Integer",
-      """case "" of
-           _ if True => 0""".typed  -> "Integer",
-      """case "" of
-           "" | "a" => 0""".typed   -> "Integer",
-      """case (1, False) of
-           (2, True) => 3
-           _         => 4""".typed  -> "Integer")
+      """case () of
+           _ => ()""".typed         -> "()",
+      """case () of
+           x @ _ => ()""".typed     -> "()",
+      """case () of
+           x => ()""".typed         -> "()",
+      """case () of
+           _ if True => ()""".typed -> "()",
+      """case () of
+           () | () => ()""".typed   -> "()",
+      """case ((), ()) of
+           ((), ()) => ()
+           _        => ()""".typed  -> "()")
     failsTypeCheck(
-      """case 5 of
-           (a @ 3 | _) => 1""".typed, // name in alternative
-      """case 5 of
-           6 => 1
-           7 => False""".typed, // disjoint bodies
-      """case 8 of
-           9     => 10
-           "abc" => 11""".typed) // disjoint branches
+      """case () of
+           (a @ () | _) => ()""".typed, // name in alternative
+      """case () of
+           () => 1
+           () => False""".typed, // disjoint bodies
+      """case () of
+           "abc" => ()""".typed) // disjoint branch from selector
   }
 
   @Test def typecheckLambda(): Unit = {
     passesTypeCheck(
-      "\\i: Integer => 'x'".typed             -> "Integer -> Char",
-      "\\i: Integer -> String => 'x'".typed   -> "(Integer -> String) -> Char",
-      "\\i: Integer, s: String => 'x'".typed  -> "Integer -> String -> Char",
-      "\\i: (Integer, String) => 'x'".typed   -> "(Integer, String) -> Char",
-      "\\i: ! Integer => 'x'".typed           -> "! Integer -> Char")
+      "\\t: () => ()".typed         -> "() -> ()",
+      "\\t: () -> () => ()".typed   -> "(() -> ()) -> ()",
+      "\\t: (), u: () => ()".typed  -> "() -> () -> ()",
+      "\\t: ((), ()) => ()".typed   -> "((), ()) -> ()",
+      "\\t: ! () => ()".typed       -> "! () -> ()")
+  }
+
+  @Test def typecheckApplication(): Unit = {
+    passesTypeCheck(
+      "(\\t: (), u: (), v: () => ()) ()".typed       -> "() -> () -> ()",
+      "(\\t: (), u: (), v: () => ()) () ()".typed    -> "() -> ()",
+      "(\\t: (), u: (), v: () => ()) () () ()".typed -> "()",
+      "\\f: () -> () => f ()".typed                  -> "(() -> ()) -> ()",
+      "\\t: () => ! ()".typed                        -> "() -> ! ()",
+    )
+    failsTypeCheck(
+      "(\\f: () => ()) 0".typed
+    )
   }
 
   @Test def typecheckLet(): Unit = {
     passesTypeCheck(
-      "let !x = !2 in (!x, !'a')".typed -> "(! Integer, ! Char)")
+      "let !x = !() in !()".typed -> "!()")
   }
 
   def (str: String) typedAs(as: Type): Checked[Type] = {
     import Types.TypeOps._
+    import CompilerErrorOps._
     for {
       expr   <- parseExpr(str)
       expr1  <- expr.typedAsExpr(as)
@@ -119,22 +144,26 @@ class TyperTest {
   def (str: String) typed: Checked[Type] = str.typedAs(wildcard)
 
   def passesTypeCheck(seq: (Checked[Type], String)*): Unit = {
-    def impl(parsed: Checked[Type], checkTpe: String): Unit =
+    def impl(parsed: Checked[Type], checkTpe: String): Unit = {
+      import CompilerErrorOps._
       parsed.fold { e =>
         fail(e.userString)
       }{ tpe =>
         assertEquals(checkTpe, tpe.userString)
       }
+    }
     seq.foreach { impl(_,_) }
   }
 
   def failsTypeCheck(seq: Checked[Type]*): Unit = {
-    def impl(parsed: Checked[Type]): Unit =
+    def impl(parsed: Checked[Type]): Unit = {
+      import CompilerErrorOps._
       parsed.fold { e =>
         ()
       }{ tpe =>
         fail(s"typed successfully as ${tpe.userString}")
       }
+    }
     seq.foreach { impl }
   }
 }

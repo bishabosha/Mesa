@@ -31,17 +31,27 @@ object Parsers {
 
     def (o: String => O) toTreeParser[O](f: O => Tree): (
       String => Checked[Tree]) = {
-        import error.CompilerErrors.CompilerError._
+        import error.CompilerErrors._
+        import error.CompilerErrors.CompilerErrorOps._
         input => f(o(input)).recover {
-          case e: ParserSyntaxException => SyntaxError(e.getMessage)
+          case e: ParserSyntaxException =>
+            CompilerError.SyntaxError(e.getMessage)
         }
       }
 
     def fromLiteral(ctx: EECParser.LiteralContext): Tree =
       if ctx.IntegerLiteral ne null then {
-        Literal(uTpe, BigIntConstant(BigInt(ctx.IntegerLiteral.getText)))
+        val txt = ctx.IntegerLiteral.getText
+        if txt.endsWith("l") || txt.endsWith("L") then {
+          throw new ParserSyntaxException(s"unexpected Long literal `$txt`")
+        }
+        Literal(uTpe, BigIntConstant(BigInt(txt)))
       } else if ctx.FloatingPointLiteral ne null then {
-        Literal(uTpe, BigDecConstant(BigDecimal(ctx.FloatingPointLiteral.getText)))
+        val txt = ctx.FloatingPointLiteral.getText
+        if txt.endsWith("f") || txt.endsWith("F") then {
+          throw new ParserSyntaxException(s"unexpected Float literal `$txt`")
+        }
+        Literal(uTpe, BigDecConstant(BigDecimal(txt)))
       } else if ctx.BooleanLiteral ne null then {
         val bool = ctx.BooleanLiteral.getText match {
           case "True" => true
@@ -454,6 +464,8 @@ object Parsers {
     val lexer       = new EECLexer(charStream)
     val tokens      = new CommonTokenStream(lexer)
     val parser      = new EECParser(tokens)
+    lexer.removeErrorListeners
+    lexer.addErrorListener(eecErrorListener)
     parser.removeErrorListeners
     parser.addErrorListener(eecErrorListener)
     parser

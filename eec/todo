@@ -3,6 +3,13 @@
 [ ] use param to count down args for applications
 [ ] lazy implementation of tuple
 
+
+!!!!!!!! why these are printed in TyperTest -> line 1:0 token recognition error at: '−'
+line 1:0 token recognition error at: ''''
+line 1:0 token recognition error at: ''ab'
+line 1:3 token recognition error at: '''
+
+
 `t: A`
     -> `let u: !A = !t`
 

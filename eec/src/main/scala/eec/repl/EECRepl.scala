@@ -5,8 +5,7 @@ class EECRepl {
   
   import compiler.types._
   import compiler.parsing._
-  import compiler.error.CompilerErrors.CompilerError
-  import compiler.error.CompilerErrors.CompilerError
+  import compiler.error.CompilerErrors._
   import compiler.types.Types._
   import compiler.types.Types.Type
   import scala.annotation._
@@ -58,6 +57,7 @@ class EECRepl {
         case AstExpr(code) => guarded(code) {
           parseExpr(code) match {
             case e: CompilerError =>
+              import CompilerErrorOps._
               println(s"[ERROR] ${e.userString}")
               state
             case expr =>
@@ -69,10 +69,11 @@ class EECRepl {
         case TypeExpr(code) => guarded(code) {
           parseExpr(code) match {
             case e: CompilerError =>
+              import CompilerErrorOps._
               println(s"[ERROR] ${e.userString}")
               state
             case expr: Tree =>
-              import CompilerError._
+              import CompilerErrorOps._
               expr.typedAsExpr(Type.WildcardType).fold { error =>
                 println(s"[ERROR] ${error.userString}")
                 state
@@ -90,6 +91,7 @@ class EECRepl {
           file.close()
           parseEEC(code) match {
             case e: CompilerError =>
+              import CompilerErrorOps._
               println(s"[ERROR] ${e.userString}")
               state
             case ast =>

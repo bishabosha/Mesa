@@ -25,7 +25,7 @@ object Trees {
     case Select(tpe: Type, tree: Tree, name: Name)
     case Ident(tpe: Type, name: Name)
     case PackageDef(tpe: Type, pid: Tree, stats: List[Tree])
-    case DefDef(tpe: Type, modifiers: Set[Modifier], sig: Tree, typ: Tree, value: Tree)
+    case DefDef(tpe: Type, modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)
     case DefSig(tpe: Type, name: Name, args: List[Name])
     case Apply(tpe: Type, id: Tree, args: List[Tree])
     case Function(tpe: Type, args: List[Tree], body: Tree)
@@ -51,31 +51,31 @@ object Trees {
     import scala.annotation._
 
     def (tree: Tree) toList: List[Tree] = tree match {
-      case EmptyTree => Nil
-      case TreeSeq(args) => args
-      case Parens(_, args) => args
+      case EmptyTree            => Nil
+      case TreeSeq(args)        => args
+      case Parens(_, args)      => args
       case Alternative(_, args) => args
-      case t => t :: Nil
+      case t                    => t :: Nil
     }
 
     def (trees: List[Tree]) toTree: Tree = trees match {
-      case Nil => EmptyTree
+      case Nil      => EmptyTree
       case t :: Nil => t
-      case ts => TreeSeq(ts)
+      case ts       => TreeSeq(ts)
     }
 
     def (tree: Tree) toNames: List[Name] = {
       @tailrec def inner(acc: List[Name], t: Tree): List[Name] = t match {
-        case Ident(_, name) => name :: acc
-        case Select(_, tree, name) => inner(name :: acc, tree)
-        case _ => acc
+        case Ident(_, name)         => name :: acc
+        case Select(_, tree, name)  => inner(name :: acc, tree)
+        case _                      => acc
       }
       inner(Nil, tree).reverse
     }
 
     def (tree: Tree) addModifiers(mods: Set[Modifier]): Tree = tree match {
-      case d: DefDef => d.copy(modifiers = (d.modifiers ++ mods))
-      case otherwise => otherwise
+      case d: DefDef  => d.copy(modifiers = (d.modifiers ++ mods))
+      case _          => tree
     }
   }
 }
