@@ -224,17 +224,18 @@ OpId: Op;
 
 CharacterLiteral: '\'' (PrintableChar | CharEscapeSeq) '\'';
 
-IntegerLiteral: '-'? (DecimalNumeral /*| HexNumeral*/) ('L' | 'l')?;
+IntegerLiteral:
+	'-'? (DecimalNumeral /*| HexNumeral*/) ('L' | 'l')?;
 
 StringLiteral:
 	'"' StringElement* '"'
 	| '"""' MultiLineChars '"""';
 
 FloatingPointLiteral:
-	'-'? Digit+ '.' Digit+ ExponentPart? FloatType?
+	'-'? (Digit+ '.' Digit+ ExponentPart? FloatType?
 	| '.' Digit+ ExponentPart? FloatType?
 	| Digit+ ExponentPart FloatType?
-	| Digit+ ExponentPart? FloatType;
+	| Digit+ ExponentPart? FloatType);
 
 fragment CharNoBackQuoteOrNewline:
 	'\u0020' .. '\u0026'

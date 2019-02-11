@@ -15,7 +15,7 @@ class TyperTest {
   import types.Typers._
   import error.CompilerErrors._
 
-  val wildcard = types.Types.Type.WildcardType
+  val any = types.Types.Type.WildcardType
 
   @Test def typecheckInteger(): Unit = {
     passesTypeCheck(
@@ -23,7 +23,7 @@ class TyperTest {
       "-0".typed  -> "Integer")
     failsTypeCheck(
       "0l".typed, // no Longs
-      "0L".typed // no Longs
+      "0L".typed  // no Longs
     )
   }
 
@@ -31,10 +31,12 @@ class TyperTest {
     passesTypeCheck(
       "3.14159265358979323846264338328".typed -> "Decimal", // PI
       "6.62607004e-34".typed                  -> "Decimal", // Planck's constant
-      "−273.15".typed                         -> "Decimal") // 0 degrees Kelvin
+      "-273.15".typed                         -> "Decimal") // 0 degrees Kelvin
     failsTypeCheck(
       "3.14159f".typed, // no Floats
-      "3.14159F".typed // no Floats
+      "3.14159F".typed, // no Floats
+      "3.14159d".typed, // no Doubles
+      "3.14159D".typed  // no Doubles
     )
   }
 
@@ -141,7 +143,7 @@ class TyperTest {
     } yield expr1.tpe
   }
 
-  def (str: String) typed: Checked[Type] = str.typedAs(wildcard)
+  def (str: String) typed: Checked[Type] = str.typedAs(any)
 
   def passesTypeCheck(seq: (Checked[Type], String)*): Unit = {
     def impl(parsed: Checked[Type], checkTpe: String): Unit = {

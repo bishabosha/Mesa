@@ -51,6 +51,9 @@ object Parsers {
         if txt.endsWith("f") || txt.endsWith("F") then {
           throw new ParserSyntaxException(s"unexpected Float literal `$txt`")
         }
+        if txt.endsWith("d") || txt.endsWith("D") then {
+          throw new ParserSyntaxException(s"unexpected Double literal `$txt`")
+        }
         Literal(uTpe, BigDecConstant(BigDecimal(txt)))
       } else if ctx.BooleanLiteral ne null then {
         val bool = ctx.BooleanLiteral.getText match {

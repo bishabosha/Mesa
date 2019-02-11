@@ -6,13 +6,15 @@ object Typers {
 
   import Types._
   import Types.Type._
-  import core.Names.Name._
+  import core.Names._
   import core.Constants._
   import core.Constants.Constant._
+  import core.Modifiers._
   import ast.Trees._
   import ast.Trees.Tree._
   import ast.Trees.untyped._
   import error.CompilerErrors._
+  import CompilerErrorOps._
 
   enum Mode {
 
@@ -58,38 +60,38 @@ object Typers {
         CompilerError.UnexpectedType(s"Types do not unify to ${tpe.userString}")
     }
 
-  def checkFunWithProto(tree: Apply, funTyp: Type, proto: Type, pt: Type): Checked[Type] = {
-    import CompilerErrorOps._
-    (funTyp, proto) match {
-      case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
-        if arg =!= arg1 then
-          if ret =!= ret1 then
-            pt match {
-              case `any` => ret
-              case _ =>
-                import core.Printing.untyped.AstOps._
-                val retStr  = ret.userString
-                val ptStr   = pt.userString
-                val ast     = tree.toAst
-                CompilerError.UnexpectedType(
-                  s"$retStr != $ptStr in `application` expr:\n$ast")
-            }
-          else
-            CompilerError.UnexpectedType("Function Definition does not match return type")
-        else {
-          import core.Printing.untyped.AstOps._
-          val argStr  = arg.userString
-          val arg1Str = arg1.userString
-          val retStr  = ret.userString
-          val ret1Str = ret1.userString
-          val ast     = tree.toAst
-          CompilerError.UnexpectedType(
-            s"Function definition does not match args. Expected `$argStr -> $retStr` but was `$arg1Str -> $ret1Str` in `application` expr:\n$ast")
-        }
-      case _ =>
-        CompilerError.IllegalState("Can not apply to non function type")
+  def checkFunWithProto(funTyp: Type, proto: Type, pt: Type)(tree: => Tree): (
+    Checked[Type]) = {
+      (funTyp, proto) match {
+        case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
+          if arg =!= arg1 then
+            if ret =!= ret1 then
+              pt match {
+                case `any` => ret
+                case _ =>
+                  import core.Printing.untyped.AstOps._
+                  val retStr  = ret.userString
+                  val ptStr   = pt.userString
+                  val ast     = tree.toAst
+                  CompilerError.UnexpectedType(
+                    s"$retStr != $ptStr in `application` expr:\n$ast")
+              }
+            else
+              CompilerError.UnexpectedType("Function Definition does not match return type")
+          else {
+            import core.Printing.untyped.AstOps._
+            val argStr  = arg.userString
+            val arg1Str = arg1.userString
+            val retStr  = ret.userString
+            val ret1Str = ret1.userString
+            val ast     = tree.toAst
+            CompilerError.UnexpectedType(
+              s"Function definition does not match args. Expected `$argStr -> $retStr` but was `$arg1Str -> $ret1Str` in `application` expr:\n$ast")
+          }
+        case _ =>
+          CompilerError.IllegalState("Can not apply to non function type")
+      }
     }
-  }
 
   def (tree: Tree) typedAsExpr(pt: Type): Checked[Tree] = {
     implicit val newMode = Mode.Term
@@ -121,76 +123,75 @@ object Typers {
       case StringConstant(_)  => Bootstraps.StringType
     }
 
-    def typedFunctionTerm(f: Function, pt: Type): Modal[Checked[Tree]] = {
-      def function(args1: List[Tree], body1: Tree) = {
-        import TypeOps._
-        val tpes  = args1.map(_.tpe)
-        val fType = tpes.foldRight(body1.tpe) { FunctionType(_,_) }
-        Function(fType, args1, body1)
-      }
-      f match {
-        case Function(_, args, body) =>
-          import CompilerErrorOps._
-          for {
-            args1 <- args.flatMapM(_.typed(pt))
-            body1 <- body.typed(pt)
-          } yield function(args1, body1)
-      }
-    }
+    def typedFunctionTerm(args: List[Tree], body: Tree)(pt: Type): (
+      Modal[Checked[Tree]]) = {
 
-    def typedFunctionType(f: Function, pt: Type): Modal[Checked[Tree]] = {
+        def function(args1: List[Tree], body1: Tree) = {
+          import TypeOps._
+          val tpes  = args1.map(_.tpe)
+          val fType = tpes.foldRight(body1.tpe) { FunctionType(_,_) }
+          Function(fType, args1, body1)
+        }
+
+        for {
+          args1 <- args.flatMapM(_.typed(pt))
+          body1 <- body.typed(pt)
+        } yield function(args1, body1)
+      }
+
+    def typedFunctionType(args: List[Tree], body: Tree)(pt: Type): Modal[Checked[Tree]] = {
+
       def function(args1: List[Tree], body1: Tree) = {
         import TypeOps._
         val tpe = args1.map(_.tpe).toType
         val fType = FunctionType(tpe, body1.tpe)
         Function(fType, args1, body1)
       }
-      f match {
-        case Function(_, args, body) =>
-          import CompilerErrorOps._
-          for {
-            args1 <- args.flatMapM(_.typed(pt))
-            body1 <- body.typed(pt)
-          } yield function(args1, body1)
-      }
+
+      for {
+        args1 <- args.flatMapM(_.typed(pt))
+        body1 <- body.typed(pt)
+      } yield function(args1, body1)
     }
 
-    def typedTagged(t: Tagged, pt: Type): Modal[Checked[Tree]] = t match {
-      case Tagged(_, arg, tpeTree) =>
+    def typedTagged(arg: Name, tpeTree: Tree)(pt: Type): (
+      Modal[Checked[Tree]]) = {
+
         import TypeOps._
-        import CompilerErrorOps._
+
         for (tpeTree1 <- tpeTree.typedAsType(pt))
           yield Tagged(tpeTree1.tpe, arg, tpeTree1)
-    }
+      }
 
-    def typedParens(t: Parens, pt: Type): Modal[Checked[Tree]] = t match {
-      case Parens(_, List()) =>
+    def typedParens(tpeTrees: List[Tree])(pt: Type): Modal[Checked[Tree]] = {
+      if tpeTrees.isEmpty then {
         val tpe = Product(List())
         Parens(tpe, List())
-      case Parens(_, es) =>
-        import CompilerErrorOps._
+      } else {
+
         import TypeOps._
+
         for {
-          es1 <- es.flatMapM(_.typed(any))
+          tpes1 <- tpeTrees.flatMapM(_.typed(any))
         } yield {
-          val tpes = es1.map(_.tpe)
-          val tupleTyp = tpes.toType
+          val tpes      = tpes1.map(_.tpe)
+          val tupleTyp  = tpes.toType
           if tupleTyp =!= pt then {
-            Parens(tupleTyp, es1)
+            Parens(tupleTyp, tpes1)
           } else {
             import core.Printing.untyped.AstOps._
             val tupleTypeStr  = tupleTyp.userString
             val expectedStr   = pt.userString
-            val ast           = t.toAst
+            val ast           = Parens(any, tpeTrees).toAst
             CompilerError.UnexpectedType(
               s"expected `$expectedStr` but was `$tupleTypeStr` in expr:\n$ast")
           }
         }
+      }
     }
 
-    def typedApply(t: Apply, pt: Type): Modal[Checked[Tree]] = t match {
-      case Apply(_, functor, args) =>
-        import CompilerErrorOps._
+    def typedApply(functor: Tree, args: List[Tree])(pt: Type): (
+      Modal[Checked[Tree]]) = {
         /*TODO: type application for generic functors
           form type prototype by typing args and then forming typeTpe:
             [...args1] => pt
@@ -208,24 +209,27 @@ object Typers {
           val tpe = AppliedType(selTpe, argTpes)
           Apply(tpe, functor1, args1)
         }
-    }
+      }
 
-    def typedApplyTerm(t: Apply, pt: Type): Modal[Checked[Tree]] = t match {
-      case Apply(_, fun, args) =>
-        import CompilerErrorOps._
+    def typedApplyTerm(fun: Tree, args: List[Tree])(pt: Type): (
+      Modal[Checked[Tree]]) = {
+
         import TypeOps._
+        import core.Printing.untyped.AstOps._
+
         for {
           args1     <- args.flatMapM(_.typed(any))
           funProto  <- FunctionType(args1.map(_.tpe).toType, pt)
           fun1      <- fun.typed(any)
-          tpe       <- checkFunWithProto(t, fun1.tpe, funProto, pt)
+          tpe       <- checkFunWithProto(fun1.tpe, funProto, pt)(Apply(any, fun, args))
         } yield Apply(tpe, fun1, args1)
-    }
+      }
 
-    def typedIf(t: If, pt: Type): Modal[Checked[Tree]] = t match {
-      case If(_, cond, thenp, elsep) =>
-        import CompilerErrorOps._
+    def typedIf(cond: Tree, thenp: Tree, elsep: Tree)(pt: Type): (
+      Modal[Checked[Tree]]) = {
+
         import TypeOps._
+
         for {
           cond1     <- cond.typed(Bootstraps.BooleanType)
           thenp1    <- thenp.typed(pt)
@@ -236,7 +240,7 @@ object Typers {
             import core.Printing.untyped.AstOps._
             val thenpTpeStr = thenp1.tpe.userString
             val elsepTpeStr = elsep1.tpe.userString
-            val ast         = t.toAst
+            val ast         = If(any,cond,thenp,elsep).toAst
             CompilerError.UnexpectedType(
               s"$thenpTpeStr != $elsepTpeStr in `if` expr:\n$ast")
           } else {
@@ -245,45 +249,48 @@ object Typers {
         }
     }
 
-    def typedLet(t: Let, pt: Type): Modal[Checked[Tree]] = t match {
-      case Let(_, name, value, continuation) =>
-        import CompilerErrorOps._
+    def typedLet(name: Name, value: Tree, continuation: Tree)(pt: Type): (
+      Modal[Checked[Tree]]) = {
+
         import core.Printing.untyped.AstOps._
         import core.Names.NameOps._
+        import TypeOps._
+
         for {
           value1        <- value.typed(pt) // need to typecheck value1 as being comp type
           continuation1 <- continuation.typed(pt)
           catchAll      <- CompilerError.UnexpectedType(
             s"Can not infer type of `! ${name.userString}` = `${value1.toAst}` as of computation type.")
-        } yield ??? // Let(continuation1.tpe, name, value1, continuation1)
+        } yield Let(continuation1.tpe, name, value1, continuation1)
     }
 
-    def typedCaseExpr(t: CaseExpr, pt: Type): Modal[Checked[Tree]] = {
-      import CompilerErrorOps._
-      def (ts: List[Tree]) mapAsCaseClauses(selTpe: Type, pt: Type): (
-        Modal[Checked[List[Tree]]]) = {
-          ts.flatMapM({
-            case t @ CaseClause(_,_,_,_) => typedCaseClause(t, selTpe, pt)
-            case unknown => CompilerError.IllegalState(
-                s"$unknown is not Tree.CaseClause(_,_,_,_)")
-          })
-        }
-      t match {
-        case CaseExpr(_, selector, cases) =>
-          import TypeOps._
-          for {
-            selector1 <- selector.typed(pt)
-            cases1    <- cases.mapAsCaseClauses(selector1.tpe, pt)
-            tpe       <- cases1.unifiedTpe
-          } yield CaseExpr(tpe, selector1, cases1)
+    def typedCaseExpr(selector: Tree, cases: List[Tree])(pt: Type): (
+      Modal[Checked[Tree]]) = {
+
+        import TypeOps._
+
+        def (ts: List[Tree]) mapAsCaseClauses(selTpe: Type, pt: Type): (
+          Modal[Checked[List[Tree]]]) = {
+            ts.flatMapM({
+              case t @ CaseClause(_,_,_,_) => typedCaseClause(t, selTpe, pt)
+              case unknown => CompilerError.IllegalState(
+                  s"$unknown is not Tree.CaseClause(_,_,_,_)")
+            })
+          }
+
+        for {
+          selector1 <- selector.typed(pt)
+          cases1    <- cases.mapAsCaseClauses(selector1.tpe, pt)
+          tpe       <- cases1.unifiedTpe
+        } yield CaseExpr(tpe, selector1, cases1)
       }
-    }
 
     def typedCaseClause(t: CaseClause, selTpe: Type, pt: Type): (
       Modal[Checked[Tree]]) = t match {
         case CaseClause(_, pat, guard, body) =>
-          import CompilerErrorOps._
+
           import TypeOps._
+
           for {
             pat1    <- pat.typedAsPattern(selTpe)
             // TODO: need to set any variables in context
@@ -292,145 +299,128 @@ object Typers {
           } yield CaseClause(body1.tpe, pat1, guard1, body1)
       }
 
-    def typedUnapply(t: Unapply, pt: Type): Modal[Checked[Tree]] = t match {
-      case Unapply(_, id, args) =>
-        import CompilerErrorOps._
+    def typedUnapply(id: Tree, args: List[Tree])(pt: Type): (
+      Modal[Checked[Tree]]) = {
+
         for {
           id1 <- id.typed(pt)
           args1 <- args.flatMapM(_.typed(pt))
         } yield {
-          import TypeOps._
           // need to lookup id1 to get idArgs, if idArgs types match args1 then ok
+          import TypeOps._
           Unapply(id1.tpe, id1, args1)
         }
+      }
+
+    def typedBind(name: Name, body: Tree)(pt: Type): Modal[Checked[Tree]] = {
+
+      import Mode._
+
+      for {
+        body1 <- body.typed(pt)
+      } yield {
+        import core.Names._
+        import TypeOps._
+        if name == Name.Wildcard then
+          body1
+        else if mode == PatAlt then
+          CompilerError.IllegalState(
+            s"Illegal variable ${name} in pattern alternative")
+        else
+          // TODO: add name to context with type of body1
+          Bind(body1.tpe, name, body1)
+      }
     }
 
-    def typedBind(t: Bind, pt: Type): Modal[Checked[Tree]] = t match {
-      case Bind(_, name, body) =>
-        import CompilerErrorOps._
-        import Mode._
+    def typedAlternative(patterns: List[Tree])(pt: Type): (
+      Modal[Checked[Tree]]) = {
+        implicit val newMode = Mode.PatAlt
         for {
-          body1 <- body.typed(pt)
-        } yield {
-          import core.Names._
-          import TypeOps._
-          if name == Name.Wildcard then
-            body1
-          else if mode == PatAlt then
-            CompilerError.IllegalState(
-              s"Illegal variable ${name} in pattern alternative")
-          else
-            // TODO: add name to context with type of body1
-            Bind(body1.tpe, name, body1)
-        }
-    }
-
-    def typedAlternative(t: Alternative, pt: Type): Modal[Checked[Tree]] =
-      t match {
-        case Alternative(_, patterns) =>
-          import CompilerErrorOps._
-          implicit val newMode = Mode.PatAlt
-          for {
-            patterns1 <- patterns.flatMapM(_.typed(pt))
-            tpe       <- patterns1.unifiedTpe
-          } yield Alternative(tpe, patterns1)
+          patterns1 <- patterns.flatMapM(_.typed(pt))
+          tpe       <- patterns1.unifiedTpe
+        } yield Alternative(tpe, patterns1)
       }
 
-    def typedPackageDef(t: PackageDef, pt: Type): Modal[Checked[Tree]] =
-      t match {
-        case PackageDef(_, pid, stats) =>
-          import CompilerErrorOps._
-          import TypeOps._
-          for {
-            pid1    <- pid.typedAsType(any)
-            // symbol  <- pid1.defineSymbol
-            stats1  <- typedStats(stats /*, symbol */)
-          } yield PackageDef(pid1.tpe, pid1, stats1)
+    def typedPackageDef(pid: Tree, stats: List[Tree])(pt: Type): (
+      Modal[Checked[Tree]]) = {
+        import TypeOps._
+        for {
+          pid1    <- pid.typedAsType(any)
+          // symbol  <- pid1.defineSymbol
+          stats1  <- typedStats(stats /*, symbol */)
+        } yield PackageDef(pid1.tpe, pid1, stats1)
       }
 
-    def typedStats(t: List[Tree] /*, symbol: ??? */): Modal[Checked[List[Tree]]] = {
-      import CompilerErrorOps._
-      t.flatMapM(_.typed(any))
-    }
+    def typedStats(stats: List[Tree] /*, symbol: ??? */): (
+      Modal[Checked[List[Tree]]]) =
+        stats.flatMapM(_.typed(any))
 
-    def typedDefDef(t: DefDef, pt: Type): Modal[Checked[Tree]] =
-      t match {
-        case DefDef(_, modifiers, sig, tpeAs, body) =>
-          import CompilerErrorOps._
-          import TypeOps._
-          for {
-            tpeAs1  <- tpeAs.typedAsType(any)
-            tpe     <- tpeAs1.tpe
-            sig1    <- sig.typed(tpe)
-            body1   <- body.typed(tpe)
-          } yield DefDef(tpe, modifiers, sig1, tpeAs1, body1)
+    def typedDefDef(
+      modifiers: Set[Modifier],
+      sig: Tree,
+      tpeAs: Tree,
+      body: Tree)(
+      pt: Type): Modal[Checked[Tree]] = {
+        import TypeOps._
+        for {
+          tpeAs1  <- tpeAs.typedAsType(any)
+          tpe     <- tpeAs1.tpe
+          sig1    <- sig.typed(tpe)
+          body1   <- body.typed(tpe)
+        } yield DefDef(tpe, modifiers, sig1, tpeAs1, body1)
       }
 
-    def typedDefSig(t: DefSig, pt: Type): Modal[Checked[Tree]] =
-      t match {
-        case DefSig(_, name, args) =>
-          CompilerError.IllegalState("Function declarations unimplemented")
-      }
+    def typedDefSig(name: Name, args: List[Name])(pt: Type): (
+      Modal[Checked[Tree]]) =
+        CompilerError.IllegalState("Function declarations unimplemented")
 
-    def typedSelectType(t: Select, pt: Type): Modal[Checked[Tree]] =
-      t match {
-        case Select(_, from, name) =>
-          CompilerError.IllegalState("Typed member selections unimplemented")
-      }
+    def typedSelectType(from: Tree, name: Name)(pt: Type): (
+      Modal[Checked[Tree]]) =
+        CompilerError.IllegalState("Typed member selections unimplemented")
 
-    def typedSelectTerm(t: Select, pt: Type): Modal[Checked[Tree]] =
-      t match {
-        case Select(_, from, name) =>
-          CompilerError.SyntaxError("Member selections do not exist for terms.")
-      }
+    def typedSelectTerm(from: Tree, name: Name)(pt: Type): (
+      Modal[Checked[Tree]]) =
+        CompilerError.SyntaxError("Member selections do not exist for terms.")
 
-    def typedIdentType(t: Ident, pt: Type): Modal[Checked[Tree]] =
-      t match {
-        case Ident(_, name) =>
-          Ident(TypeRef(name), name)
-      }
+    def typedIdentType(name: Name)(pt: Type): Modal[Checked[Tree]] =
+      Ident(TypeRef(name), name)
 
-    def typedIdentPat(t: Ident, pt: Type): Modal[Checked[Tree]] =
-      t match {
-        case Ident(_, name) =>
-          Ident(pt, name) // TODO: need to add name to context
-      }
+    def typedIdentPat(name: Name)(pt: Type): Modal[Checked[Tree]] =
+      Ident(pt, name) // TODO: need to add name to context
 
-    def typedLiteral(t: Literal): Modal[Checked[Tree]] =
-      t match {
-        case Literal(_, constant) => Literal(constantTpe(constant), constant)
-      }
+    def typedLiteral(constant: Constant): Modal[Checked[Tree]] =
+      Literal(constantTpe(constant), constant)
  
     def inner(tree: Tree, pt: Type): Modal[Checked[Tree]] = {
       import Mode._
       tree match {
         /* Type Trees */
-        case t @ Select(_,_,_)      if mode == Type   => typedSelectType(t, pt)
-        case t @ Ident(_,_)         if mode == Type   => typedIdentType(t, pt)
-        case t @ Apply(_,_,_)       if mode == Type   => typedApply(t, pt)
-        case t @ Function(_,_,_)    if mode == Type   => typedFunctionType(t, pt)
+        case Select(_,t,n)      if mode == Type   => typedSelectType(t,n)(pt)
+        case Ident(_,n)         if mode == Type   => typedIdentType(n)(pt)
+        case Apply(_,t,ts)      if mode == Type   => typedApply(t,ts)(pt)
+        case Function(_,ts,t)   if mode == Type   => typedFunctionType(ts,t)(pt)
         /* Pattern Trees */
-        case t @ Ident(_,_)         if mode.isPattern => typedIdentPat(t, pt)
-        case t @ Unapply(_,_,_)     if mode.isPattern => typedUnapply(t, pt)
-        case t @ Bind(_,_,_)        if mode.isPattern => typedBind(t, pt)
-        case t @ Alternative(_,_)   if mode.isPattern => typedAlternative(t, pt)
+        case Ident(_,n)         if mode.isPattern => typedIdentPat(n)(pt)
+        case Unapply(_,t,ts)    if mode.isPattern => typedUnapply(t,ts)(pt)
+        case Bind(_,n,t)        if mode.isPattern => typedBind(n,t)(pt)
+        case Alternative(_,ts)  if mode.isPattern => typedAlternative(ts)(pt)
         /* Term Trees */
-        case t @ PackageDef(_,_,_)  if mode == Term   => typedPackageDef(t, pt)
-        case t @ Apply(_,_,_)       if mode == Term   => typedApplyTerm(t, pt)
-        case t @ DefDef(_,_,_,_,_)  if mode == Term   => typedDefDef(t, pt)
-        case t @ DefSig(_,_,_)      if mode == Term   => typedDefSig(t, pt)
-        case t @ If(_,_,_,_)        if mode == Term   => typedIf(t, pt)
-        case t @ Let(_,_,_,_)       if mode == Term   => typedLet(t, pt)
-        case t @ Function(_,_,_)    if mode == Term   => typedFunctionTerm(t, pt)
-        case t @ Tagged(_,_,_)      if mode == Term   => typedTagged(t, pt)
-        case t @ CaseExpr(_,_,_)    if mode == Term   => typedCaseExpr(t, pt)
-        case t @ Select(_,_,_)      if mode == Term   => typedSelectTerm(t, pt)
+        case PackageDef(_,t,ts) if mode == Term   => typedPackageDef(t,ts)(pt)
+        case Apply(_,t,ts)      if mode == Term   => typedApplyTerm(t,ts)(pt)
+        case DefDef(_,m,s,t,b)  if mode == Term   => typedDefDef(m,s,t,b)(pt)
+        case DefSig(_,n,ns)     if mode == Term   => typedDefSig(n,ns)(pt)
+        case If(_,c,t,e)        if mode == Term   => typedIf(c,t,e)(pt)
+        case Let(_,n,v,c)       if mode == Term   => typedLet(n,v,c)(pt)
+        case Function(_,ts,t)   if mode == Term   => typedFunctionTerm(ts,t)(pt)
+        case Tagged(_,n,t)      if mode == Term   => typedTagged(n,t)(pt)
+        case CaseExpr(_,t,ts)   if mode == Term   => typedCaseExpr(t,ts)(pt)
+        case Select(_,t,n)      if mode == Term   => typedSelectTerm(t,n)(pt)
         /* any mode */
-        case t @ Literal(_,_)                         => typedLiteral(t)
-        case t @ Parens(_,_)                          => typedParens(t, pt)
+        case Literal(_,c)                         => typedLiteral(c)
+        case Parens(_,ts)                         => typedParens(ts)(pt)
         case t @ ( TreeSeq(_)
                  | CaseClause(_,_,_,_)
-                 | EmptyTree)                         => t
+                 | EmptyTree)                     => t
         /* error case */
         case _ =>
           import core.Printing.untyped.AstOps._
@@ -443,7 +433,6 @@ object Typers {
       case _ => false
     }
 
-    import CompilerErrorOps._
     inner(tree, pt).map {
       typed =>
 
