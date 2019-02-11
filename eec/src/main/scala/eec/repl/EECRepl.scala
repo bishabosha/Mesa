@@ -38,15 +38,33 @@ class EECRepl {
 
   private[this] case class LoopState(prompt: String, break: Boolean)
 
+  private[this] def loadFile(name: String): Checked[String] = {
+    import scala.util.control._
+    var file: scala.io.BufferedSource = null
+    try {
+      file = scala.io.Source.fromFile(s"$pwd/$name")
+      return file.getLines.mkString("\n")
+    } catch {
+      case e: Exception if NonFatal(e) =>
+        CompilerError.IllegalState(e.getMessage)
+    } finally {
+      if file ne null then {
+        file.close()
+      }
+    }
+  }
+
   private[this] def command(state: LoopState, input: String): LoopState = {
 
       import Commands._
       import Commands.Command._
       import compiler.ast.Trees._
       import compiler.types.Typers._
+      import compiler.core.Printing.untyped.AstOps._
+      import CompilerErrorOps._
 
       def guarded(string: String)(body: => LoopState): LoopState =
-        if string.isBlank then {
+        if string.isEmpty then {
           println(s"[ERROR] empty input")
           state
         } else {
@@ -55,50 +73,38 @@ class EECRepl {
 
       parseCommand(input) match {
         case AstExpr(code) => guarded(code) {
-          parseExpr(code) match {
-            case e: CompilerError =>
-              import CompilerErrorOps._
-              println(s"[ERROR] ${e.userString}")
-              state
-            case expr =>
-              import compiler.core.Printing.untyped.AstOps._
-              pprintln(expr.asInstanceOf[Tree].toAst, height = Int.MaxValue)
-              state
-          }
+          parseExpr(code).fold
+            { err => println(s"[ERROR] ${err.userString}") }
+            { expr => pprintln(expr.toAst, height = Int.MaxValue) }
+
+          state
         }
         case TypeExpr(code) => guarded(code) {
-          parseExpr(code) match {
-            case e: CompilerError =>
-              import CompilerErrorOps._
-              println(s"[ERROR] ${e.userString}")
-              state
-            case expr: Tree =>
-              import CompilerErrorOps._
-              expr.typedAsExpr(Type.WildcardType).fold { error =>
-                println(s"[ERROR] ${error.userString}")
-                state
-              }{ typed =>
-                import TypeOps._
-                val tpe = typed.tpe
-                println(tpe.userString)
-                state
-              }
-          }
+          import TypeOps._
+
+          val yieldTyped = for {
+            expr <- parseExpr(code)
+            typed <- expr.typedAsExpr(Type.WildcardType)
+          } yield typed
+
+          yieldTyped.fold
+            { error => println(s"[ERROR] ${error.userString}") }
+            { typed => println(typed.tpe.userString) }
+
+          state
         }
         case AstFile(name) => guarded(name) {
-          val file = scala.io.Source.fromFile(s"$pwd/$name")
-          val code = file.getLines.mkString("\n")
-          file.close()
-          parseEEC(code) match {
-            case e: CompilerError =>
-              import CompilerErrorOps._
-              println(s"[ERROR] ${e.userString}")
-              state
-            case ast =>
-              import compiler.core.Printing.untyped.AstOps._
-              pprintln(ast.asInstanceOf[Tree].toAst, height = Int.MaxValue)
-              state
-          }
+
+          val yieldAst = for {
+            code  <- loadFile(name)
+            ast   <- parseEEC(code)
+          } yield ast
+
+          yieldAst.fold
+            { err => println(s"[ERROR] ${err.userString}") }
+            { ast => pprintln(ast.toAst, height = Int.MaxValue) }
+
+          state
         }
         case SetPrompt(newPrompt) => guarded(newPrompt) {
           state.copy(prompt = newPrompt)

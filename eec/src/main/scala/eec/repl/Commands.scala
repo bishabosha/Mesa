@@ -31,12 +31,14 @@ object Commands {
   private val setPrompt = """:prompt(?:\s*?(\S*))?""".r
   private val showHelp = ":help".r
 
+  def (s: String) trimOrEmpty: String = Option(s).map(_.trim).getOrElse("")
+
   def parseCommand(line: String): Command = line.trim match {
     case quitCommand() => Quit
-    case astExpr(code) => AstExpr(Option(code).getOrElse(""))
-    case typeExpr(code) => TypeExpr(Option(code).getOrElse(""))
-    case astFile(file) => AstFile(Option(file).getOrElse(""))
-    case setPrompt(newPrompt) => SetPrompt(Option(newPrompt).getOrElse(""))
+    case astExpr(code) => AstExpr(code.trimOrEmpty)
+    case typeExpr(code) => TypeExpr(code.trimOrEmpty)
+    case astFile(file) => AstFile(file.trimOrEmpty)
+    case setPrompt(newPrompt) => SetPrompt(newPrompt.trimOrEmpty)
     case showHelp() => ShowHelp
     case _ => Unknown
   }
