@@ -16,21 +16,24 @@ object Namers {
 
   def namedDefDef(sig: Tree, tpeAs: Tree, body: Tree): Contextual[Modal[Unit]] = {
     val oldCtx = ctx
-    def namedDef(name: Name, args: List[Name]): Unit = {
-      implicit val newCtx: Context = enterFresh(name)(oldCtx)
-      args.foreach(enterLeaf)
+    def namedDef(id: Id, name: Name, args: List[Tree]): Unit = {
+      implicit val newCtx: Context = enterFresh(id, name)(oldCtx)
+      args.foreach {
+        case t @ Ident(name) => enterLeaf(t.id, name)
+        case _ =>
+      }
       index(body)
     }
-    val DefSig(_, name, names) = sig
-    namedDef(name, names)
+    val DefSig(name, names) = sig
+    namedDef(sig.id, name, names)
   }
 
-  def namedFunctionTerm(args: List[Tree], body: Tree): Contextual[Modal[Unit]] = {
+  def namedFunctionTerm(args: List[Tree], body: Tree)(id: Id): Contextual[Modal[Unit]] = {
     val oldCtx = ctx
     def inner: Unit = {
-      implicit val newCtx: Context = enterFresh(anon)(oldCtx)
+      implicit val newCtx: Context = enterFresh(id, anon)(oldCtx)
       args.foreach {
-        case Tagged(_, name, _) => enterLeaf(name)
+        case t @ Tagged(name, _) => enterLeaf(t.id, name)
         case _ =>
       }
       index(body)
@@ -38,14 +41,10 @@ object Namers {
     inner
   }
 
-  def namedTagged(name: Name): Contextual[Modal[Unit]] = {
-    enterLeaf(name)
-  }
-
   def namedPackageDef(pid: Tree, stats: List[Tree]): Contextual[Modal[Unit]] = {
     import TreeOps._
     var ctxNew = ctx
-    pid.toNames.foreach { n => ctxNew = enterFresh(n)(ctxNew) }
+    pid.toNamePairs.foreach { (id, n) => ctxNew = enterFresh(id, n)(ctxNew) }
     stats.foreach(index(_)(ctxNew))
   }
 
@@ -54,11 +53,12 @@ object Namers {
     args.foreach(index)
   }
 
-  def namedLet(name: Name, value: Tree, continuation: Tree): Contextual[Modal[Unit]] = {
+  def namedLet(letId: Tree, value: Tree, continuation: Tree)(id: Id): Contextual[Modal[Unit]] = {
     val oldCtx = ctx
     def inner: Unit = {
-      implicit val newCtx = enterFresh(anon)(oldCtx)
-      enterLeaf(name)
+      implicit val newCtx = enterFresh(id, anon)(oldCtx)
+      val Ident(name) = letId
+      enterLeaf(letId.id, name)
       index(continuation)
     }
     index(value)
@@ -67,13 +67,13 @@ object Namers {
 
   def namedIf(cond: Tree, thenp: Tree, elsep: Tree): Contextual[Modal[Unit]] = {
     index(cond)
-    index(thenp)(enterFresh(anon))
-    index(elsep)(enterFresh(anon))
+    index(thenp)(enterFresh(thenp.id, anon))
+    index(elsep)(enterFresh(elsep.id, anon))
   }
 
   def namedCaseExpr(selector: Tree, cases: List[Tree]): Contextual[Modal[Unit]] = {
     index(selector)
-    cases.foreach(index(_)(enterFresh(anon)))
+    cases.foreach(c => index(c)(enterFresh(c.id, anon)))
   }
 
   def namedCaseClause(pat: Tree, guard: Tree, body: Tree): Contextual[Modal[Unit]] = {
@@ -91,8 +91,8 @@ object Namers {
     alts.foreach(index)
   }
 
-  def namedBind(name: Name, pat: Tree): Contextual[Modal[Unit]] = {
-    enterLeaf(name)
+  def namedBind(name: Name, pat: Tree)(id: Id): Contextual[Modal[Unit]] = {
+    enterLeaf(id, name)
     index(pat)
   }
 
@@ -100,9 +100,9 @@ object Namers {
     args.foreach(index)
   }
 
-  def namedIdentPat(name: Name): Contextual[Modal[Unit]] = {
+  def namedIdentPat(name: Name)(id: Id): Contextual[Modal[Unit]] = {
     if name != Name.Wildcard then {
-      enterLeaf(name)
+      enterLeaf(id, name)
     }
   }
 
@@ -119,22 +119,22 @@ object Namers {
   def index(tree: Tree): Contextual[Modal[Unit]] = tree match {
     /* Type Trees */
     /* Pattern Trees */
-    case Ident(_,n)           if mode.isPattern => namedIdentPat(n)
-    case Unapply(_,t,ts)      if mode.isPattern => namedUnapply(t,ts)
-    case Bind(_,n,t)          if mode.isPattern => namedBind(n,t)
-    case Alternative(_,ts)    if mode.isPattern => namedAlternative(ts)
+    case Ident(n)           if mode.isPattern => namedIdentPat(n)(tree.id)
+    case Unapply(t,ts)      if mode.isPattern => namedUnapply(t,ts)
+    case Bind(n,t)          if mode.isPattern => namedBind(n,t)(tree.id)
+    case Alternative(ts)    if mode.isPattern => namedAlternative(ts)
     /* Term Trees */
-    case PackageDef(_,t,ts)   if mode == Term   => namedPackageDef(t,ts)
-    case Apply(_,t,ts)        if mode == Term   => namedApplyTerm(t,ts)
-    case DefDef(_,_,s,t,b)    if mode == Term   => namedDefDef(s,t,b)
-    case If(_,c,t,e)          if mode == Term   => namedIf(c,t,e)
-    case Let(_,n,v,c)         if mode == Term   => namedLet(n,v,c)
-    case Function(_,ts,t)     if mode == Term   => namedFunctionTerm(ts,t)
-    case CaseExpr(_,t,ts)     if mode == Term   => namedCaseExpr(t,ts)
-    case CaseClause(_,p,g,b)  if mode == Term   => namedCaseClause(p,g,b)
+    case PackageDef(t,ts)   if mode == Term   => namedPackageDef(t,ts)
+    case Apply(t,ts)        if mode == Term   => namedApplyTerm(t,ts)
+    case DefDef(_,s,t,b)    if mode == Term   => namedDefDef(s,t,b)
+    case If(c,t,e)          if mode == Term   => namedIf(c,t,e)
+    case Let(n,v,c)         if mode == Term   => namedLet(n,v,c)(tree.id)
+    case Function(ts,t)     if mode == Term   => namedFunctionTerm(ts,t)(tree.id)
+    case CaseExpr(t,ts)     if mode == Term   => namedCaseExpr(t,ts)
+    case CaseClause(p,g,b)  if mode == Term   => namedCaseClause(p,g,b)
     /* any mode */
-    case Parens(_,ts)                           => namedParens(ts)
-    case Literal(_,_) | Ident(_,_) | EmptyTree  => // atomic
+    case Parens(ts)                           => namedParens(ts)
+    case Literal(_) | Ident(_) | EmptyTree    => // atomic
     /* error case */
     case _ =>
       import TreeOps._

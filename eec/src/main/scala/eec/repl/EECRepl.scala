@@ -75,6 +75,7 @@ class EECRepl {
 
       parseCommand(input) match {
         case AstExpr(code) => guarded(code) {
+          implicit val rootCtx = RootContext()
           parseExpr(code).fold
             { err => println(s"[ERROR] ${err.userString}") }
             { expr => pprintln(expr.toAst, height = Int.MaxValue) }

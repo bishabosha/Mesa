@@ -84,48 +84,48 @@ object Types {
       case _          => Type.Product(types)
     }
 
-    def (tree: Tree) withType(tpe: Type): Tree = tree match {
-      case t @ Select(_,_,_)        => t.copy(tpe = tpe)
-      case t @ Ident(_,_)           => t.copy(tpe = tpe)
-      case t @ PackageDef(_,_,_)    => t.copy(tpe = tpe)
-      case t @ DefDef(_,_,_,_,_)    => t.copy(tpe = tpe)
-      case t @ DefSig(_,_,_)        => t.copy(tpe = tpe)
-      case t @ Apply(_,_,_)         => t.copy(tpe = tpe)
-      case t @ Function(_,_,_)      => t.copy(tpe = tpe)
-      case t @ Let(_,_,_,_)         => t.copy(tpe = tpe)
-      case t @ If(_,_,_,_)          => t.copy(tpe = tpe)
-      case t @ Literal(_,_)         => t.copy(tpe = tpe)
-      case t @ CaseExpr(_,_,_)      => t.copy(tpe = tpe)
-      case t @ CaseClause(_,_,_,_)  => t.copy(tpe = tpe)
-      case t @ Alternative(_,_)     => t.copy(tpe = tpe)
-      case t @ Parens(_,_)          => t.copy(tpe = tpe)
-      case t @ Bind(_,_,_)          => t.copy(tpe = tpe)
-      case t @ Unapply(_,_,_)       => t.copy(tpe = tpe)
-      case t @ Tagged(_,_,_)        => t.copy(tpe = tpe)
-      case t @ TreeSeq(_)           => t
-      case EmptyTree                => EmptyTree
-    }
+    // def (tree: Tree) withType(tpe: Type): Tree = tree match {
+    //   case t @ Select(_,_,_)        => t.copy(tpe = tpe)
+    //   case t @ Ident(_,_)           => t.copy(tpe = tpe)
+    //   case t @ PackageDef(_,_,_)    => t.copy(tpe = tpe)
+    //   case t @ DefDef(_,_,_,_,_)    => t.copy(tpe = tpe)
+    //   case t @ DefSig(_,_,_)        => t.copy(tpe = tpe)
+    //   case t @ Apply(_,_,_)         => t.copy(tpe = tpe)
+    //   case t @ Function(_,_,_)      => t.copy(tpe = tpe)
+    //   case t @ Let(_,_,_,_)         => t.copy(tpe = tpe)
+    //   case t @ If(_,_,_,_)          => t.copy(tpe = tpe)
+    //   case t @ Literal(_,_)         => t.copy(tpe = tpe)
+    //   case t @ CaseExpr(_,_,_)      => t.copy(tpe = tpe)
+    //   case t @ CaseClause(_,_,_,_)  => t.copy(tpe = tpe)
+    //   case t @ Alternative(_,_)     => t.copy(tpe = tpe)
+    //   case t @ Parens(_,_)          => t.copy(tpe = tpe)
+    //   case t @ Bind(_,_,_)          => t.copy(tpe = tpe)
+    //   case t @ Unapply(_,_,_)       => t.copy(tpe = tpe)
+    //   case t @ Tagged(_,_,_)        => t.copy(tpe = tpe)
+    //   case t @ TreeSeq(_)           => t
+    //   case EmptyTree                => EmptyTree
+    // }
 
-    def (tree: Tree) tpe: Type = tree match {
-      case Select(t,_,_)        => t
-      case Ident(t,_)           => t
-      case PackageDef(t,_,_)    => t
-      case DefDef(t,_,_,_,_)    => t
-      case DefSig(t,_,_)        => t
-      case Apply(t,_,_)         => t
-      case Function(t,_,_)      => t
-      case Let(t,_,_,_)         => t
-      case If(t,_,_,_)          => t
-      case Literal(t,_)         => t
-      case CaseExpr(t,_,_)      => t
-      case CaseClause(t,_,_,_)  => t
-      case Alternative(t,_)     => t
-      case Parens(t,_)          => t
-      case Bind(t,_,_)          => t
-      case Unapply(t,_,_)       => t
-      case Tagged(t,_,_)        => t
-      case TreeSeq(_)           => Type.NoType
-      case EmptyTree            => Type.NoType
-    }
+    // def (tree: Tree) tpe: Type = tree match {
+    //   case Select(t,_,_)        => t
+    //   case Ident(t,_)           => t
+    //   case PackageDef(t,_,_)    => t
+    //   case DefDef(t,_,_,_,_)    => t
+    //   case DefSig(t,_,_)        => t
+    //   case Apply(t,_,_)         => t
+    //   case Function(t,_,_)      => t
+    //   case Let(t,_,_,_)         => t
+    //   case If(t,_,_,_)          => t
+    //   case Literal(t,_)         => t
+    //   case CaseExpr(t,_,_)      => t
+    //   case CaseClause(t,_,_,_)  => t
+    //   case Alternative(t,_)     => t
+    //   case Parens(t,_)          => t
+    //   case Bind(t,_,_)          => t
+    //   case Unapply(t,_,_)       => t
+    //   case Tagged(t,_,_)        => t
+    //   case TreeSeq(_)           => Type.NoType
+    //   case EmptyTree            => Type.NoType
+    // }
   }
 }

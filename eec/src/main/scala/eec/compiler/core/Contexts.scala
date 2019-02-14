@@ -39,8 +39,9 @@ object Contexts {
   opaque type Id = Long
 
   object Id {
-    private[Contexts] val noId: Id = 0l
-    private[Contexts] val initId: Id = 1l
+    private[Contexts] val rootId: Id = 0l
+    val noId: Id = -1l
+    val initId: Id = 1l
     private[Contexts] def apply(l: Long): Id = l
     def (x: Id) + (y: Id): Id = x + y
     def (s: Id) toLong: Long = s
@@ -48,9 +49,11 @@ object Contexts {
 
   case class Sym(id: Id, name: Name)
 
-  object RootSym extends Sym(Id.noId, Name.From(rootString))
+  object RootSym extends Sym(Id.rootId, Name.From(rootString))
 
   type Scope = mutable.Buffer[(Sym, Context)]
+
+  type TypeTable = mutable.LongMap[Type]
 
   sealed trait Context {
     import Context._
@@ -66,22 +69,22 @@ object Contexts {
 
     def ctx(implicit c: Context) = c
 
-    def enterFresh(name: Name): Contextual[Context] = {
+    def enterFresh(id: Id, name: Name): Contextual[Context] = {
       val newCtx = Fresh(ctx, new mutable.ArrayBuffer)
-      ctx.scope += Sym(ctx.rootCtx.fresh, name) -> newCtx
+      ctx.scope += Sym(id, name) -> newCtx
       newCtx
     }
 
-    def enterLeaf(name: Name): Contextual[Unit] = {
+    def enterLeaf(id: Id, name: Name): Contextual[Unit] = {
       val newCtx = Leaf(ctx, new mutable.ArrayBuffer)
-      ctx.scope += Sym(ctx.rootCtx.fresh, name) -> newCtx
+      ctx.scope += Sym(id, name) -> newCtx
     }
 
     def enterBootstrapped: Contextual[Checked[Unit]] = {
       if ctx.rootCtx.scope.nonEmpty then {
         CompilerError.IllegalState("Non-fresh _root_ context")
       } else {
-        Names.bootstrapped.foreach(enterLeaf(_)(ctx.rootCtx))
+        Names.bootstrapped.foreach(enterLeaf(ctx.rootCtx.fresh, _)(ctx.rootCtx))
       }
     }
   }
@@ -98,13 +101,21 @@ object Contexts {
     import Id._
 
     private[this] val _scope: Scope = new mutable.ArrayBuffer
-
+    private[this] var _typeTable: TypeTable = new mutable.LongMap
     private[this] var _id: Id = Id.initId
 
     def fresh: Id = {
       val id = _id
       _id += Id(1l)
       id
+    }
+
+    def putType(id: Id, tpe: Type): Unit = {
+      _typeTable += id.toLong -> tpe
+    }
+
+    def getType(id: Id): Type = {
+      _typeTable(id.toLong)
     }
 
     override def rootCtx = this

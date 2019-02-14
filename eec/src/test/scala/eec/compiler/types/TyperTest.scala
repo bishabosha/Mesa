@@ -136,7 +136,9 @@ class TyperTest {
 
   def (str: String) typedAs(as: Type): Checked[Type] = {
     import Types.TypeOps._
+    import core.Contexts._
     import CompilerErrorOps._
+    implicit val rootCtx = RootContext()
     for {
       expr   <- parseExpr(str)
       expr1  <- expr.typedAsExpr(as)
