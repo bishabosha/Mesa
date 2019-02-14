@@ -3,9 +3,11 @@ package repl
 
 class EECRepl {
   
+  import compiler.core.Contexts._
   import compiler.types._
   import compiler.parsing._
   import compiler.error.CompilerErrors._
+  import compiler.types.Namers._
   import compiler.types.Types._
   import compiler.types.Types.Type
   import scala.annotation._
@@ -81,28 +83,41 @@ class EECRepl {
         }
         case TypeExpr(code) => guarded(code) {
           import TypeOps._
-
+          import ContextOps._
+          implicit val rootCtx = RootContext()
           val yieldTyped = for {
-            expr <- parseExpr(code)
+            _     <- Context.enterBootstrapped
+            expr  <- parseExpr(code)
+            _     <- indexAsExpr(expr).recoverDefault
             typed <- expr.typedAsExpr(Type.WildcardType)
           } yield typed
 
           yieldTyped.fold
             { error => println(s"[ERROR] ${error.userString}") }
-            { typed => println(typed.tpe.userString) }
+            { typed =>
+              println(typed.tpe.userString)
+              pprintln(rootCtx.toScoping, height = Int.MaxValue)
+            }
 
           state
         }
         case AstFile(name) => guarded(name) {
-
+          import ContextOps._
+          implicit val rootCtx = RootContext()
           val yieldAst = for {
+            _     <- Context.enterBootstrapped
             code  <- loadFile(name)
             ast   <- parseEEC(code)
+          } yield for {
+            _ <- indexAsExpr(ast).recoverDefault
           } yield ast
 
           yieldAst.fold
             { err => println(s"[ERROR] ${err.userString}") }
-            { ast => pprintln(ast.toAst, height = Int.MaxValue) }
+            { ast =>
+              pprintln(ast.toAst, height = Int.MaxValue)
+              pprintln(rootCtx.toScoping, height = Int.MaxValue)
+            }
 
           state
         }

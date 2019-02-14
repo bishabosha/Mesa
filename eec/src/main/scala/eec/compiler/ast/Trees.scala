@@ -49,6 +49,12 @@ object Trees {
   object TreeOps {
 
     import scala.annotation._
+    import util.Showable
+
+    implicit val TreeShowable: Showable[Tree] = new {
+      import core.Printing.untyped.AstOps._
+      override def (tree: Tree) userString: String = tree.toAst.toString
+    }
 
     def (tree: Tree) toList: List[Tree] = tree match {
       case EmptyTree            => Nil
@@ -70,7 +76,7 @@ object Trees {
         case Select(_, tree, name)  => inner(name :: acc, tree)
         case _                      => acc
       }
-      inner(Nil, tree).reverse
+      inner(Nil, tree)
     }
 
     def (tree: Tree) addModifiers(mods: Set[Modifier]): Tree = tree match {

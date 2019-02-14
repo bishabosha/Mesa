@@ -45,6 +45,14 @@ object CompilerErrors {
 
     import eec.util.Showable
 
+    def (f: => O) recoverDefault[O]: Checked[O] = {
+      import scala.util.control._
+      import CompilerError._
+      f.recover {
+        case e: Exception if NonFatal(e) => Internal(e)
+      }
+    }
+
     def (f: => O) recover[O](
       opt: PartialFunction[Exception, CompilerError]): Checked[O] = {
 
@@ -55,14 +63,19 @@ object CompilerErrors {
           f
         } catch {
           case e: Exception if opt.isDefinedAt(e) => opt(e)
-          case e: Exception if NonFatal(e)        => new Internal(e)
+          case e: Exception if NonFatal(e)        => Internal(e)
         }
       }
 
     implicit val EECErrorShowable: Showable[CompilerError] = new {
       import CompilerError._
       override def (error: CompilerError) userString: String = error match {
-        case Internal(e)          => s"${e.getClass.getSimpleName}: ${e.getMessage}"
+        case Internal(e) =>
+          val trace = e.getStackTraceString.split("\n")
+            .toSeq
+            .map("    " + _)
+            .mkString("\n")
+          s"Internal: ${e.getClass.getSimpleName}: ${e.getMessage}\nDebug trace:\n$trace"
         case UnexpectedType(msg)  => s"UnexpectedType: $msg"
         case IllegalState(msg)    => s"IllegalState: $msg"
         case SyntaxError(msg)     => s"SyntaxError: $msg"

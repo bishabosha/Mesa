@@ -4,6 +4,8 @@ package core
 
 object Names {
 
+  import Name._
+
   enum Name {
     case From(name: String)
     case ComputationTag, UnitTag, Tuple2Tag, IntegerTag, DecimalTag,
@@ -11,6 +13,16 @@ object Names {
   }
 
   val emptyString: String = "<empty>"
+  val rootString: String  = "_root_"
+
+  val bootstrapped = List(
+    ComputationTag,
+    IntegerTag,
+    DecimalTag,
+    BooleanTag,
+    StringTag,
+    CharTag
+  )
 
   object NameOps {
 

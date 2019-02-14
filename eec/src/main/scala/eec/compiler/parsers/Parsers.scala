@@ -444,7 +444,11 @@ object Parsers {
       ctx: EECParser.TranslationUnitContext): Tree = {
         import TreeOps._
         val pkgId = fromPackageInfo(ctx.packageInfo)
-        val stats = fromStatSeq(ctx.statSeq)
+        val stats =
+          if ctx.statSeq ne null then
+            fromStatSeq(ctx.statSeq)
+          else
+            EmptyTree
         PackageDef(uTpe, pkgId, stats.toList)
       }
   }

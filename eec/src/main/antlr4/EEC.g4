@@ -205,7 +205,7 @@ statSeq: stat (Sep? stat)*;
 stat: def | dcl;
 
 translationUnit:
-	Sep? packageInfo Sep? /*(topStatSeq Sep?)? */ (statSeq Sep?)?;
+	Sep* packageInfo Sep* /*(topStatSeq Sep?)? */ (statSeq Sep*)?;
 
 //
 // Lexer Defs
