@@ -8,6 +8,7 @@ object Contexts {
   import core.Names._
   import error.CompilerErrors._
   import scala.collection._
+  import scala.annotation._
 
   enum Mode {
 
@@ -53,14 +54,55 @@ object Contexts {
 
   type Scope = mutable.Buffer[(Sym, Context)]
 
-  type TypeTable = mutable.LongMap[Type]
+  type TypeTable = mutable.AnyRefMap[Name, Type]
 
   sealed trait Context {
     import Context._
+    import Id._
+    import NameOps._
+
     val outer: Context
     val scope: Scope
+    private[Context] val typeTable: TypeTable
+
+    def putType(name: Name, tpe: Type): Unit = {
+      typeTable += name -> tpe
+    }
+
+    def getType(name: Name): Checked[Type] = {
+      typeTable.getOrElse[Checked[Type]](
+        name,
+        CompilerError.UnexpectedType(s"no type found for name: ${name.userString}")
+      )
+    }
 
     def rootCtx: RootContext
+
+    def firstCtx(name: Name): Checked[Context] = {
+      import NameOps._
+      import ContextOps._
+
+      lazy val root = rootCtx
+
+      @tailrec
+      def inner(ctxIt: Context): Checked[Context] =
+        if ctxIt.scope.view.map(_._1.name).contains(name) then
+          ctxIt
+        else if ctxIt eq root then
+          CompilerError.IllegalState(s"name not found: ${name.userString}")
+        else
+          inner(outer)
+
+      inner(this)
+    }
+
+    def lookIn(id: Id): Checked[Context] = {
+      scope.collectFirst[Checked[Context]] {
+        case (Sym(`id`, _), c) => c
+      }.getOrElse {
+        CompilerError.IllegalState(s"No context found for Id(${id})")
+      }
+    }
   }
 
   type Contextual[O] = implicit Context => O
@@ -70,13 +112,13 @@ object Contexts {
     def ctx(implicit c: Context) = c
 
     def enterFresh(id: Id, name: Name): Contextual[Context] = {
-      val newCtx = Fresh(ctx, new mutable.ArrayBuffer)
+      val newCtx = Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
       ctx.scope += Sym(id, name) -> newCtx
       newCtx
     }
 
     def enterLeaf(id: Id, name: Name): Contextual[Unit] = {
-      val newCtx = Leaf(ctx, new mutable.ArrayBuffer)
+      val newCtx = Leaf(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
       ctx.scope += Sym(id, name) -> newCtx
     }
 
@@ -84,24 +126,27 @@ object Contexts {
       if ctx.rootCtx.scope.nonEmpty then {
         CompilerError.IllegalState("Non-fresh _root_ context")
       } else {
-        Names.bootstrapped.foreach(enterLeaf(ctx.rootCtx.fresh, _)(ctx.rootCtx))
+        Names.bootstrapped.foreach({ (name, tpe) =>
+          enterLeaf(ctx.rootCtx.fresh, name)(ctx.rootCtx)
+          ctx.rootCtx.putType(name, tpe)
+        })
       }
     }
   }
 
-  case class Fresh private[Contexts] (override val outer: Context, override val scope: Scope) extends Context {
+  case class Fresh private[Contexts] (override val outer: Context, override val scope: Scope, override val typeTable: TypeTable) extends Context {
     override def rootCtx = outer.rootCtx
   }
 
-  case class Leaf private[Contexts] (override val outer: Context, override val scope: Scope) extends Context {
+  case class Leaf private[Contexts] (override val outer: Context, override val scope: Scope, override val typeTable: TypeTable) extends Context {
     override def rootCtx = outer.rootCtx
   }
 
   case class RootContext() extends Context {
     import Id._
 
+    private[this] val _typeTable: TypeTable = new mutable.AnyRefMap
     private[this] val _scope: Scope = new mutable.ArrayBuffer
-    private[this] var _typeTable: TypeTable = new mutable.LongMap
     private[this] var _id: Id = Id.initId
 
     def fresh: Id = {
@@ -110,14 +155,7 @@ object Contexts {
       id
     }
 
-    def putType(id: Id, tpe: Type): Unit = {
-      _typeTable += id.toLong -> tpe
-    }
-
-    def getType(id: Id): Type = {
-      _typeTable(id.toLong)
-    }
-
+    override val typeTable = _typeTable
     override def rootCtx = this
     override val outer = this
     override val scope = _scope
@@ -134,11 +172,11 @@ object Contexts {
     }
 
     def (ctx: Context) toScoping: Scoping = ctx match {
-      case c @ RootContext() =>
+      case c: RootContext =>
         val foo = c.scope.map(p => ScopeDef(p._1, p._2.toScoping)).toList
         ScopeDef(RootSym, Branch(foo))
-      case Fresh(_,scope) =>
-        Branch(scope.map(p => ScopeDef(p._1, p._2.toScoping)).toList)
+      case f: Fresh =>
+        Branch(f.scope.map(p => ScopeDef(p._1, p._2.toScoping)).toList)
       case l: Leaf => Empty
     }
   }

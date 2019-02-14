@@ -113,7 +113,12 @@ class TyperTest {
       "\\t: () -> () => ()".typed   -> "(() -> ()) -> ()",
       "\\t: (), u: () => ()".typed  -> "() -> () -> ()",
       "\\t: ((), ()) => ()".typed   -> "((), ()) -> ()",
-      "\\t: ! () => ()".typed       -> "! () -> ()")
+      "\\t: ! () => ()".typed       -> "! () -> ()"
+    )
+    failsTypeCheck(
+      "\\f: () -> Char => ()".typed, // f.tpe is not computation co-domain
+      "\\f: () => 0".typed // lambda tpe is not computation co-domain
+    )
   }
 
   @Test def typecheckApplication(): Unit = {
@@ -123,24 +128,28 @@ class TyperTest {
       "(\\t: (), u: (), v: () => ()) () () ()".typed -> "()",
       "\\f: () -> () => f ()".typed                  -> "(() -> ()) -> ()",
       "\\t: () => ! ()".typed                        -> "() -> ! ()",
+      "\\t: () -> () => \\c: () => t c".typed        -> "(() -> ()) -> () -> ()",
     )
     failsTypeCheck(
-      "(\\f: () => ()) 0".typed
+      "(\\f: () => ()) 0".typed // expects () not Integer
     )
   }
 
   @Test def typecheckLet(): Unit = {
     passesTypeCheck(
-      "let !x = !() in !()".typed -> "!()")
+      "let !x = !() in ()".typed -> "()")
   }
 
   def (str: String) typedAs(as: Type): Checked[Type] = {
     import Types.TypeOps._
     import core.Contexts._
+    import Namers._
     import CompilerErrorOps._
     implicit val rootCtx = RootContext()
     for {
       expr   <- parseExpr(str)
+      _      <- Context.enterBootstrapped
+      _      <- indexAsExpr(expr)
       expr1  <- expr.typedAsExpr(as)
     } yield expr1.tpe
   }

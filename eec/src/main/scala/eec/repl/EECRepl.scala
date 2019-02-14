@@ -97,7 +97,7 @@ class EECRepl {
             { error => println(s"[ERROR] ${error.userString}") }
             { typed =>
               println(typed.tpe.userString)
-              pprintln(rootCtx.toScoping, height = Int.MaxValue)
+              // pprintln(rootCtx.toScoping, height = Int.MaxValue)
             }
 
           state
@@ -117,7 +117,7 @@ class EECRepl {
             { err => println(s"[ERROR] ${err.userString}") }
             { ast =>
               pprintln(ast.toAst, height = Int.MaxValue)
-              pprintln(rootCtx.toScoping, height = Int.MaxValue)
+              // pprintln(rootCtx.toScoping, height = Int.MaxValue)
             }
 
           state
