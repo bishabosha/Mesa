@@ -32,6 +32,8 @@ object Parsers {
 
   private[parsing] object TreeParsers {
 
+    def freshId: Contextual[Id] = ctx.rootCtx.fresh
+
     def (o: String => O) toTreeParser[O](f: O => Contextual[Tree]): (
       String => Contextual[Checked[Tree]]) = {
         import error.CompilerErrors._
@@ -48,7 +50,7 @@ object Parsers {
         if txt.endsWith("l") || txt.endsWith("L") then {
           throw new ParserSyntaxException(s"unexpected Long literal `$txt`")
         }
-        Literal(BigIntConstant(BigInt(txt)))(ctx.rootCtx.fresh, uTpe)
+        Literal(BigIntConstant(BigInt(txt)))(freshId, uTpe)
       } else if context.FloatingPointLiteral ne null then {
         val txt = context.FloatingPointLiteral.getText
         if txt.endsWith("f") || txt.endsWith("F") then {
@@ -57,18 +59,18 @@ object Parsers {
         if txt.endsWith("d") || txt.endsWith("D") then {
           throw new ParserSyntaxException(s"unexpected Double literal `$txt`")
         }
-        Literal(BigDecConstant(BigDecimal(txt)))(ctx.rootCtx.fresh, uTpe)
+        Literal(BigDecConstant(BigDecimal(txt)))(freshId, uTpe)
       } else if context.BooleanLiteral ne null then {
         val bool = context.BooleanLiteral.getText match {
           case "True" => true
           case _ => false
         }
-        Literal(BooleanConstant(bool))(ctx.rootCtx.fresh, uTpe)
+        Literal(BooleanConstant(bool))(freshId, uTpe)
       } else if context.CharacterLiteral ne null then {
         val charStr = context.CharacterLiteral.getText
           .stripPrefix("'").stripSuffix("'")
         val char = if charStr.length == 0 then 0 else charStr.charAt(0)
-        Literal(CharConstant(char))(ctx.rootCtx.fresh, uTpe)
+        Literal(CharConstant(char))(freshId, uTpe)
       } else { // StringLiteral
         val text = context.StringLiteral.getText
         val string =
@@ -76,25 +78,25 @@ object Parsers {
             text stripPrefix "\"\"\"" stripSuffix "\"\"\""
           else
             text stripPrefix "\"" stripSuffix "\""
-        Literal(StringConstant(string))(ctx.rootCtx.fresh, uTpe)
+        Literal(StringConstant(string))(freshId, uTpe)
       }
 
     def fromId(context: EECParser.IdContext): Contextual[Tree] = {
       import NameOps._
-      Ident(context.getText.readAs)(ctx.rootCtx.fresh, uTpe)
+      Ident(context.getText.readAs)(freshId, uTpe)
     }
 
     def fromAlphaId(context: EECParser.AlphaIdContext): Contextual[Tree] = {
       import NameOps._
-      Ident(context.getText.readAs)(ctx.rootCtx.fresh, uTpe)
+      Ident(context.getText.readAs)(freshId, uTpe)
     }
 
     def fromQualId(context: EECParser.QualIdContext): Contextual[Tree] = {
       import scala.language.implicitConversions
       import NameOps._
       def listToRefId(lst: List[String]): Contextual[Tree] = lst match {
-        case n :: Nil => Ident(n.readAs)(ctx.rootCtx.fresh, uTpe)
-        case n :: tail => Select(listToRefId(tail), n.readAs)(ctx.rootCtx.fresh, uTpe)
+        case n :: Nil => Ident(n.readAs)(freshId, uTpe)
+        case n :: tail => Select(listToRefId(tail), n.readAs)(freshId, uTpe)
         case Nil => EmptyTree
       }
       listToRefId(context.id.reverse.map(_.getText).toList)
@@ -111,7 +113,7 @@ object Parsers {
         import TreeOps._
         val src = ids(0)
         val List(select) = ids(1).toNames
-        Select(src, select)(ctx.rootCtx.fresh, uTpe)
+        Select(src, select)(freshId, uTpe)
       }
     }
 
@@ -119,7 +121,7 @@ object Parsers {
       if context.`type` ne null then {
         val arg = fromInfixType(context.infixType)
         val body = fromType(context.`type`)
-        Function(List(arg), body)(ctx.rootCtx.fresh, uTpe)
+        Function(List(arg), body)(freshId, uTpe)
       } else {
         fromInfixType(context.infixType)
       }
@@ -135,16 +137,16 @@ object Parsers {
       val types = context.`type`
         .map(fromType)
         .ensuring(l => l.size == 0 || l.size == 2)
-      Parens(types.toList)(ctx.rootCtx.fresh, uTpe)
+      Parens(types.toList)(freshId, uTpe)
     }
 
     def fromPrefixType(context: EECParser.PrefixTypeContext): Contextual[Tree] =
       if context.simpleType ne null then {
         fromSimpleType(context.simpleType)
       } else {
-        val tag = Ident(Name.ComputationTag)(ctx.rootCtx.fresh, uTpe)
+        val tag = Ident(Name.ComputationTag)(freshId, uTpe)
         val args = fromType(context.`type`) :: Nil
-        Apply(tag, args)(ctx.rootCtx.fresh, uTpe)
+        Apply(tag, args)(freshId, uTpe)
       }
 
     def fromSimpleType(context: EECParser.SimpleTypeContext): Contextual[Tree] =
@@ -170,14 +172,14 @@ object Parsers {
         import scala.language.implicitConversions
         import TreeOps._
         val Seq(expr, arg) = exprs.map(fromExpr).ensuring(_.size == 2)
-        Apply(expr, arg.toList)(ctx.rootCtx.fresh, uTpe)
+        Apply(expr, arg.toList)(freshId, uTpe)
       }
 
     def fromLambda(context: EECParser.LambdaContext): Contextual[Tree] = {
       import TreeOps._
       val bindings = fromBindings(context.bindings).toList
       val body = fromExpr(context.expr)
-      Function(bindings, body)(ctx.rootCtx.fresh, uTpe)
+      Function(bindings, body)(freshId, uTpe)
     }
 
     def fromLetExpr(context: EECParser.LetExprContext): Contextual[Tree] = {
@@ -190,15 +192,15 @@ object Parsers {
       var exprs = context.expr.ensuring(_.size == 2)
       var value = fromExpr(exprs.get(0))
       var continuation = fromExpr(exprs.get(1))
-      val ident = Ident(name)(ctx.rootCtx.fresh, uTpe)
-      Let(ident, value, continuation)(ctx.rootCtx.fresh, uTpe)
+      val ident = Ident(name)(freshId, uTpe)
+      Let(ident, value, continuation)(freshId, uTpe)
     }
 
     def fromCaseExpr(context: EECParser.CaseExprContext): Contextual[Tree] = {
       import TreeOps._
       val selector = fromExpr(context.expr)
       val cases = fromCases(context.cases).toList
-      CaseExpr(selector, cases)(ctx.rootCtx.fresh, uTpe)
+      CaseExpr(selector, cases)(freshId, uTpe)
     }
 
     def fromExpr1(context: EECParser.Expr1Context): Contextual[Tree] =
@@ -209,7 +211,11 @@ object Parsers {
         val exprs = context.expr
           .ensuring(_.size == 3)
           .map(fromExpr)
-        If(exprs(0), exprs(1), exprs(2))(ctx.rootCtx.fresh, uTpe)
+        val patTrue   = Literal(BooleanConstant(true))(freshId, uTpe)
+        val patFalse  = Literal(BooleanConstant(false))(freshId, uTpe)
+        val caseTrue  = CaseClause(patTrue, EmptyTree, exprs(1))(freshId, uTpe)
+        val caseFalse = CaseClause(patFalse, EmptyTree, exprs(2))(freshId, uTpe)
+        CaseExpr(exprs(0), List(caseTrue, caseFalse))(freshId, uTpe)
       }
 
     def fromInfixExpr(context: EECParser.InfixExprContext): Contextual[Tree] =
@@ -219,7 +225,7 @@ object Parsers {
         val id =
           if context.OpId ne null then {
             import NameOps._
-            Ident(context.OpId.getText.readAs)(ctx.rootCtx.fresh, uTpe)
+            Ident(context.OpId.getText.readAs)(freshId, uTpe)
           } else {
             fromAlphaId(context.alphaId)
           }
@@ -227,16 +233,16 @@ object Parsers {
         val infixes = context.infixExpr
           .ensuring(_.size == 2)
           .map(fromInfixExpr)
-        val firstApply = Apply(id, List(infixes(0)))(ctx.rootCtx.fresh, uTpe)
-        Apply(firstApply, List(infixes(1)))(ctx.rootCtx.fresh, uTpe)
+        val firstApply = Apply(id, List(infixes(0)))(freshId, uTpe)
+        Apply(firstApply, List(infixes(1)))(freshId, uTpe)
       }
 
     def fromPrefixExpr(context: EECParser.PrefixExprContext): Contextual[Tree] = {
       val simpleExpr = fromSimpleExpr(context.simpleExpr)
       if context.Bang ne null then {
         import NameOps._
-        val tag = Ident(Name.ComputationTag)(ctx.rootCtx.fresh, uTpe)
-        Apply(tag, List(simpleExpr))(ctx.rootCtx.fresh, uTpe)
+        val tag = Ident(Name.ComputationTag)(freshId, uTpe)
+        Apply(tag, List(simpleExpr))(freshId, uTpe)
       } else {
         simpleExpr
       }
@@ -265,7 +271,7 @@ object Parsers {
         else
           EmptyTree
       val body = fromExpr(context.expr)
-      CaseClause(pat, guard, body)(ctx.rootCtx.fresh, uTpe)
+      CaseClause(pat, guard, body)(freshId, uTpe)
     }
 
     def fromExprsInParens(
@@ -277,7 +283,7 @@ object Parsers {
         if expr.size == 1 then
           expr(0)
         else
-          Parens(expr.toList)(ctx.rootCtx.fresh, uTpe)
+          Parens(expr.toList)(freshId, uTpe)
       }
 
     def fromPattern(context: EECParser.PatternContext): Contextual[Tree] = {
@@ -288,26 +294,28 @@ object Parsers {
       if patterns.size == 1 then
         patterns(0)
       else
-        Alternative(patterns.toList)(ctx.rootCtx.fresh, uTpe)
+        Alternative(patterns.toList)(freshId, uTpe)
     }
 
     def fromPattern1(context: EECParser.Pattern1Context): Contextual[Tree] =
       fromPattern2(context.pattern2)
 
-    def fromPattern2(context: EECParser.Pattern2Context): Contextual[Tree] =
-      if context.Varid ne null then {
-        val name = {
-          import NameOps._
-          context.Varid.getText.readAs
-        }
-        if context.pattern3 ne null then {
-          Bind(name, fromPattern3(context.pattern3))(ctx.rootCtx.fresh, uTpe)
-        } else {
-          Ident(name)(ctx.rootCtx.fresh, uTpe)
-        }
-      } else {
-        fromPattern3(context.pattern3)
+    def fromPattern2(context: EECParser.Pattern2Context): Contextual[Tree] = {
+
+      def fromVarid: Tree = {
+        import NameOps._
+        val name = context.Varid.getText.readAs
+        if context.pattern3 ne null then
+          Bind(name, fromPattern3(context.pattern3))(freshId, uTpe)
+        else
+          Ident(name)(freshId, uTpe)
       }
+
+      if context.Varid ne null then
+        fromVarid
+      else
+        fromPattern3(context.pattern3)
+    }
 
     def fromPattern3(context: EECParser.Pattern3Context): Contextual[Tree] =
       fromSimplePattern(context.simplePattern)
@@ -317,16 +325,16 @@ object Parsers {
         if context.Wildcard ne null then {
           wildcardIdent
         } else if context.getText == "()" then {
-          Parens(Nil)(ctx.rootCtx.fresh, uTpe)
+          Parens(Nil)(freshId, uTpe)
         } else if context.Varid ne null then {
           import NameOps._
-          Ident(context.Varid.getText.readAs)(ctx.rootCtx.fresh, uTpe)
+          Ident(context.Varid.getText.readAs)(freshId, uTpe)
         } else if context.literal ne null then {
           fromLiteral(context.literal)
         } else if context.simplePattern ne null then { // Bang present
           val simplePat = fromSimplePattern(context.simplePattern)
-          val computation = Ident(Name.ComputationTag)(ctx.rootCtx.fresh, uTpe)
-          Unapply(computation, List(simplePat))(ctx.rootCtx.fresh, uTpe)
+          val computation = Ident(Name.ComputationTag)(freshId, uTpe)
+          Unapply(computation, List(simplePat))(freshId, uTpe)
         } else { // tuple
           fromUpToPairPatten(context.upToPairPatten)
         }
@@ -341,7 +349,7 @@ object Parsers {
             patterns(0)
           } else {
             assert(patterns.size == 2)
-            Parens(patterns.toList)(ctx.rootCtx.fresh, uTpe)
+            Parens(patterns.toList)(freshId, uTpe)
           }
         }
 
@@ -355,15 +363,14 @@ object Parsers {
       context: EECParser.BindingsTaggedContext): Contextual[Tree] = {
         import scala.language.implicitConversions
         import TreeOps._
-        val bindings = context.binding.map(fromBinding).toList
-        bindings.toTree
+        context.binding.map(fromBinding).toList.toTree
       }
 
     def fromBinding(context: EECParser.BindingContext): Contextual[Tree] = {
       import TreeOps._
       val List(name) = fromId(context.id).toNames
       val typ = fromType(context.`type`)
-      Tagged(name, typ)(ctx.rootCtx.fresh, uTpe)
+      Tagged(name, typ)(freshId, uTpe)
     }
 
     def fromDcl(context: EECParser.DclContext): Contextual[Tree] =
@@ -381,7 +388,7 @@ object Parsers {
     def fromDefDecl(context: EECParser.DefDeclContext): Contextual[Tree] = {
       val sig = fromDefSig(context.defSig)
       val typ = fromType(context.`type`)
-      DefDef(Set(), sig, typ, EmptyTree)(ctx.rootCtx.fresh, uTpe)
+      DefDef(Set(), sig, typ, EmptyTree)(freshId, uTpe)
     }
 
     def fromDef(context: EECParser.DefContext): Contextual[Tree] =
@@ -391,7 +398,7 @@ object Parsers {
       val defSig = fromDefSig(context.defSig)
       val typ = fromType(context.`type`)
       val expr = fromExpr(context.expr)
-      DefDef(Set(), defSig, typ, expr)(ctx.rootCtx.fresh, uTpe)
+      DefDef(Set(), defSig, typ, expr)(freshId, uTpe)
     }
 
     def fromDefSig(context: EECParser.DefSigContext): Contextual[Tree] =
@@ -403,8 +410,8 @@ object Parsers {
           import NameOps._
           context.Varid.map(_.getText.readAs).toList
         }
-        val identArgs = varids.tail.map(n => Ident(n)(ctx.rootCtx.fresh, uTpe))
-        DefSig(varids.head, identArgs)(ctx.rootCtx.fresh, uTpe)
+        val identArgs = varids.tail.map(n => Ident(n)(freshId, uTpe))
+        DefSig(varids.head, identArgs)(freshId, uTpe)
       }
 
     def fromInfixDefSig(context: EECParser.InfixDefSigContext): Contextual[Tree] = {
@@ -416,16 +423,16 @@ object Parsers {
         var args = context.Varid
           .ensuring(_.size == 2)
           .map(_.getText.readAs)
-          .map(n => Ident(n)(ctx.rootCtx.fresh, uTpe))
+          .map(n => Ident(n)(freshId, uTpe))
           .toList
-        DefSig(context.OpId.getText.readAs, args)(ctx.rootCtx.fresh, uTpe)
+        DefSig(context.OpId.getText.readAs, args)(freshId, uTpe)
       } else {
         var varids = context.Varid
           .ensuring(_.size == 3)
           .map(_.getText.readAs)
         val name = varids(1)
-        val args = List(varids(0), varids(1)).map(n => Ident(n)(ctx.rootCtx.fresh, uTpe))
-        DefSig(name, args)(ctx.rootCtx.fresh, uTpe)
+        val args = List(varids(0), varids(1)).map(n => Ident(n)(freshId, uTpe))
+        DefSig(name, args)(freshId, uTpe)
       }
     }
 
@@ -433,9 +440,9 @@ object Parsers {
       import scala.language.implicitConversions
       import NameOps._
       var args = context.Varid.map(_.getText.readAs)
-        .map(n => Ident(n)(ctx.rootCtx.fresh, uTpe))
+        .map(n => Ident(n)(freshId, uTpe))
         .toList
-      DefSig(context.OpId.getText.readAs, args)(ctx.rootCtx.fresh, uTpe)
+      DefSig(context.OpId.getText.readAs, args)(freshId, uTpe)
     }
 
     def fromPackageInfo(context: EECParser.PackageInfoContext): Contextual[Tree] =
@@ -444,8 +451,7 @@ object Parsers {
     def fromStatSeq(context: EECParser.StatSeqContext): Contextual[Tree] = {
       import scala.language.implicitConversions
       import TreeOps._
-      val stats = context.stat.map(fromStat).toList
-      stats.toTree
+      context.stat.map(fromStat).toList.toTree
     }
 
     def fromStat(context: EECParser.StatContext): Contextual[Tree] =
@@ -460,7 +466,7 @@ object Parsers {
             fromStatSeq(context.statSeq)
           else
             EmptyTree
-        PackageDef(pkgId, stats.toList)(ctx.rootCtx.fresh, uTpe)
+        PackageDef(pkgId, stats.toList)(freshId, uTpe)
       }
   }
 

@@ -65,12 +65,6 @@ object Namers {
     inner
   }
 
-  def namedIf(cond: Tree, thenp: Tree, elsep: Tree): Contextual[Modal[Unit]] = {
-    index(cond)
-    index(thenp)(enterFresh(thenp.id, anon))
-    index(elsep)(enterFresh(elsep.id, anon))
-  }
-
   def namedCaseExpr(selector: Tree, cases: List[Tree]): Contextual[Modal[Unit]] = {
     index(selector)
     cases.foreach(c => index(c)(enterFresh(c.id, anon)))
@@ -127,14 +121,16 @@ object Namers {
     case PackageDef(t,ts)   if mode == Term   => namedPackageDef(t,ts)
     case Apply(t,ts)        if mode == Term   => namedApplyTerm(t,ts)
     case DefDef(_,s,t,b)    if mode == Term   => namedDefDef(s,t,b)
-    case If(c,t,e)          if mode == Term   => namedIf(c,t,e)
     case Let(n,v,c)         if mode == Term   => namedLet(n,v,c)(tree.id)
     case Function(ts,t)     if mode == Term   => namedFunctionTerm(ts,t)(tree.id)
     case CaseExpr(t,ts)     if mode == Term   => namedCaseExpr(t,ts)
     case CaseClause(p,g,b)  if mode == Term   => namedCaseClause(p,g,b)
     /* any mode */
     case Parens(ts)                           => namedParens(ts)
-    case Literal(_) | Ident(_) | EmptyTree    => // atomic
+    case Literal(_)
+       | Ident(_)
+       | Select(_,_)
+       | EmptyTree                            => // atomic
     /* error case */
     case _ =>
       import TreeOps._

@@ -93,7 +93,6 @@ object Types {
     //   case t @ Apply(_,_,_)         => t.copy(tpe = tpe)
     //   case t @ Function(_,_,_)      => t.copy(tpe = tpe)
     //   case t @ Let(_,_,_,_)         => t.copy(tpe = tpe)
-    //   case t @ If(_,_,_,_)          => t.copy(tpe = tpe)
     //   case t @ Literal(_,_)         => t.copy(tpe = tpe)
     //   case t @ CaseExpr(_,_,_)      => t.copy(tpe = tpe)
     //   case t @ CaseClause(_,_,_,_)  => t.copy(tpe = tpe)
@@ -115,7 +114,6 @@ object Types {
     //   case Apply(t,_,_)         => t
     //   case Function(t,_,_)      => t
     //   case Let(t,_,_,_)         => t
-    //   case If(t,_,_,_)          => t
     //   case Literal(t,_)         => t
     //   case CaseExpr(t,_,_)      => t
     //   case CaseClause(t,_,_,_)  => t

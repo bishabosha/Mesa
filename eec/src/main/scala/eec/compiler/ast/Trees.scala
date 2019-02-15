@@ -32,7 +32,6 @@ object Trees {
     case Apply(f: Tree, args: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
     case Function(args: List[Tree], body: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
     case Let(name: Tree, value: Tree, continuation: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case If(cond: Tree, thenp: Tree, elsep: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
     case Literal(constant: Constant)(id: Id, tpe: Type) extends Tree(id, tpe)
     case CaseExpr(selector: Tree, cases: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
     case CaseClause(pat: Tree, guard: Tree, body: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
@@ -41,7 +40,7 @@ object Trees {
     case Bind(name: Name, body: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
     case Unapply(f: Tree, args: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
     case Tagged(arg: Name, tpeAs: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case TreeSeq(args: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
+    case TreeSeq(args: List[Tree]) extends Tree(Id.noId, Type.NoType)
     case EmptyTree extends Tree(Id.noId, Type.NoType)
   }
 
@@ -69,7 +68,7 @@ object Trees {
     def (trees: List[Tree]) toTree: Tree = trees match {
       case Nil      => EmptyTree
       case t :: Nil => t
-      case ts       => TreeSeq(ts)(Id.noId, Type.NoType)
+      case ts       => TreeSeq(ts)
     }
 
     def (tree: Tree) toNames: List[Name] = {

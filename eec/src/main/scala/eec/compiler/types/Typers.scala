@@ -102,11 +102,6 @@ object Typers {
     tree.typed(pt)
   }
 
-  // def (tree: Tree) typedAsPackageSelection(id: Id, pt: Type): Contextual[Checked[Tree]] = {
-  //   implicit val newMode = Mode.PackageSelect
-  //   tree.typed(pt)
-  // }
-
   def constantTpe: Constant => Type = {
     case BooleanConstant(_) => Bootstraps.BooleanType
     case BigDecConstant(_)  => Bootstraps.DecimalType
@@ -227,30 +222,6 @@ object Typers {
         tpe       <- checkFunWithProto(fun1.tpe, funProto, pt)(Apply(fun, args)(Id.noId, Type.NoType))
       } yield Apply(fun1, args1)(id, tpe)
     }
-
-  def typedIf(cond: Tree, thenp: Tree, elsep: Tree)(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = {
-
-      import TypeOps._
-
-      for {
-        cond1     <- cond.typed(Bootstraps.BooleanType)
-        thenp1    <- thenp.typed(pt)
-        elsep1    <- elsep.typed(pt)
-        strictEq  <- thenp1.tpe =!= elsep1.tpe
-      } yield {
-        if !strictEq then {
-          import TreeOps._
-          val thenpTpeStr = thenp1.tpe.userString
-          val elsepTpeStr = elsep1.tpe.userString
-          val treeStr     = If(cond,thenp,elsep)(Id.noId, Type.NoType).userString
-          CompilerError.UnexpectedType(
-            s"$thenpTpeStr != $elsepTpeStr in `if` expr:\n$treeStr")
-        } else {
-          If(cond1, thenp1, elsep1)(id, thenp1.tpe)
-        }
-      }
-  }
 
   def typedLet(letId: Tree, value: Tree, continuation: Tree)(id: Id, pt: Type): (
     Contextual[Modal[Checked[Tree]]]) = {
@@ -379,7 +350,7 @@ object Typers {
 
   def typedSelectType(from: Tree, name: Name)(id: Id, pt: Type): (
     Contextual[Modal[Checked[Tree]]]) =
-      CompilerError.IllegalState("Typed member selections unimplemented")
+     CompilerError.SyntaxError("Member selections do not exist for types.")
 
   def typedSelectTerm(from: Tree, name: Name)(id: Id, pt: Type): (
     Contextual[Modal[Checked[Tree]]]) =
@@ -462,7 +433,6 @@ object Typers {
       case Apply(t,ts)      if mode == Term   => typedApplyTerm(t,ts)(tree.id, pt)
       case DefDef(m,s,t,b)  if mode == Term   => typedDefDef(m,s,t,b)(tree.id, pt)
       case DefSig(n,ns)     if mode == Term   => typedDefSig(n,ns)(tree.id, pt)
-      case If(c,t,e)        if mode == Term   => typedIf(c,t,e)(tree.id, pt)
       case Let(n,v,c)       if mode == Term   => typedLet(n,v,c)(tree.id, pt)
       case Function(ts,t)   if mode == Term   => typedFunctionTerm(ts,t)(tree.id, pt)
       case Tagged(n,t)      if mode == Term   => typedTagged(n,t)(tree.id, pt)
