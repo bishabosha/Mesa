@@ -23,8 +23,7 @@ class TyperTest {
       "-0".typed  -> "Integer")
     failsTypeCheck(
       "0l".typed, // no Longs
-      "0L".typed  // no Longs
-    )
+      "0L".typed)  // no Longs
   }
 
   @Test def typecheckDecimal(): Unit = {
@@ -36,8 +35,7 @@ class TyperTest {
       "3.14159f".typed, // no Floats
       "3.14159F".typed, // no Floats
       "3.14159d".typed, // no Doubles
-      "3.14159D".typed  // no Doubles
-    )
+      "3.14159D".typed)  // no Doubles
   }
 
   @Test def typecheckBoolean(): Unit = {
@@ -113,12 +111,10 @@ class TyperTest {
       "\\t: () -> () => ()".typed   -> "(() -> ()) -> ()",
       "\\t: (), u: () => ()".typed  -> "() -> () -> ()",
       "\\t: ((), ()) => ()".typed   -> "((), ()) -> ()",
-      "\\t: ! () => ()".typed       -> "! () -> ()"
-    )
+      "\\t: ! () => ()".typed       -> "! () -> ()")
     failsTypeCheck(
       "\\f: () -> Char => ()".typed, // f.tpe is not computation co-domain
-      "\\f: () => 0".typed // lambda tpe is not computation co-domain
-    )
+      "\\f: () => 0".typed) // lambda tpe is not computation co-domain
   }
 
   @Test def typecheckApplication(): Unit = {
@@ -128,16 +124,26 @@ class TyperTest {
       "(\\t: (), u: (), v: () => ()) () () ()".typed -> "()",
       "\\f: () -> () => f ()".typed                  -> "(() -> ()) -> ()",
       "\\t: () => ! ()".typed                        -> "() -> ! ()",
-      "\\t: () -> () => \\c: () => t c".typed        -> "(() -> ()) -> () -> ()",
-    )
+      "\\t: () -> () => \\c: () => t c".typed        -> "(() -> ()) -> () -> ()")
     failsTypeCheck(
-      "(\\f: () => ()) 0".typed // expects () not Integer
-    )
+      "(\\f: () => ()) 0".typed) // expects () not Integer
   }
 
   @Test def typecheckLet(): Unit = {
     passesTypeCheck(
-      "let !x = !() in ()".typed -> "()")
+      "let !x = !() in ()".typed -> "()",
+      "let !x = !0 in !x".typed -> "! Integer")
+    failsTypeCheck(
+      "let !x = () in ()".typed, // () is not ! type
+      "let !x = 0 in ()".typed, // 0 is not of ! type
+      "let !x = !0 in 0".typed) // 0 is not of computation type
+  }
+
+  @Test def typecheckBind(): Unit = {
+    passesTypeCheck(
+      "\\ma: !a, f: a -> !b => let !a = ma in f a".typed      -> "! a -> (a -> ! b) -> ! b",
+      "\\ma: !a => \\f: a -> !b => let !a = ma in f a".typed  -> "! a -> (a -> ! b) -> ! b",
+      "\\a: !a, f: a -> !b => let !a = a in f a".typed        -> "! a -> (a -> ! b) -> ! b") // modified to test rebinding
   }
 
   def (str: String) typedAs(as: Type): Checked[Type] = {
@@ -145,7 +151,7 @@ class TyperTest {
     import core.Contexts._
     import Namers._
     import CompilerErrorOps._
-    implicit val rootCtx = RootContext()
+    implicit val rootCtx = new RootContext()
     for {
       expr   <- parseExpr(str)
       _      <- Context.enterBootstrapped

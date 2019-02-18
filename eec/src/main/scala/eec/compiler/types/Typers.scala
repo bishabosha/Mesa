@@ -30,7 +30,8 @@ object Typers {
     }
   }
 
-  def (tpe: Type) =!= (other: Type): Boolean = tpe == other ||
+  def (tpe: Type) =!= (other: Type): Boolean =
+    tpe == other ||
     tpe == Type.WildcardType ||
     other == Type.WildcardType
 
@@ -66,7 +67,7 @@ object Typers {
                   import TreeOps._
                   val retStr  = ret.userString
                   val ptStr   = pt.userString
-                  val treeStr     = tree.userString
+                  val treeStr = tree.userString
                   CompilerError.UnexpectedType(
                     s"$retStr != $ptStr in application expr:\n$treeStr")
               }
@@ -78,7 +79,7 @@ object Typers {
             val retStr  = ret.userString
             val arg1Str = arg1.userString
             val ret1Str = ret1.userString
-            val treeStr     = tree.userString
+            val treeStr = tree.userString
             CompilerError.UnexpectedType(
               s"Function definition `$argStr -> $retStr` does not match args. Expected `$argStr` but was `$arg1Str` in application expr:\n$treeStr")
           }
@@ -199,13 +200,13 @@ object Typers {
         check tpe matches prototype
       */
       for {
-        functor1 <- functor.typed(pt)
-        args1 <- args.flatMapM(_.typed(pt))
+        functor1  <- functor.typed(pt)
+        args1     <- args.flatMapM(_.typed(pt))
       } yield {
         import TypeOps._
-        val selTpe = functor1.tpe
+        val selTpe  = functor1.tpe
         val argTpes = args1.map(_.tpe)
-        val tpe = AppliedType(selTpe, argTpes)
+        val tpe     = AppliedType(selTpe, argTpes)
         Apply(functor1, args1)(id, tpe)
       }
     }
@@ -236,15 +237,25 @@ object Typers {
         case AppliedType(TypeRef(Name.ComputationTag), List(t)) =>
           t
         case _ =>
-          CompilerError.UnexpectedType(s"Can not infer type of `! ${name.userString}` = `${value.userString}` as of computation type.")
+          CompilerError.UnexpectedType(s"Can not infer type of `!${name.userString} = ${value.userString}` as of ! type.")
       }
 
+      def contIsComp(tpe: Type): Checked[Type] =
+        if tpe.isComputationType then
+          tpe
+        else
+          CompilerError.UnexpectedType("Let body does not have computation type.")
+
+
       for {
+        lCtx          <- ctx.lookIn(id)
         value1        <- value.typed(pt) // need to typecheck value1 as being comp type
         value1Inner   <- unwrapCompApply(value1.tpe)
         letId1        <- Ident(name)(letId.id, value1Inner)
-        continuation1 <- continuation.typed(pt)
-      } yield Let(letId1, value1, continuation1)(id, continuation1.tpe)
+        _             <- lCtx.putType(name, value1Inner)
+        continuation1 <- continuation.typed(pt)(lCtx)
+        tpe           <- contIsComp(continuation1.tpe)
+      } yield Let(letId1, value1, continuation1)(id, tpe)
   }
 
   def typedCaseExpr(selector: Tree, cases: List[Tree])(id: Id, pt: Type): (
@@ -283,7 +294,7 @@ object Typers {
     Contextual[Modal[Checked[Tree]]]) = {
       import TypeOps._
       for {
-        id1 <- f.typed(pt)
+        id1   <- f.typed(pt)
         args1 <- args.flatMapM(_.typed(pt))
       } yield Unapply(id1, args1)(id, id1.tpe) // need to lookup id1 to get idArgs, if idArgs types match args1 then ok
     }

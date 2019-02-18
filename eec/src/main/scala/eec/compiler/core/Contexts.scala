@@ -91,7 +91,7 @@ object Contexts {
         else if ctxIt eq root then
           CompilerError.IllegalState(s"name not found: ${name.userString}")
         else
-          inner(outer)
+          inner(ctxIt.outer)
 
       inner(this)
     }
@@ -112,13 +112,13 @@ object Contexts {
     def ctx(implicit c: Context) = c
 
     def enterFresh(id: Id, name: Name): Contextual[Context] = {
-      val newCtx = Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
+      val newCtx = new Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
       ctx.scope += Sym(id, name) -> newCtx
       newCtx
     }
 
     def enterLeaf(id: Id, name: Name): Contextual[Unit] = {
-      val newCtx = Leaf(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
+      val newCtx = new Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
       ctx.scope += Sym(id, name) -> newCtx
     }
 
@@ -134,15 +134,11 @@ object Contexts {
     }
   }
 
-  case class Fresh private[Contexts] (override val outer: Context, override val scope: Scope, override val typeTable: TypeTable) extends Context {
+  class Fresh private[Contexts] (override val outer: Context, override val scope: Scope, override val typeTable: TypeTable) extends Context {
     override def rootCtx = outer.rootCtx
   }
 
-  case class Leaf private[Contexts] (override val outer: Context, override val scope: Scope, override val typeTable: TypeTable) extends Context {
-    override def rootCtx = outer.rootCtx
-  }
-
-  case class RootContext() extends Context {
+  class RootContext extends Context {
     import Id._
 
     private[this] val _typeTable: TypeTable = new mutable.AnyRefMap
@@ -175,9 +171,10 @@ object Contexts {
       case c: RootContext =>
         val foo = c.scope.map(p => ScopeDef(p._1, p._2.toScoping)).toList
         ScopeDef(RootSym, Branch(foo))
-      case f: Fresh =>
+      case f: Fresh if f.scope.nonEmpty =>
         Branch(f.scope.map(p => ScopeDef(p._1, p._2.toScoping)).toList)
-      case l: Leaf => Empty
+      case _ =>
+        Empty
     }
   }
 
