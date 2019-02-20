@@ -35,7 +35,7 @@ object Contexts {
     }
   }
 
-  type Modal[X] = implicit Mode => X
+  type Modal[X] = given Mode => X
 
   opaque type Id = Long
 
@@ -105,7 +105,7 @@ object Contexts {
     }
   }
 
-  type Contextual[O] = implicit Context => O
+  type Contextual[O] = given Context => O
 
   object Context {
 
@@ -127,7 +127,7 @@ object Contexts {
         CompilerError.IllegalState("Non-fresh _root_ context")
       } else {
         Names.bootstrapped.foreach({ (name, tpe) =>
-          enterLeaf(ctx.rootCtx.fresh, name)(ctx.rootCtx)
+          enterLeaf(ctx.rootCtx.fresh, name) given ctx.rootCtx
           ctx.rootCtx.putType(name, tpe)
         })
       }

@@ -3,13 +3,13 @@ package repl
 
 class EECRepl {
   
-  import compiler.core.Contexts._
-  import compiler.types._
-  import compiler.parsing._
-  import compiler.error.CompilerErrors._
-  import compiler.types.Namers._
-  import compiler.types.Types._
-  import compiler.types.Types.Type
+  import compiler._
+  import types._
+  import parsing._
+  import Namers._
+  import Types._
+  import core.Contexts._
+  import error.CompilerErrors._
   import scala.annotation._
   import pprint._
 
@@ -59,10 +59,10 @@ class EECRepl {
   private[this] def command(state: LoopState, input: String): LoopState = {
 
       import Commands._
-      import Commands.Command._
-      import compiler.ast.Trees._
-      import compiler.types.Typers._
-      import compiler.core.Printing.untyped.AstOps._
+      import Command._
+      import ast._
+      import Typers._
+      import core.Printing.untyped.AstOps._
       import CompilerErrorOps._
 
       def guarded(string: String)(body: => LoopState): LoopState =

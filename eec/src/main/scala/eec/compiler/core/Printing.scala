@@ -5,9 +5,10 @@ package core
 object Printing {
 
   import compiler.ast.Trees._
-  import compiler.core.Names._
-  import compiler.core.Modifiers._
-  import compiler.core.Constants._
+  import compiler.core._
+  import Names._
+  import Modifiers._
+  import Constants._
 
   object untyped {
 

@@ -5,14 +5,15 @@ package types
 object Typers {
 
   import Types._
-  import Types.Type._
+  import Type._
   import core.Names._
   import core.Constants._
   import core.Constants.Constant._
   import core.Modifiers._
+  import ast._
   import ast.Trees._
-  import ast.Trees.Tree._
-  import ast.Trees.untyped._
+  import Tree._
+  import untyped._
   import error.CompilerErrors._
   import CompilerErrorOps._
   import core.Contexts._
@@ -126,8 +127,8 @@ object Typers {
 
       for {
         fCtx  <- ctx.lookIn(id)
-        args1 <- args.flatMapM(_.typed(pt)(fCtx))
-        body1 <- body.typed(pt)(fCtx)
+        args1 <- args.flatMapM(_.typed(pt) given fCtx)
+        body1 <- body.typed(pt) given fCtx
         f     <- function(args1, body1)
       } yield f
     }
@@ -253,7 +254,7 @@ object Typers {
         value1Inner   <- unwrapCompApply(value1.tpe)
         letId1        <- Ident(name)(letId.id, value1Inner)
         _             <- lCtx.putType(name, value1Inner)
-        continuation1 <- continuation.typed(pt)(lCtx)
+        continuation1 <- continuation.typed(pt) given lCtx
         tpe           <- contIsComp(continuation1.tpe)
       } yield Let(letId1, value1, continuation1)(id, tpe)
   }

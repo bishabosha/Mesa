@@ -17,7 +17,7 @@ object Namers {
   def namedDefDef(sig: Tree, tpeAs: Tree, body: Tree): Contextual[Modal[Unit]] = {
     val oldCtx = ctx
     def namedDef(id: Id, name: Name, args: List[Tree]): Unit = {
-      implicit val newCtx: Context = enterFresh(id, name)(oldCtx)
+      implicit val newCtx: Context = enterFresh(id, name) given oldCtx
       args.foreach {
         case t @ Ident(name) => enterLeaf(t.id, name)
         case _ =>
@@ -31,7 +31,7 @@ object Namers {
   def namedFunctionTerm(args: List[Tree], body: Tree)(id: Id): Contextual[Modal[Unit]] = {
     val oldCtx = ctx
     def inner: Unit = {
-      implicit val newCtx: Context = enterFresh(id, anon)(oldCtx)
+      implicit val newCtx: Context = enterFresh(id, anon) given oldCtx
       args.foreach {
         case t @ Tagged(name, _) => enterLeaf(t.id, name)
         case _ =>
@@ -44,8 +44,8 @@ object Namers {
   def namedPackageDef(pid: Tree, stats: List[Tree]): Contextual[Modal[Unit]] = {
     import TreeOps._
     var ctxNew = ctx
-    pid.toNamePairs.foreach { (id, n) => ctxNew = enterFresh(id, n)(ctxNew) }
-    stats.foreach(index(_)(ctxNew))
+    pid.toNamePairs.foreach { (id, n) => ctxNew = enterFresh(id, n) given ctxNew }
+    stats.foreach(index(_) given ctxNew)
   }
 
   def namedApplyTerm(fun: Tree, args: List[Tree]): Contextual[Modal[Unit]] = {
@@ -56,7 +56,7 @@ object Namers {
   def namedLet(letId: Tree, value: Tree, continuation: Tree)(id: Id): Contextual[Modal[Unit]] = {
     val oldCtx = ctx
     def inner: Unit = {
-      implicit val newCtx = enterFresh(id, anon)(oldCtx)
+      implicit val newCtx = enterFresh(id, anon) given oldCtx
       val Ident(name) = letId
       enterLeaf(letId.id, name)
       index(continuation)
@@ -67,7 +67,7 @@ object Namers {
 
   def namedCaseExpr(selector: Tree, cases: List[Tree]): Contextual[Modal[Unit]] = {
     index(selector)
-    cases.foreach(c => index(c)(enterFresh(c.id, anon)))
+    cases.foreach(c => index(c) given enterFresh(c.id, anon))
   }
 
   def namedCaseClause(pat: Tree, guard: Tree, body: Tree): Contextual[Modal[Unit]] = {

@@ -5,9 +5,10 @@ package parsing
 object Parsers {
 
   import TreeParsers._
-  import ast.Trees._
-  import ast.Trees.Tree._
-  import ast.Trees.untyped._
+  import ast._
+  import Trees._
+  import Tree._
+  import untyped._
   import core.Names._
   import core.Contexts._
   import Context._

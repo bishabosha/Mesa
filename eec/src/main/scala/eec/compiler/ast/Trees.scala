@@ -4,24 +4,11 @@ package ast
 
 object Trees {
 
-  import Trees._
-  import Tree._
   import core.Names._
-  import core.Names.Name._
   import core.Constants._
+  import core.Contexts._
   import core.Modifiers._
   import types.Types._
-
-  object untyped {
-    type Tree = Trees.Tree
-    val uTpe = Type.Untyped
-  }
-
-  object typed {
-    type Tree = Trees.Tree
-  }
-
-  import core.Contexts._
 
   enum Tree(val id: Id, val tpe: Type) {
     case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(id, tpe)
@@ -44,13 +31,11 @@ object Trees {
     case EmptyTree extends Tree(Id.noId, Type.NoType)
   }
 
-  val emptyIdent = Ident(EmptyName)(Id.noId, Type.NoType)
-  val wildcardIdent = Ident(Wildcard)(Id.noId, Type.NoType)
-
   object TreeOps {
 
     import scala.annotation._
     import util.Showable
+    import Trees.Tree._
 
     implicit val TreeShowable: Showable[Tree] = new {
       import core.Printing.untyped.AstOps._
@@ -94,4 +79,5 @@ object Trees {
       case _          => tree
     }
   }
+
 }

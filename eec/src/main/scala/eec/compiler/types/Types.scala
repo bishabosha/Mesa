@@ -35,7 +35,6 @@ object Types {
     import eec.util.Showable
 
     implicit val TypeShowable: Showable[Type] = new {
-      import Tree._
 
       private def (tree: Tree) named: String = {
         import TreeOps._
@@ -75,9 +74,6 @@ object Types {
   }
 
   object TypeOps {
-
-    import ast.Trees._
-    import ast.Trees.Tree._
 
     def (types: List[Type]) toType: Type = types match {
       case tpe :: Nil => tpe

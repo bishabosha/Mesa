@@ -1,6 +1,7 @@
 package eec
-package object compiler {
-  val preludeSource ="""
+package compiler
+
+val preludeSource ="""
 package eec.Prelude
 
 primitive fst p: (a, b) -> a
@@ -9,4 +10,3 @@ primitive debug x: a -> String
 
 Unit: () = ()
 """.trim
-}
