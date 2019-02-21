@@ -151,7 +151,8 @@ class TyperTest {
     import core.Contexts._
     import Namers._
     import CompilerErrorOps._
-    implicit val rootCtx = new RootContext()
+    val rootCtx = new RootContext()
+    implied for Context = rootCtx
     for {
       expr   <- parseExpr(str)
       _      <- Context.enterBootstrapped

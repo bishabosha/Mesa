@@ -34,7 +34,7 @@ object Types {
     import Type._
     import eec.util.Showable
 
-    implied for Showable[Type] = new {
+    implied for Showable[Type] {
 
       private def (tree: Tree) named: String = {
         import TreeOps._
@@ -42,7 +42,7 @@ object Types {
         tree.toNames.map(_.userString).mkString(".")
       }
 
-      override def (typ: Type) userString: String = typ match {
+      def (typ: Type) userString: String = typ match {
         case FunctionType(f: FunctionType, b) =>
           s"(${f.userString}) -> ${b.userString}"
         case FunctionType(t, b) =>

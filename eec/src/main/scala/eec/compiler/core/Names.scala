@@ -31,8 +31,8 @@ object Names {
     import Name._
     import eec.util.{Showable, Readable}
 
-    implied for Showable[Name] = new {
-      override def (name: Name) userString: String = name match {
+    implied for Showable[Name] {
+      def (name: Name) userString: String = name match {
         case Wildcard       => "_"
         case ComputationTag => "!"
         case UnitTag        => "()"
@@ -47,8 +47,8 @@ object Names {
       }
     }
 
-    implied for Readable[Name] = new {
-      override def (str: String) readAs: Name = str match {
+    implied for Readable[Name] {
+      def (str: String) readAs: Name = str match {
         case "_"        => Wildcard
         case "!"        => ComputationTag
         case "()"       => UnitTag

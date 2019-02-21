@@ -17,7 +17,8 @@ object Namers {
   def namedDefDef(sig: Tree, tpeAs: Tree, body: Tree): Contextual[Modal[Unit]] = {
     val oldCtx = ctx
     def namedDef(id: Id, name: Name, args: List[Tree]): Unit = {
-      implicit val newCtx: Context = enterFresh(id, name) given oldCtx
+      val newCtx = enterFresh(id, name) given oldCtx
+      implied for Context = newCtx
       args.foreach {
         case t @ Ident(name) => enterLeaf(t.id, name)
         case _ =>
@@ -31,7 +32,8 @@ object Namers {
   def namedFunctionTerm(args: List[Tree], body: Tree)(id: Id): Contextual[Modal[Unit]] = {
     val oldCtx = ctx
     def inner: Unit = {
-      implicit val newCtx: Context = enterFresh(id, anon) given oldCtx
+      val newCtx = enterFresh(id, anon) given oldCtx
+      implied for Context = newCtx
       args.foreach {
         case t @ Tagged(name, _) => enterLeaf(t.id, name)
         case _ =>
@@ -56,7 +58,8 @@ object Namers {
   def namedLet(letId: Tree, value: Tree, continuation: Tree)(id: Id): Contextual[Modal[Unit]] = {
     val oldCtx = ctx
     def inner: Unit = {
-      implicit val newCtx = enterFresh(id, anon) given oldCtx
+      val newCtx = enterFresh(id, anon) given oldCtx
+      implied for Context = newCtx
       val Ident(name) = letId
       enterLeaf(letId.id, name)
       index(continuation)
@@ -81,7 +84,7 @@ object Namers {
   }
 
   def namedAlternative(alts: List[Tree]): Contextual[Modal[Unit]] = {
-    implicit val newMode = Mode.PatAlt
+    implied for Mode = Mode.PatAlt
     alts.foreach(index)
   }
 
@@ -101,12 +104,12 @@ object Namers {
   }
 
   def indexAsPattern(tree: Tree): Contextual[Unit] = {
-    implicit val mode: Mode = Mode.Pat
+    implied for Mode = Mode.Pat
     index(tree)
   }
 
   def indexAsExpr(tree: Tree): Contextual[Unit] = {
-    implicit val mode: Mode = Mode.Term
+    implied for Mode = Mode.Term
     index(tree)
   }
 

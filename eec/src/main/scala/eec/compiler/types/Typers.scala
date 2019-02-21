@@ -90,17 +90,17 @@ object Typers {
     }
 
   def (tree: Tree) typedAsExpr(pt: Type): Contextual[Checked[Tree]] = {
-    implicit val newMode = Mode.Term
+    implied for Mode = Mode.Term
     tree.typed(pt)
   }
 
   def (tree: Tree) typedAsType(pt: Type): Contextual[Checked[Tree]] = {
-    implicit val newMode = Mode.Type
+    implied for Mode = Mode.Type
     tree.typed(pt)
   }
 
   def (tree: Tree) typedAsPattern(pt: Type): Contextual[Checked[Tree]] = {
-    implicit val newMode = Mode.Pat
+    implied for Mode = Mode.Pat
     tree.typed(pt)
   }
 
@@ -318,7 +318,7 @@ object Typers {
   }
 
   def typedAlternative(patterns: List[Tree])(id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
-      implicit val newMode = Mode.PatAlt
+      implied for Mode = Mode.PatAlt
       for {
         patterns1 <- patterns.flatMapM(_.typed(pt))
         tpe       <- patterns1.unifiedTpe

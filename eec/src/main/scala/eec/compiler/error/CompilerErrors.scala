@@ -67,9 +67,9 @@ object CompilerErrors {
         }
       }
 
-    implied for Showable[CompilerError] = new {
+    implied for Showable[CompilerError] {
       import CompilerError._
-      override def (error: CompilerError) userString: String = error match {
+      def (error: CompilerError) userString: String = error match {
         case Internal(e) =>
           val trace = e.getStackTraceString.split("\n")
             .toSeq

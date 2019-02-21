@@ -76,7 +76,8 @@ class EECRepl {
 
       parseCommand(input) match {
         case AstExpr(code) => guarded(code) {
-          implicit val rootCtx = new RootContext()
+          val rootCtx = new RootContext()
+          implied for Context = rootCtx
           parseExpr(code).fold
             { err => println(s"[ERROR] ${err.userString}") }
             { expr => pprintln(expr.toAst, height = Int.MaxValue) }
@@ -86,7 +87,8 @@ class EECRepl {
         case TypeExpr(code) => guarded(code) {
           import TypeOps._
           import ContextOps._
-          implicit val rootCtx = new RootContext()
+          val rootCtx = new RootContext()
+          implied for Context = rootCtx
           val yieldTyped = for {
             _     <- Context.enterBootstrapped
             expr  <- parseExpr(code)
@@ -105,7 +107,8 @@ class EECRepl {
         }
         case AstFile(name) => guarded(name) {
           import ContextOps._
-          implicit val rootCtx = new RootContext()
+          val rootCtx = new RootContext()
+          implied for Context = rootCtx
           val yieldAst = for {
             _     <- Context.enterBootstrapped
             code  <- loadFile(name)

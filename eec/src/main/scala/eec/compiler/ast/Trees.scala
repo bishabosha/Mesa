@@ -37,9 +37,9 @@ object Trees {
     import util.Showable
     import Trees.Tree._
 
-    implied for Showable[Tree] = new {
+    implied for Showable[Tree] {
       import core.Printing.untyped.AstOps._
-      override def (tree: Tree) userString: String = tree.toAst.toString
+      def (tree: Tree) userString: String = tree.toAst.toString
     }
 
     def (tree: Tree) toList: List[Tree] = tree match {
@@ -79,5 +79,4 @@ object Trees {
       case _          => tree
     }
   }
-
 }

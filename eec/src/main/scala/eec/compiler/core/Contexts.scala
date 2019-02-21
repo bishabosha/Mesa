@@ -24,10 +24,10 @@ object Contexts {
 
     import util.Showable
 
-    def mode(implicit m: Mode) = m
+    def mode given (m: Mode) = m
 
-    implied for Showable[Mode] = new {
-      override def (m: Mode) userString: String = m match {
+    implied for Showable[Mode] {
+      def (m: Mode) userString: String = m match {
         case Pat | PatAlt => "pattern"
         case Term => "term"
         case Type => "type"
@@ -109,7 +109,7 @@ object Contexts {
 
   object Context {
 
-    def ctx(implicit c: Context) = c
+    def ctx given (c: Context) = c
 
     def enterFresh(id: Id, name: Name): Contextual[Context] = {
       val newCtx = new Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
