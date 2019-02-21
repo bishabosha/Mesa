@@ -31,7 +31,7 @@ object Names {
     import Name._
     import eec.util.{Showable, Readable}
 
-    implicit val NameShowable: Showable[Name] = new {
+    implied for Showable[Name] = new {
       override def (name: Name) userString: String = name match {
         case Wildcard       => "_"
         case ComputationTag => "!"
@@ -47,7 +47,7 @@ object Names {
       }
     }
 
-    implicit val NameReadable: Readable[Name] = new {
+    implied for Readable[Name] = new {
       override def (str: String) readAs: Name = str match {
         case "_"        => Wildcard
         case "!"        => ComputationTag

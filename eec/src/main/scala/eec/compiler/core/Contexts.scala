@@ -26,7 +26,7 @@ object Contexts {
 
     def mode(implicit m: Mode) = m
 
-    implicit val ModeShowable: Showable[Mode] = new {
+    implied for Showable[Mode] = new {
       override def (m: Mode) userString: String = m match {
         case Pat | PatAlt => "pattern"
         case Term => "term"
@@ -59,7 +59,7 @@ object Contexts {
   sealed trait Context {
     import Context._
     import Id._
-    import NameOps._
+    import implied NameOps._
 
     val outer: Context
     val scope: Scope

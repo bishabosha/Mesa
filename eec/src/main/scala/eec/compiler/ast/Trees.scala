@@ -37,7 +37,7 @@ object Trees {
     import util.Showable
     import Trees.Tree._
 
-    implicit val TreeShowable: Showable[Tree] = new {
+    implied for Showable[Tree] = new {
       import core.Printing.untyped.AstOps._
       override def (tree: Tree) userString: String = tree.toAst.toString
     }

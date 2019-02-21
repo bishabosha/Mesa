@@ -34,11 +34,11 @@ object Types {
     import Type._
     import eec.util.Showable
 
-    implicit val TypeShowable: Showable[Type] = new {
+    implied for Showable[Type] = new {
 
       private def (tree: Tree) named: String = {
         import TreeOps._
-        import NameOps._
+        import implied NameOps._
         tree.toNames.map(_.userString).mkString(".")
       }
 
@@ -59,7 +59,7 @@ object Types {
           else
             s"${t.userString} $args"
         case TypeRef(t) =>
-          import NameOps._
+          import implied NameOps._
           t.userString
         // case Derived(tree) =>
         //   s"<derived from: `${tree.named}`>"

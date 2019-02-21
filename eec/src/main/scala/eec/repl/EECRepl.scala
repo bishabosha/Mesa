@@ -64,6 +64,7 @@ class EECRepl {
       import Typers._
       import core.Printing.untyped.AstOps._
       import CompilerErrorOps._
+      import implied CompilerErrorOps._
 
       def guarded(string: String)(body: => LoopState): LoopState =
         if string.isEmpty then {

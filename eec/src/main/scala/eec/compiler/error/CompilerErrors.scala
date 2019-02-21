@@ -67,7 +67,7 @@ object CompilerErrors {
         }
       }
 
-    implicit val EECErrorShowable: Showable[CompilerError] = new {
+    implied for Showable[CompilerError] = new {
       import CompilerError._
       override def (error: CompilerError) userString: String = error match {
         case Internal(e) =>

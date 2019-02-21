@@ -165,6 +165,7 @@ class TyperTest {
   def passesTypeCheck(seq: (Checked[Type], String)*): Unit = {
     def impl(parsed: Checked[Type], checkTpe: String): Unit = {
       import CompilerErrorOps._
+      import implied CompilerErrorOps._
       parsed.fold { e =>
         fail(e.userString)
       }{ tpe =>

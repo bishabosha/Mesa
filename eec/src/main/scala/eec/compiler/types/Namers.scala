@@ -133,7 +133,7 @@ object Namers {
        | EmptyTree                            => // atomic
     /* error case */
     case _ =>
-      import TreeOps._
+      import implied TreeOps._
       throw new IllegalStateException(s"Please implement Name pass for `${tree.userString}`")
   }
 }

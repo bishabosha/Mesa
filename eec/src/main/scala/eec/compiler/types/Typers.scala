@@ -65,7 +65,7 @@ object Typers {
                       ret
                   }
                 case _ =>
-                  import TreeOps._
+                  import implied TreeOps._
                   val retStr  = ret.userString
                   val ptStr   = pt.userString
                   val treeStr = tree.userString
@@ -75,7 +75,7 @@ object Typers {
             else
               CompilerError.UnexpectedType("Function Definition does not match return type")
           else {
-            import TreeOps._
+            import implied TreeOps._
             val argStr  = arg.userString
             val retStr  = ret.userString
             val arg1Str = arg1.userString
@@ -180,7 +180,7 @@ object Typers {
         if tupleTyp =!= pt then {
           Parens(tpes1)(id, tupleTyp)
         } else {
-          import TreeOps._
+          import implied TreeOps._
           val tupleTypeStr  = tupleTyp.userString
           val expectedStr   = pt.userString
           val treeStr       = Parens(tpeTrees)(Id.noId, Type.NoType).userString
@@ -228,9 +228,8 @@ object Typers {
   def typedLet(letId: Tree, value: Tree, continuation: Tree)(id: Id, pt: Type): (
     Contextual[Modal[Checked[Tree]]]) = {
 
-      import TreeOps._
-      import core.Names.NameOps._
-      import TypeOps._
+      import implied TreeOps._
+      import implied core.Names.NameOps._
 
       val Ident(name) = letId
 
@@ -387,7 +386,7 @@ object Typers {
       if idRefTpe =!= pt then {
         Ident(name)(id, idRefTpe)
       } else {
-        import NameOps._
+        import implied NameOps._
         val nameStr     = name.userString
         val idRefTpeStr = idRefTpe.userString
         val ptStr       = pt.userString
@@ -417,7 +416,7 @@ object Typers {
       if safe then {
         typed
       } else {
-        import TreeOps._
+        import implied TreeOps._
         val treeStr = typed.userString
         val modeStr = mode.userString
         val ptStr   = pt.userString
@@ -459,7 +458,7 @@ object Typers {
                 | EmptyTree)                  => t
       /* error case */
       case _ =>
-        import TreeOps._
+        import implied TreeOps._
         CompilerError.IllegalState(s"Typing not implemented for <${mode.userString}, ${tree.userString}>")
     }
     inner(tree, pt).map(check(_)(pt))
