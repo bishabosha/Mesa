@@ -4,13 +4,14 @@ package types
 
 object Types {
 
-  import core.Names._
+  import core.Names
+  import Names._
+  import Name._
   import ast.Trees._
 
   object Bootstraps {
 
     import Type._
-    import Name._
 
     val BooleanType = TypeRef(BooleanTag)
     val DecimalType = TypeRef(DecimalTag)
@@ -19,7 +20,8 @@ object Types {
     val StringType  = TypeRef(StringTag)
   }
 
-  enum Type {
+  enum Type derives Eql {
+    // case PackageInfo(parent: Type, name: Name)
     case TypeRef(name: Name)
     case FunctionType(arg: Type, body: Type)
     case Product(args: List[Type])
@@ -33,6 +35,8 @@ object Types {
 
     import Type._
     import eec.util.Showable
+
+    // val rootPkg = PackageInfo(NoType, From(rootString))
 
     implied for Showable[Type] {
 
@@ -75,9 +79,16 @@ object Types {
 
   object TypeOps {
 
+    import Type._
+
     def (types: List[Type]) toType: Type = types match {
       case tpe :: Nil => tpe
-      case _          => Type.Product(types)
+      case _          => Product(types)
+    }
+
+    def (tpe: Type) toList: List[Type] = tpe match {
+      case Product(ls) => ls
+      case _           => tpe :: Nil
     }
 
     // def (tree: Tree) withType(tpe: Type): Tree = tree match {

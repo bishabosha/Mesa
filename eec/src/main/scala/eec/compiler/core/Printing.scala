@@ -12,7 +12,7 @@ object Printing {
 
   object untyped {
 
-    enum Ast {
+    enum Ast derives Eql {
       case Select(tree: Ast, name: Name)
       case Ident(name: Name)
       case PackageDef(pid: Ast, stats: List[Ast])
@@ -27,7 +27,7 @@ object Printing {
       case Alternative(bodys: List[Ast])
       case Parens(exprs: List[Ast])
       case Bind(name: Name, body: Ast)
-      case Unapply(id: Ast, args: List[Ast])
+      // case Unapply(id: Ast, args: List[Ast])
       case Tagged(arg: Name, tpeAs: Ast)
       case TreeSeq(args: List[Ast])
       case EmptyAst
@@ -50,7 +50,7 @@ object Printing {
         case Tree.Alternative(bodys) => Alternative(bodys.map(_.toAst))
         case Tree.Parens(exprs) => Parens(exprs.map(_.toAst))
         case Tree.Bind(name, body) => Bind(name, body.toAst)
-        case Tree.Unapply(id, args) => Unapply(id.toAst, args.map(_.toAst))
+        // case Tree.Unapply(id, args) => Unapply(id.toAst, args.map(_.toAst))
         case Tree.Tagged(arg, tpeAs) => Tagged(arg, tpeAs.toAst)
         case Tree.TreeSeq(args) => TreeSeq(args.map(_.toAst))
         case Tree.EmptyTree => EmptyAst

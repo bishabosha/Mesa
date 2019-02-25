@@ -62,8 +62,8 @@ package foo.bar
   }
 -}
 
-ok: !Integer = let !x = !1 in
-               let !y = !x in !y
+-- ok: !Integer = let !x = !1 in
+--                let !y = !x in !y
 
 {-| pseudo C code (var scoping)
   !int ok() {

@@ -332,11 +332,11 @@ object Parsers {
           Ident(context.Varid.getText.readAs)(freshId, uTpe)
         } else if context.literal ne null then {
           fromLiteral(context.literal)
-        } else if context.simplePattern ne null then { // Bang present
+        } /*else if context.simplePattern ne null then { // Bang present <- removing Bang for semantics unknown
           val simplePat = fromSimplePattern(context.simplePattern)
           val computation = Ident(Name.ComputationTag)(freshId, uTpe)
           Unapply(computation, List(simplePat))(freshId, uTpe)
-        } else { // tuple
+        }*/ else { // tuple
           fromUpToPairPatten(context.upToPairPatten)
         }
 

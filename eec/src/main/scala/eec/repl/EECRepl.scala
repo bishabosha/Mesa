@@ -60,11 +60,34 @@ class EECRepl {
 
       import Commands._
       import Command._
-      import ast._
       import Typers._
+      import ast.Trees._
       import core.Printing.untyped.AstOps._
       import CompilerErrorOps._
       import implied CompilerErrorOps._
+
+      def Typed(code: String)(f: String => Contextual[Checked[Tree]]): (
+        LoopState) = guarded(code) {
+          import TypeOps._
+          import ContextOps._
+          val rootCtx = new RootContext()
+          implied for Context = rootCtx
+          val yieldTyped = for {
+            _     <- Context.enterBootstrapped
+            expr  <- f(code)
+            _     <- indexAsExpr(expr).recoverDefault
+            typed <- expr.typedAsExpr(Type.WildcardType)
+          } yield typed
+
+          yieldTyped.fold
+            { error => println(s"[ERROR] ${error.userString}") }
+            { typed =>
+              println(typed.tpe.userString)
+              pprintln(rootCtx.toScoping, height = Int.MaxValue)
+            }
+
+          state
+        }
 
       def guarded(string: String)(body: => LoopState): LoopState =
         if string.isEmpty then {
@@ -76,35 +99,31 @@ class EECRepl {
 
       parseCommand(input) match {
         case AstExpr(code) => guarded(code) {
-          val rootCtx = new RootContext()
-          implied for Context = rootCtx
-          parseExpr(code).fold
-            { err => println(s"[ERROR] ${err.userString}") }
-            { expr => pprintln(expr.toAst, height = Int.MaxValue) }
-
-          state
-        }
-        case TypeExpr(code) => guarded(code) {
           import TypeOps._
           import ContextOps._
           val rootCtx = new RootContext()
           implied for Context = rootCtx
-          val yieldTyped = for {
+
+          val yieldNamed = for {
             _     <- Context.enterBootstrapped
             expr  <- parseExpr(code)
             _     <- indexAsExpr(expr).recoverDefault
-            typed <- expr.typedAsExpr(Type.WildcardType)
-          } yield typed
+            ex    <- expr
+          } yield ex
 
-          yieldTyped.fold
-            { error => println(s"[ERROR] ${error.userString}") }
-            { typed =>
-              println(typed.tpe.userString)
-              // pprintln(rootCtx.toScoping, height = Int.MaxValue)
+          yieldNamed.fold
+            { err => println(s"[ERROR] ${err.userString}") }
+            { expr =>
+              pprintln(expr.toAst, height = Int.MaxValue)
+              pprintln(rootCtx.toScoping, height = Int.MaxValue)
             }
 
           state
         }
+        case TypeExpr(code) =>
+          Typed(code)(parseExpr)
+        case TypeTop(code) =>
+          Typed(code)(parseEEC)
         case AstFile(name) => guarded(name) {
           import ContextOps._
           val rootCtx = new RootContext()
@@ -121,7 +140,7 @@ class EECRepl {
             { err => println(s"[ERROR] ${err.userString}") }
             { ast =>
               pprintln(ast.toAst, height = Int.MaxValue)
-              // pprintln(rootCtx.toScoping, height = Int.MaxValue)
+              pprintln(rootCtx.toScoping, height = Int.MaxValue)
             }
 
           state

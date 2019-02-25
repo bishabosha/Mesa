@@ -22,7 +22,7 @@ class TyperTest {
       "0".typed   -> "Integer",
       "-0".typed  -> "Integer")
     failsTypeCheck(
-      "0l".typed, // no Longs
+      "0l".typed,  // no Longs
       "0L".typed)  // no Longs
   }
 
@@ -32,9 +32,9 @@ class TyperTest {
       "6.62607004e-34".typed                  -> "Decimal", // Planck's constant
       "-273.15".typed                         -> "Decimal") // 0 degrees Kelvin
     failsTypeCheck(
-      "3.14159f".typed, // no Floats
-      "3.14159F".typed, // no Floats
-      "3.14159d".typed, // no Doubles
+      "3.14159f".typed,  // no Floats
+      "3.14159F".typed,  // no Floats
+      "3.14159d".typed,  // no Doubles
       "3.14159D".typed)  // no Doubles
   }
 
@@ -83,26 +83,49 @@ class TyperTest {
   @Test def typecheckCase(): Unit = {
     passesTypeCheck(
       """case () of
-           _ => ()""".typed         -> "()",
+          _ => ()""".typed                  -> "()",
       """case () of
-           x @ _ => ()""".typed     -> "()",
+          x => x""".typed                   -> "()",
+      // """case !() of
+      //     !x => x""".typed                  -> "()",
       """case () of
-           x => ()""".typed         -> "()",
+          c @ x => (c, x)""".typed          -> "((), ())",
+      // """case !() of
+      //     !() | !() => ()""".typed          -> "()",
+      // """case (!(), (!(), !())) of
+      //     (!x, (_, !y)) => (x, y)""".typed  -> "((), ())",
       """case () of
-           _ if True => ()""".typed -> "()",
+          _ if True => ()""".typed          -> "()",
       """case () of
-           () | () => ()""".typed   -> "()",
+          () | () => ()""".typed            -> "()",
+      """case "hello" of
+          "" | _ => ()""".typed             -> "()", // alternatives don't unify
       """case ((), ()) of
-           ((), ()) => ()
-           _        => ()""".typed  -> "()")
+          ((), ())  => ()
+          _         => ()""".typed          -> "()",
+      """case ((), ()) of
+          (_, a) => a""".typed              -> "()",
+      """case ((), ((), ())) of
+          (_, (_, a)) => a""".typed         -> "()",
+      """case ((), ((), ())) of
+          (a, (_, b)) => (a, b)""".typed    -> "((), ())",
+      """case ((), ((), ())) of
+          (_, (_, _)) => ()""".typed        -> "()")
     failsTypeCheck(
       """case () of
-           (a @ () | _) => ()""".typed, // name in alternative
+          (a | _) => ()""".typed, // name in alternative
       """case () of
-           () => 1
-           () => False""".typed, // disjoint bodies
+          ()  => 1
+          ()  => False""".typed, // disjoint bodies
       """case () of
-           "abc" => ()""".typed) // disjoint branch from selector
+          "abc" => ()""".typed, // pattern doesn't match selector
+      """case ((), ((), ())) of
+          (((), ()), ()) => 0""".typed, // pattern doesn't match selector
+      """case ((), ((), ())) of
+          ((_, _), _) => 0""".typed, // pattern doesn't match selector
+      """case "hello" of
+          ""  => 0
+          1   => 0""".typed) // mismatching cases
   }
 
   @Test def typecheckLambda(): Unit = {
@@ -123,7 +146,6 @@ class TyperTest {
       "(\\t: (), u: (), v: () => ()) () ()".typed    -> "() -> ()",
       "(\\t: (), u: (), v: () => ()) () () ()".typed -> "()",
       "\\f: () -> () => f ()".typed                  -> "(() -> ()) -> ()",
-      "\\t: () => ! ()".typed                        -> "() -> ! ()",
       "\\t: () -> () => \\c: () => t c".typed        -> "(() -> ()) -> () -> ()")
     failsTypeCheck(
       "(\\f: () => ()) 0".typed) // expects () not Integer
@@ -146,7 +168,7 @@ class TyperTest {
       "\\a: !a, f: a -> !b => let !a = a in f a".typed        -> "! a -> (a -> ! b) -> ! b") // modified to test rebinding
   }
 
-  def (str: String) typedAs(as: Type): Checked[Type] = {
+  def (str: String) typedAs(as: Type): Checked[Tree] = {
     import Types.TypeOps._
     import core.Contexts._
     import Namers._
@@ -158,31 +180,32 @@ class TyperTest {
       _      <- Context.enterBootstrapped
       _      <- indexAsExpr(expr)
       expr1  <- expr.typedAsExpr(as)
-    } yield expr1.tpe
+    } yield expr1
   }
 
-  def (str: String) typed: Checked[Type] = str.typedAs(any)
+  def (str: String) typed: Checked[Tree] = str.typedAs(any)
 
-  def passesTypeCheck(seq: (Checked[Type], String)*): Unit = {
-    def impl(parsed: Checked[Type], checkTpe: String): Unit = {
+  def passesTypeCheck(seq: (Checked[Tree], String)*): Unit = {
+    def impl(parsed: Checked[Tree], checkTpe: String): Unit = {
       import CompilerErrorOps._
       import implied CompilerErrorOps._
       parsed.fold { e =>
         fail(e.userString)
-      }{ tpe =>
-        assertEquals(checkTpe, tpe.userString)
+      }{ tree =>
+        assertEquals(checkTpe, tree.tpe.userString)
       }
     }
     seq.foreach { impl(_,_) }
   }
 
-  def failsTypeCheck(seq: Checked[Type]*): Unit = {
-    def impl(parsed: Checked[Type]): Unit = {
+  def failsTypeCheck(seq: Checked[Tree]*): Unit = {
+    def impl(parsed: Checked[Tree]): Unit = {
       import CompilerErrorOps._
+      import implied TreeOps._
       parsed.fold { e =>
         ()
-      }{ tpe =>
-        fail(s"typed successfully as ${tpe.userString}")
+      }{ tree =>
+        fail(s"Typed successfully as ${tree.tpe.userString} for expr:\n${tree.userString}")
       }
     }
     seq.foreach { impl }

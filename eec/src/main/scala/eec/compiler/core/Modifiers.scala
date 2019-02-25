@@ -4,7 +4,7 @@ package core
 
 object Modifiers {
 
-  enum Modifier {
+  enum Modifier derives Eql {
     case Primitive
   }
 

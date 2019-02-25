@@ -8,7 +8,7 @@ object Names {
   import types.Types._
   import Type._
 
-  enum Name {
+  enum Name derives Eql {
     case From(name: String)
     case ComputationTag, UnitTag, Tuple2Tag, IntegerTag, DecimalTag,
       BooleanTag, StringTag, CharTag, Wildcard, EmptyName

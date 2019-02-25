@@ -140,7 +140,7 @@ simplePattern
    : Wildcard
    | Varid
    | literal
-   | '!' simplePattern
+  //  | '!' simplePattern <- semantics not really proven
 //   | stableId ('(' patterns? ')')?
 //   | stableId '(' (patterns? ',')? (Varid '@')? '_' '*' ')'
    | '(' upToPairPatten? ')'

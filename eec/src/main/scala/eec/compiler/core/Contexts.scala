@@ -10,9 +10,9 @@ object Contexts {
   import scala.collection._
   import scala.annotation._
 
-  enum Mode {
+  enum Mode derives Eql {
 
-    case Type, Term, Pat, PatAlt //, PackageSelect
+    case Type, Term, Pat, PatAlt, Packaging
 
     def isPattern = this match {
       case Pat | PatAlt => true
@@ -31,6 +31,7 @@ object Contexts {
         case Pat | PatAlt => "pattern"
         case Term => "term"
         case Type => "type"
+        case Packaging => "packaging"
       }
     }
   }
@@ -65,8 +66,8 @@ object Contexts {
     val scope: Scope
     private[Context] val typeTable: TypeTable
 
-    def putType(name: Name, tpe: Type): Unit = {
-      typeTable += name -> tpe
+    def putType(pair: (Name, Type)): Unit = {
+      typeTable += pair
     }
 
     def getType(name: Name): Checked[Type] = {
@@ -128,7 +129,7 @@ object Contexts {
       } else {
         Names.bootstrapped.foreach({ (name, tpe) =>
           enterLeaf(ctx.rootCtx.fresh, name) given ctx.rootCtx
-          ctx.rootCtx.putType(name, tpe)
+          ctx.rootCtx.putType(name -> tpe)
         })
       }
     }
@@ -161,7 +162,7 @@ object Contexts {
     import util.Showable
     import Scoping._
 
-    enum Scoping {
+    enum Scoping derives Eql {
       case ScopeDef(id: Sym, scope: Scoping)
       case Branch(scopes: Seq[Scoping])
       case Empty

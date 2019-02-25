@@ -10,7 +10,7 @@ object Trees {
   import core.Modifiers._
   import types.Types._
 
-  enum Tree(val id: Id, val tpe: Type) {
+  enum Tree(val id: Id, val tpe: Type) derives Eql {
     case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(id, tpe)
     case Ident(name: Name)(id: Id, tpe: Type) extends Tree(id, tpe)
     case PackageDef(pid: Tree, stats: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
@@ -25,7 +25,7 @@ object Trees {
     case Alternative(bodys: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
     case Parens(exprs: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
     case Bind(name: Name, body: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Unapply(f: Tree, args: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
+    // case Unapply(f: Tree, args: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
     case Tagged(arg: Name, tpeAs: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
     case TreeSeq(args: List[Tree]) extends Tree(Id.noId, Type.NoType)
     case EmptyTree extends Tree(Id.noId, Type.NoType)

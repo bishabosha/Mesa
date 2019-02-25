@@ -79,9 +79,9 @@ object Namers {
     index(body) 
   }
 
-  def namedUnapply(functor: Tree, args: List[Tree]): Contextual[Modal[Unit]] = {
-    args.foreach(index)
-  }
+  // def namedUnapply(functor: Tree, args: List[Tree]): Contextual[Modal[Unit]] = {
+  //   args.foreach(index)
+  // }
 
   def namedAlternative(alts: List[Tree]): Contextual[Modal[Unit]] = {
     implied for Mode = Mode.PatAlt
@@ -117,7 +117,7 @@ object Namers {
     /* Type Trees */
     /* Pattern Trees */
     case Ident(n)           if mode.isPattern => namedIdentPat(n)(tree.id)
-    case Unapply(t,ts)      if mode.isPattern => namedUnapply(t,ts)
+    // case Unapply(t,ts)      if mode.isPattern => namedUnapply(t,ts)
     case Bind(n,t)          if mode.isPattern => namedBind(n,t)(tree.id)
     case Alternative(ts)    if mode.isPattern => namedAlternative(ts)
     /* Term Trees */

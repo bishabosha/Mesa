@@ -3,7 +3,8 @@ package compiler
 package core
 
 object Constants {
-  enum Constant {
+
+  enum Constant derives Eql {
     case StringConstant(str: String)
     case CharConstant(chr: Char)
     // case IntConstant(i: Int)
@@ -14,4 +15,5 @@ object Constants {
     case BigDecConstant(bd: BigDecimal)
     case BooleanConstant(z: Boolean)
   }
+
 }

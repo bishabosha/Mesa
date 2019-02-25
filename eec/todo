@@ -1,23 +1,7 @@
-[ ] desugar operators into list of calls
-[ ] test how diff postfix levels interact
-[ ] use param to count down args for applications
-[ ] lazy implementation of tuple
-
-
-!!!!!!!! why these are printed in TyperTest -> line 1:0 token recognition error at: '−'
-line 1:0 token recognition error at: ''''
-line 1:0 token recognition error at: ''ab'
-line 1:3 token recognition error at: '''
-
-
-`t: A`
-    -> `let u: !A = !t`
-
-`t: !A`, `u: ~B`, `let !x = t in u`
-    -> "evaluate t, bind result to x and continue with u, if z is first within t, then it is first
-        within `let !x = t in u`" - *** !x is a pattern match ***
-
-`let x = 2 in x*2`
+[x] desugar operators into list of calls
+[-] test how diff postfix levels interact
+[?] lazy implementation of tuple
+[?] desugar `case x [: !_] of !(a, _) => a ; !x => x` to `let !p = x in case p of (a, _) => a; x => x`
 
 `products a lazy interpretation: components are only evaluated once projected out. (So, e.g., the linearity in the rule
 for 1 is correct because 1 is the empty product and ∗ can never be projected.)`

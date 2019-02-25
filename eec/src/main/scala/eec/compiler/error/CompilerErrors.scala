@@ -4,7 +4,7 @@ package error
 
 object CompilerErrors {
   
-  enum CompilerError {
+  enum CompilerError derives Eql {
     case UnexpectedType(msg: String)
     case IllegalState(msg: String)
     case SyntaxError(msg: String)
