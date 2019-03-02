@@ -34,49 +34,58 @@ object Trees {
   object TreeOps {
 
     import scala.annotation._
-    import util.Showable
+    import util.{Showable, |>, Convert}
     import Trees.Tree._
+    import core.Printing.untyped.Ast
+    import implied core.Printing.untyped.AstOps._
 
     implied for Showable[Tree] {
-      import core.Printing.untyped.AstOps._
-      def (tree: Tree) userString: String = tree.toAst.toString
+      def (t: Tree) userString = toAst(t).toString
     }
 
-    def (tree: Tree) toList: List[Tree] = tree match {
-      case EmptyTree          => Nil
-      case TreeSeq(args)      => args
-      case Parens(args)       => args
-      case Alternative(args)  => args
-      case t                  => t :: Nil
-    }
-
-    def (trees: List[Tree]) toTree: Tree = trees match {
-      case Nil      => EmptyTree
-      case t :: Nil => t
-      case ts       => TreeSeq(ts)
-    }
-
-    def (tree: Tree) toNames: List[Name] = {
-      @tailrec def inner(acc: List[Name], t: Tree): List[Name] = t match {
-        case Ident(name)        => name :: acc
-        case Select(tree, name) => inner(name :: acc, tree)
-        case _                  => acc
+    implied for (Tree |> List[Tree]) {
+      def apply(t: Tree) = t match {
+        case EmptyTree          => Nil
+        case TreeSeq(args)      => args
+        case Parens(args)       => args
+        case Alternative(args)  => args
+        case t                  => t :: Nil
       }
-      inner(Nil, tree)
     }
 
-    def (tree: Tree) toNamePairs: List[(Id, Name)] = {
-      @tailrec def inner(acc: List[(Id, Name)], t: Tree): List[(Id, Name)] = t match {
-        case t @ Ident(name)    => (t.id, name) :: acc
-        case t @ Select(tree, name) => inner((t.id, name) :: acc, tree)
-        case _                  => acc
+    implied for (List[Tree] |> Tree) {
+      def apply(ts: List[Tree]) = ts match {
+        case Nil      => EmptyTree
+        case t :: Nil => t
+        case ts       => TreeSeq(ts)
       }
-      inner(Nil, tree)
+    }
+
+    implied toNames for (Tree |> List[Name]) {
+      def apply(t: Tree) = toNames(Nil, t)
+    }
+
+    implied toNamePairs for (Tree |> List[(Id, Name)]) {
+      def apply(t: Tree) = toPairs(Nil, t)
     }
 
     def (tree: Tree) addModifiers(mods: Set[Modifier]): Tree = tree match {
       case d: DefDef  => d.copy(modifiers = (d.modifiers ++ mods))(d.id, d.tpe)
       case _          => tree
+    }
+
+    @tailrec
+    private[this] def toNames(acc: List[Name], t: Tree): List[Name] = t match {
+      case Ident(name)        => name :: acc
+      case Select(tree, name) => toNames(name :: acc, tree)
+      case _                  => acc
+    }
+
+    @tailrec
+    private[this] def toPairs(acc: List[(Id, Name)], t: Tree): List[(Id, Name)] = t match {
+      case t @ Ident(name)        => (t.id, name) :: acc
+      case t @ Select(tree, name) => toPairs((t.id, name) :: acc, tree)
+      case _                      => acc
     }
   }
 }

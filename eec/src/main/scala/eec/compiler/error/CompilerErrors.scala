@@ -3,7 +3,9 @@ package compiler
 package error
 
 object CompilerErrors {
-  
+
+  import CompilerError._
+
   enum CompilerError derives Eql {
     case UnexpectedType(msg: String)
     case IllegalState(msg: String)
@@ -68,8 +70,7 @@ object CompilerErrors {
       }
 
     implied for Showable[CompilerError] {
-      import CompilerError._
-      def (error: CompilerError) userString: String = error match {
+      def (e: CompilerError) userString = e match {
         case Internal(e) =>
           val trace = e.getStackTraceString.split("\n")
             .toSeq

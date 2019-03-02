@@ -14,6 +14,7 @@ object Parsers {
   import Context._
   import core.Constants._
   import core.Constants.Constant._
+  import util.Convert
   import error.CompilerErrors._
   import org.antlr.v4.runtime.tree.TerminalNode
   import org.antlr.v4.runtime._
@@ -111,9 +112,9 @@ object Parsers {
       if ids.size == 1 then {
         ids(0)
       } else {
-        import TreeOps._
+        import implied TreeOps._
         val src = ids(0)
-        val List(select) = ids(1).toNames
+        val List(select) = Convert[Tree, List[Name]](ids(1))
         Select(src, select)(freshId, uTpe)
       }
     }
@@ -171,14 +172,15 @@ object Parsers {
     def fromExprSeqAsApply(
       exprs: java.util.List[EECParser.ExprContext]): Contextual[Tree] = {
         import scala.language.implicitConversions
-        import TreeOps._
+        import implied TreeOps._
         val Seq(expr, arg) = exprs.map(fromExpr).ensuring(_.size == 2)
-        Apply(expr, arg.toList)(freshId, uTpe)
+        val args = Convert[Tree, List[Tree]](arg)
+        Apply(expr, args)(freshId, uTpe)
       }
 
     def fromLambda(context: EECParser.LambdaContext): Contextual[Tree] = {
-      import TreeOps._
-      val bindings = fromBindings(context.bindings).toList
+      import implied TreeOps._
+      val bindings = Convert[Tree, List[Tree]](fromBindings(context.bindings))
       val body = fromExpr(context.expr)
       Function(bindings, body)(freshId, uTpe)
     }
@@ -198,9 +200,9 @@ object Parsers {
     }
 
     def fromCaseExpr(context: EECParser.CaseExprContext): Contextual[Tree] = {
-      import TreeOps._
+      import implied TreeOps._
       val selector = fromExpr(context.expr)
-      val cases = fromCases(context.cases).toList
+      val cases = Convert[Tree, List[Tree]](fromCases(context.cases))
       CaseExpr(selector, cases)(freshId, uTpe)
     }
 
@@ -259,9 +261,9 @@ object Parsers {
 
     def fromCases(context: EECParser.CasesContext): Contextual[Tree] = {
       import scala.language.implicitConversions
-      import TreeOps._
+      import implied TreeOps._
       val caseClauses = context.caseClause.map(fromCaseClause).toList
-      caseClauses.toTree
+      Convert[List[Tree], Tree](caseClauses)
     }
 
     def fromCaseClause(context: EECParser.CaseClauseContext): Contextual[Tree] = {
@@ -363,13 +365,14 @@ object Parsers {
     def fromBindingsTagged(
       context: EECParser.BindingsTaggedContext): Contextual[Tree] = {
         import scala.language.implicitConversions
-        import TreeOps._
-        context.binding.map(fromBinding).toList.toTree
+        import implied TreeOps._
+        val bindings = context.binding.map(fromBinding).toList
+        Convert[List[Tree], Tree](bindings)
       }
 
     def fromBinding(context: EECParser.BindingContext): Contextual[Tree] = {
-      import TreeOps._
-      val List(name) = fromId(context.id).toNames
+      import implied TreeOps._
+      val List(name) = Convert[Tree, List[Name]](fromId(context.id))
       val typ = fromType(context.`type`)
       Tagged(name, typ)(freshId, uTpe)
     }
@@ -451,8 +454,9 @@ object Parsers {
 
     def fromStatSeq(context: EECParser.StatSeqContext): Contextual[Tree] = {
       import scala.language.implicitConversions
-      import TreeOps._
-      context.stat.map(fromStat).toList.toTree
+      import implied TreeOps._
+      val stats = context.stat.map(fromStat).toList
+      Convert[List[Tree], Tree](stats)
     }
 
     def fromStat(context: EECParser.StatContext): Contextual[Tree] =
@@ -460,14 +464,15 @@ object Parsers {
 
     def fromTranslationUnit(
       context: EECParser.TranslationUnitContext): Contextual[Tree] = {
-        import TreeOps._
+        import implied TreeOps._
         val pkgId = fromPackageInfo(context.packageInfo)
         val stats =
           if context.statSeq ne null then
             fromStatSeq(context.statSeq)
           else
             EmptyTree
-        PackageDef(pkgId, stats.toList)(freshId, uTpe)
+        val toList = Convert[Tree, List[Tree]]
+        PackageDef(pkgId, toList(stats))(freshId, uTpe)
       }
   }
 

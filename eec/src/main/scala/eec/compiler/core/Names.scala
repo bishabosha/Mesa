@@ -32,7 +32,7 @@ object Names {
     import eec.util.{Showable, Readable}
 
     implied for Showable[Name] {
-      def (name: Name) userString: String = name match {
+      def (n: Name) userString = n match {
         case Wildcard       => "_"
         case ComputationTag => "!"
         case UnitTag        => "()"
@@ -48,7 +48,7 @@ object Names {
     }
 
     implied for Readable[Name] {
-      def (str: String) readAs: Name = str match {
+      def (s: String) readAs = s match {
         case "_"        => Wildcard
         case "!"        => ComputationTag
         case "()"       => UnitTag
@@ -58,7 +58,7 @@ object Names {
         case "Boolean"  => BooleanTag
         case "String"   => StringTag
         case "Char"     => CharTag
-        case _          => From(str)
+        case str        => From(str)
       }
     }
   }

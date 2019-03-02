@@ -18,6 +18,17 @@ object Typers {
   import CompilerErrorOps._
   import core.Contexts._
   import Context._
+  import util.Convert
+
+  private val toType = {
+    import implied TypeOps._
+    Convert[List[Type], Type]
+  }
+  
+  private val typeToList = {
+    import implied TypeOps._
+    Convert[Type, List[Type]]
+  }
 
   private[Typers] val any = Type.WildcardType
 
@@ -142,7 +153,7 @@ object Typers {
     Contextual[Modal[Checked[Tree]]]) = {
       def function(args1: List[Tree], body1: Tree): Checked[Tree] = {
         import TypeOps._
-        val argTpes = args1.map(_.tpe).toType
+        val argTpes = toType(args1.map(_.tpe))
         val fType = FunctionType(argTpes, body1.tpe)
         if !fType.isComputationType then
           CompilerError.UnexpectedType("Function does not have computational co-domain")
@@ -172,11 +183,10 @@ object Typers {
   def typedParens(ts: List[Tree])(id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
 
       def typeAsTuple(ts: List[Tree], pt: Type): Checked[List[Tree]] = {
-        import TypeOps._
         if pt == any then
           ts.flatMapM(_.typed(any))
         else {
-          val ptAsTuple = pt.toList
+          val ptAsTuple = typeToList(pt)
           if ts.length != ptAsTuple.length then
             CompilerError.UnexpectedType("Tuple lengths do not match")
           else
@@ -188,7 +198,7 @@ object Typers {
         ts1 <- typeAsTuple(ts, pt)
       } yield {
         import TypeOps._
-        val tupleTyp = ts1.map(_.tpe).toType
+        val tupleTyp = toType(ts1.map(_.tpe))
         if tupleTyp =!= pt then {
           Parens(ts1)(id, tupleTyp)
         } else {
@@ -226,12 +236,9 @@ object Typers {
 
   def typedApplyTerm(fun: Tree, args: List[Tree])(id: Id, pt: Type): (
     Contextual[Modal[Checked[Tree]]]) = {
-
-      import TypeOps._
-
       for {
         args1     <- args.flatMapM(_.typed(any))
-        funProto  <- FunctionType(args1.map(_.tpe).toType, pt)
+        funProto  <- FunctionType(toType(args1.map(_.tpe)), pt)
         fun1      <- fun.typed(any)
         tpe       <- checkFunWithProto(fun1.tpe, funProto, pt)(Apply(fun, args)(Id.noId, Type.NoType))
       } yield Apply(fun1, args1)(id, tpe)
@@ -483,7 +490,7 @@ object Typers {
 
   def (tree: Tree) typed(pt: Type): Contextual[Modal[Checked[Tree]]] = {
     import Mode._
-    def inner(tree: Tree, pt: Type): Contextual[Modal[Checked[Tree]]] = tree match {
+    def inner(tree: Tree, pt: Type) = tree match {
       /* Type Trees */
       case Select(t,n)      if mode == Type   => typedSelectType(t,n)(tree.id, pt)
       case Ident(n)         if mode == Type   => typedIdentType(n)(tree.id, pt)

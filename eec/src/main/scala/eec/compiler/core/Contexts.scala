@@ -44,9 +44,7 @@ object Contexts {
     private[Contexts] val rootId: Id = 0l
     val noId: Id = -1l
     val initId: Id = 1l
-    private[Contexts] def apply(l: Long): Id = l
-    def (x: Id) + (y: Id): Id = x + y
-    def (s: Id) toLong: Long = s
+    def (x: Id) succ : Id = x + 1l
   }
 
   case class Sym(id: Id, name: Name)
@@ -148,7 +146,7 @@ object Contexts {
 
     def fresh: Id = {
       val id = _id
-      _id += Id(1l)
+      _id = _id.succ
       id
     }
 

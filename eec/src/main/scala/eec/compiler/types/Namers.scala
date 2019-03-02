@@ -15,24 +15,21 @@ object Namers {
   private[this] val anon = Name.From(emptyString)
 
   def namedDefDef(sig: Tree, tpeAs: Tree, body: Tree): Contextual[Modal[Unit]] = {
-    val oldCtx = ctx
-    def namedDef(id: Id, name: Name, args: List[Tree]): Unit = {
-      val newCtx = enterFresh(id, name) given oldCtx
+    val DefSig(name, names) = sig
+    val newCtx = enterFresh(sig.id, name)
+    locally {
       implied for Context = newCtx
-      args.foreach {
+      names.foreach {
         case t @ Ident(name) => enterLeaf(t.id, name)
         case _ =>
       }
       index(body)
     }
-    val DefSig(name, names) = sig
-    namedDef(sig.id, name, names)
   }
 
   def namedFunctionTerm(args: List[Tree], body: Tree)(id: Id): Contextual[Modal[Unit]] = {
-    val oldCtx = ctx
-    def inner: Unit = {
-      val newCtx = enterFresh(id, anon) given oldCtx
+    val newCtx = enterFresh(id, anon)
+    locally {
       implied for Context = newCtx
       args.foreach {
         case t @ Tagged(name, _) => enterLeaf(t.id, name)
@@ -40,13 +37,12 @@ object Namers {
       }
       index(body)
     }
-    inner
   }
 
   def namedPackageDef(pid: Tree, stats: List[Tree]): Contextual[Modal[Unit]] = {
-    import TreeOps._
     var ctxNew = ctx
-    pid.toNamePairs.foreach { (id, n) => ctxNew = enterFresh(id, n) given ctxNew }
+    import implied TreeOps._
+    toNamePairs(pid).foreach { (id, n) => ctxNew = enterFresh(id, n) given ctxNew }
     stats.foreach(index(_) given ctxNew)
   }
 
@@ -56,16 +52,14 @@ object Namers {
   }
 
   def namedLet(letId: Tree, value: Tree, continuation: Tree)(id: Id): Contextual[Modal[Unit]] = {
-    val oldCtx = ctx
-    def inner: Unit = {
-      val newCtx = enterFresh(id, anon) given oldCtx
+    index(value)
+    val newCtx = enterFresh(id, anon)
+    locally {
       implied for Context = newCtx
       val Ident(name) = letId
       enterLeaf(letId.id, name)
       index(continuation)
     }
-    index(value)
-    inner
   }
 
   def namedCaseExpr(selector: Tree, cases: List[Tree]): Contextual[Modal[Unit]] = {

@@ -11,6 +11,7 @@ class EECRepl {
   import core.Contexts._
   import error.CompilerErrors._
   import scala.annotation._
+  import util.Convert
   import pprint._
 
   val pwd = System.getProperty("user.dir")
@@ -114,7 +115,9 @@ class EECRepl {
           yieldNamed.fold
             { err => println(s"[ERROR] ${err.userString}") }
             { expr =>
-              pprintln(expr.toAst, height = Int.MaxValue)
+              import core.Printing.untyped.Ast
+              import implied core.Printing.untyped.AstOps._
+              pprintln(Convert[Tree, Ast](expr), height = Int.MaxValue)
               pprintln(rootCtx.toScoping, height = Int.MaxValue)
             }
 
@@ -139,7 +142,9 @@ class EECRepl {
           yieldAst.fold
             { err => println(s"[ERROR] ${err.userString}") }
             { ast =>
-              pprintln(ast.toAst, height = Int.MaxValue)
+              import core.Printing.untyped.Ast
+              import implied core.Printing.untyped.AstOps._
+              pprintln(Convert[Tree, Ast](ast), height = Int.MaxValue)
               pprintln(rootCtx.toScoping, height = Int.MaxValue)
             }
 

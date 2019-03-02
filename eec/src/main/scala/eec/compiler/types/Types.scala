@@ -41,9 +41,11 @@ object Types {
     implied for Showable[Type] {
 
       private def (tree: Tree) named: String = {
-        import TreeOps._
+        import implied TreeOps._
         import implied NameOps._
-        tree.toNames.map(_.userString).mkString(".")
+        import util.Convert
+        val names = Convert[Tree, List[Name]](tree)
+        names.map(_.userString).mkString(".")
       }
 
       def (typ: Type) userString: String = typ match {
@@ -80,15 +82,20 @@ object Types {
   object TypeOps {
 
     import Type._
+    import util.|>
 
-    def (types: List[Type]) toType: Type = types match {
-      case tpe :: Nil => tpe
-      case _          => Product(types)
+    implied fromList for (List[Type] |> Type) {
+      def apply(ts: List[Type]) = ts match {
+        case tpe :: Nil => tpe
+        case types      => Product(types)
+      }
     }
 
-    def (tpe: Type) toList: List[Type] = tpe match {
-      case Product(ls) => ls
-      case _           => tpe :: Nil
+    implied toList for (Type |> List[Type]) {
+      def apply(t: Type) = t match {
+        case Product(ls)  => ls
+        case tpe          => tpe :: Nil
+      }
     }
 
     // def (tree: Tree) withType(tpe: Type): Tree = tree match {

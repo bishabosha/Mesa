@@ -27,7 +27,7 @@ object Printing {
       case Alternative(bodys: List[Ast])
       case Parens(exprs: List[Ast])
       case Bind(name: Name, body: Ast)
-      // case Unapply(id: Ast, args: List[Ast])
+      // case UntoAst(id: Ast, args: List[Ast])
       case Tagged(arg: Name, tpeAs: Ast)
       case TreeSeq(args: List[Ast])
       case EmptyAst
@@ -35,27 +35,28 @@ object Printing {
 
     object AstOps {
       import Ast._
-      def (tree: Tree) toAst: Ast = tree match {
-        case Tree.Select(tree, name) => Select(tree.toAst, name)
+      import util.|>
+
+      implied toAst for (Tree |> Ast) = {
+        case Tree.Select(tree, name) => Select(toAst(tree), name)
         case Tree.Ident(name) => Ident(name)
-        case Tree.PackageDef(pid, stats) => PackageDef(pid.toAst, stats.map(_.toAst))
-        case Tree.DefDef(modifiers, sig, tpeAs, body) => DefDef(modifiers, sig.toAst, tpeAs.toAst, body.toAst)
+        case Tree.PackageDef(pid, stats) => PackageDef(toAst(pid), stats.map(toAst(_)))
+        case Tree.DefDef(modifiers, sig, tpeAs, body) => DefDef(modifiers, toAst(sig), toAst(tpeAs), toAst(body))
         case Tree.DefSig(name, args) => DefSig(name, args)
-        case Tree.Apply(id, args) => Apply(id.toAst, args.map(_.toAst))
-        case Tree.Function(args, body) => Function(args.map(_.toAst), body.toAst)
-        case Tree.Let(name, value, continuation) => Let(name, value.toAst, continuation.toAst)
+        case Tree.Apply(id, args) => Apply(toAst(id), args.map(toAst(_)))
+        case Tree.Function(args, body) => Function(args.map(toAst(_)), toAst(body))
+        case Tree.Let(name, value, continuation) => Let(name, toAst(value), toAst(continuation))
         case Tree.Literal(constant) => Literal(constant)
-        case Tree.CaseExpr(selector, cases) => CaseExpr(selector.toAst, cases.map(_.toAst))
-        case Tree.CaseClause(pat, guard, body) => CaseClause(pat.toAst, guard.toAst, body.toAst)
-        case Tree.Alternative(bodys) => Alternative(bodys.map(_.toAst))
-        case Tree.Parens(exprs) => Parens(exprs.map(_.toAst))
-        case Tree.Bind(name, body) => Bind(name, body.toAst)
-        // case Tree.Unapply(id, args) => Unapply(id.toAst, args.map(_.toAst))
-        case Tree.Tagged(arg, tpeAs) => Tagged(arg, tpeAs.toAst)
-        case Tree.TreeSeq(args) => TreeSeq(args.map(_.toAst))
+        case Tree.CaseExpr(selector, cases) => CaseExpr(toAst(selector), cases.map(toAst(_)))
+        case Tree.CaseClause(pat, guard, body) => CaseClause(toAst(pat), toAst(guard), toAst(body))
+        case Tree.Alternative(bodys) => Alternative(bodys.map(toAst(_)))
+        case Tree.Parens(exprs) => Parens(exprs.map(toAst(_)))
+        case Tree.Bind(name, body) => Bind(name, toAst(body))
+        // case Tree.UntoAst(id, args) => UntoAst(id.toAst, args.map(_.toAst))
+        case Tree.Tagged(arg, tpeAs) => Tagged(arg, toAst(tpeAs))
+        case Tree.TreeSeq(args) => TreeSeq(args.map(toAst(_)))
         case Tree.EmptyTree => EmptyAst
       }
     }
-
   }
 }
