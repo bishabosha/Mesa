@@ -144,7 +144,7 @@ object Typers {
 
       for {
         fCtx  <- ctx.lookIn(id)
-        args1 <- args.flatMapM(_.typed(pt) given fCtx)
+        args1 <- args.mapE(_.typed(pt) given fCtx)
         body1 <- body.typed(pt) given fCtx
         f     <- function(args1, body1)
       } yield f
@@ -163,7 +163,7 @@ object Typers {
       }
 
       for {
-        args1 <- args.flatMapM(_.typed(pt))
+        args1 <- args.mapE(_.typed(pt))
         body1 <- body.typed(pt)
         f     <- function(args1, body1)
       } yield f
@@ -181,13 +181,13 @@ object Typers {
 
       def typeAsTuple(ts: List[Tree], pt: Type): Checked[List[Tree]] = {
         if pt == any then
-          ts.flatMapM(_.typed(any))
+          ts.mapE(_.typed(any))
         else {
           val ptAsTuple = typeToList(pt)
           if ts.length != ptAsTuple.length then
             CompilerError.UnexpectedType("Tuple lengths do not match")
           else
-            ts.zip(ptAsTuple).flatMapM { _.typed(_) }
+            ts.zip(ptAsTuple).mapE { _.typed(_) }
         }
       }
 
@@ -221,7 +221,7 @@ object Typers {
       */
       for {
         functor1  <- functor.typed(pt)
-        args1     <- args.flatMapM(_.typed(pt))
+        args1     <- args.mapE(_.typed(pt))
       } yield {
         val selTpe  = functor1.tpe
         val argTpes = args1.map(_.tpe)
@@ -233,7 +233,7 @@ object Typers {
   def typedApplyTerm(fun: Tree, args: List[Tree])(id: Id, pt: Type): (
     Contextual[Modal[Checked[Tree]]]) = {
       for {
-        args1     <- args.flatMapM(_.typed(any))
+        args1     <- args.mapE(_.typed(any))
         funProto  <- FunctionType(toType(args1.map(_.tpe)), pt)
         fun1      <- fun.typed(any)
         tpe       <- checkFunWithProto(fun1.tpe, funProto, pt)(Apply(fun, args)(Id.noId, Type.NoType))
@@ -278,7 +278,7 @@ object Typers {
 
       def (ts: List[Tree]) mapAsCaseClauses(selTpe: Type)(pt: Type): (
         Contextual[Modal[Checked[List[Tree]]]]) = {
-          ts.flatMapM({
+          ts.mapE({
             case t @ CaseClause(p,g,b) => typedCaseClause(p, g, b, selTpe)(t.id, pt)
             case unknown => CompilerError.IllegalState(
                 s"$unknown is not Tree.CaseClause(_,_,_,_)")
@@ -325,7 +325,7 @@ object Typers {
   //             else if ts.length != args.length then
   //               CompilerError.UnexpectedType("Functor args lengths do not match")
   //             else {
-  //               ts.zip(ptArgs).flatMapM { _.typed(_) }
+  //               ts.zip(ptArgs).mapE { _.typed(_) }
   //             }
   //           case _ =>
   //             CompilerError.IllegalState("Unapply does not match Functor type.")
@@ -369,7 +369,7 @@ object Typers {
     Contextual[Modal[Checked[Tree]]]) = {
       implied for Mode = Mode.PatAlt
       for {
-        patterns1 <- patterns.flatMapM(_.typed(pt))
+        patterns1 <- patterns.mapE(_.typed(pt))
         tpe       <- patterns1.unifiedTpe
       } yield Alternative(patterns1)(id, tpe)
     }
@@ -391,7 +391,7 @@ object Typers {
             } yield {
               confirmed.putType(name, tpe)
               var nextCtx = confirmed
-              tail.foldLeftM(Ident(name)(id, tpe)) { (acc, pair) =>
+              tail.foldLeftE(Ident(name)(id, tpe)) { (acc, pair) =>
                 pair match {
                   case (id, name) =>
                     for {
@@ -418,7 +418,7 @@ object Typers {
 
   def typedStats(stats: List[Tree]): (
     Contextual[Modal[Checked[List[Tree]]]]) =
-      stats.flatMapM(_.typed(any))
+      stats.mapE(_.typed(any))
 
   def typedDefDef(
     modifiers: Set[Modifier],

@@ -35,9 +35,9 @@ object CompilerErrors {
         case _                => f(o.asInstanceOf[O])
       }
 
-    def (l: List[A]) flatMapM[A, O](f: A => Checked[O]): Checked[List[O]] = {
+    def (l: List[A]) mapE[A, O](f: A => Checked[O]): Checked[List[O]] = {
       import scala.collection._
-      l.foldLeftM(new mutable.ListBuffer[O]) { (acc, a) =>
+      l.foldLeftE(new mutable.ListBuffer[O]) { (acc, a) =>
         for (o <- f(a)) yield {
           acc += o
           acc
@@ -47,7 +47,7 @@ object CompilerErrors {
     }
 
     /** shortcutting fold over a list - optimised */
-    def (l: List[A]) foldLeftM[A, O](seed: O)(f: (O, A) => Checked[O]): Checked[O] = {
+    def (l: List[A]) foldLeftE[A, O](seed: O)(f: (O, A) => Checked[O]): Checked[O] = {
       var acc = seed
       var rest = l
       while (true) {
