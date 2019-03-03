@@ -74,7 +74,8 @@ class TyperTest {
 
   @Test def typecheckIf(): Unit = {
     passesTypeCheck(
-      "if True then () else ()".typed -> "()")
+      "if True then () else ()".typed -> "()",
+      "\\a: Boolean, b: Boolean => if a then !b else !False".typed -> "Boolean -> Boolean -> ! Boolean")
     failsTypeCheck(
       "if 0 then () else ()".typed, // non Boolean condition
       "if True then 0 else ()".typed) // disjoint branches

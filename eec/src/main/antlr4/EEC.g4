@@ -65,13 +65,13 @@ stableId: id | id '.' id;
 
 type: infixType '->' type | infixType;
 
-infixType: prefixType | productType;
+infixType: prefixType; //| productType;
+
+prefixType: simpleType | Bang simpleType;
+
+simpleType: qualId | '(' type ')' | productType;
 
 productType: '(' type ',' type ')' | '()';
-
-prefixType: simpleType | Bang type;
-
-simpleType: qualId | '(' type ')';
 
 ascription: ':' type;
 

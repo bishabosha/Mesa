@@ -6,6 +6,7 @@ object Commands {
 
   enum Command derives Eql {
     case AstExpr(code: String)
+    case AstTop(code: String)
     case TypeExpr(code: String)
     case TypeTop(code: String)
     case AstFile(path: String)
@@ -21,8 +22,9 @@ object Commands {
       |
       | :help           => Show this help
       | :ast    <expr>  => Print the AST for the given expression
+      | :astt   <topl> => Print the AST for the given top level declarations
       | :t      <expr>  => Print the Type for the given expression
-      | :tt     <expr>  => Print the Type for the given top level declaration
+      | :tt     <topl>  => Print the Type for the given top level declarations
       | :tf     <file>  => Print the Type for the given code loaded from file
       | :astf   <file>  => Print the AST for the given code loaded from file
       | :prompt <word>  => Change the REPL prompt
@@ -30,6 +32,7 @@ object Commands {
 
   private val quitCommand = ":q".r
   private val astExpr = """:ast(?:\s+?(.*))?""".r
+  private val astTop = """:astt(?:\s+?(.*))?""".r
   private val typeExpr = """:t(?:\s+?(.*))?""".r
   private val typeTop = """:tt(?:\s+?(.*))?""".r
   private val astFile = """:astf(?:\s+((?:\S(?:\s*)?)*))?""".r
@@ -42,6 +45,7 @@ object Commands {
   def parseCommand(line: String): Command = line.trim match {
     case quitCommand()        => Quit
     case astExpr(code)        => AstExpr(code.trimOrEmpty)
+    case astTop(code)         => AstTop(code.trimOrEmpty)
     case typeExpr(code)       => TypeExpr(code.trimOrEmpty)
     case typeTop(code)        => TypeTop(code.trimOrEmpty)
     case astFile(file)        => AstFile(file.trimOrEmpty)

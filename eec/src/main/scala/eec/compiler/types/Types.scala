@@ -26,6 +26,7 @@ object Types {
     case AppliedType(typ: Type, args: List[Type])
     case NoType
     case WildcardType
+    case UntypedExpect(typ: Type)
     case Untyped
   }
 
@@ -36,6 +37,7 @@ object Types {
     import scala.annotation._
     import util.Showable
     import Type._
+    import Tree._
     import util.|>
     import implied NameOps._
 
@@ -43,6 +45,35 @@ object Types {
       case PackageInfo(_, name) => name
       case _                    => EmptyName
     }
+
+    def toCurriedList(t: Type): List[Type] = {
+      @tailrec
+      def inner(acc: List[Type], t: Type): List[Type] = t match {
+        case FunctionType(arg, body) => inner(arg :: acc, body)
+        case _ => t :: acc
+      }
+      inner(Nil, t).reverse
+    }
+
+//  lift f : (a -> !b) -> !a -> !b
+//  [f], [a -> !b, !a, !b] => !a -> !b
+
+    def toReturnType(defSig: Tree, t: Type): Type =
+      defSig match {
+        case DefSig(_, args) =>
+          toCurriedList(t) match {
+            case Nil    => NoType
+            case many   => toFunctionType(many.drop(args.length))
+          }
+        case _ =>
+          NoType
+      }
+
+    def toFunctionType(ts: List[Type]): Type =
+      ts.reverse match {
+        case t :: rest  => rest.foldLeft(t)((acc, t1) => FunctionType(t1, acc))
+        case Nil        => NoType
+      }
 
     implied for Showable[Type] {
 
@@ -83,7 +114,7 @@ object Types {
           t.userString
         case WildcardType =>
           "<anytype>"
-        case Untyped =>
+        case Untyped | UntypedExpect(_) =>
           "<untyped>"
         case NoType =>
           "<notype>"
@@ -104,46 +135,26 @@ object Types {
       }
     }
 
-    // def (tree: Tree) withType(tpe: Type): Tree = tree match {
-    //   case t @ Select(_,_,_)        => t.copy(tpe = tpe)
-    //   case t @ Ident(_,_)           => t.copy(tpe = tpe)
-    //   case t @ PackageDef(_,_,_)    => t.copy(tpe = tpe)
-    //   case t @ DefDef(_,_,_,_,_)    => t.copy(tpe = tpe)
-    //   case t @ DefSig(_,_,_)        => t.copy(tpe = tpe)
-    //   case t @ Apply(_,_,_)         => t.copy(tpe = tpe)
-    //   case t @ Function(_,_,_)      => t.copy(tpe = tpe)
-    //   case t @ Let(_,_,_,_)         => t.copy(tpe = tpe)
-    //   case t @ Literal(_,_)         => t.copy(tpe = tpe)
-    //   case t @ CaseExpr(_,_,_)      => t.copy(tpe = tpe)
-    //   case t @ CaseClause(_,_,_,_)  => t.copy(tpe = tpe)
-    //   case t @ Alternative(_,_)     => t.copy(tpe = tpe)
-    //   case t @ Parens(_,_)          => t.copy(tpe = tpe)
-    //   case t @ Bind(_,_,_)          => t.copy(tpe = tpe)
-    //   case t @ Unapply(_,_,_)       => t.copy(tpe = tpe)
-    //   case t @ Tagged(_,_,_)        => t.copy(tpe = tpe)
-    //   case t @ TreeSeq(_)           => t
-    //   case EmptyTree                => EmptyTree
-    // }
-
-    // def (tree: Tree) tpe: Type = tree match {
-    //   case Select(t,_,_)        => t
-    //   case Ident(t,_)           => t
-    //   case PackageDef(t,_,_)    => t
-    //   case DefDef(t,_,_,_,_)    => t
-    //   case DefSig(t,_,_)        => t
-    //   case Apply(t,_,_)         => t
-    //   case Function(t,_,_)      => t
-    //   case Let(t,_,_,_)         => t
-    //   case Literal(t,_)         => t
-    //   case CaseExpr(t,_,_)      => t
-    //   case CaseClause(t,_,_,_)  => t
-    //   case Alternative(t,_)     => t
-    //   case Parens(t,_)          => t
-    //   case Bind(t,_,_)          => t
-    //   case Unapply(t,_,_)       => t
-    //   case Tagged(t,_,_)        => t
-    //   case TreeSeq(_)           => Type.NoType
-    //   case EmptyTree            => Type.NoType
-    // }
+    import Tree._
+    def (tree: Tree) withType(tpe: Type): Tree = tree match {
+      case t @ Select(_,_)        => t.copy()(t.id, tpe)
+      case t @ Ident(_)           => t.copy()(t.id, tpe)
+      case t @ PackageDef(_,_)    => t.copy()(t.id, tpe)
+      case t @ DefDef(_,_,_,_)    => t.copy()(t.id, tpe)
+      case t @ DefSig(_,_)        => t.copy()(t.id, tpe)
+      case t @ Apply(_,_)         => t.copy()(t.id, tpe)
+      case t @ Function(_,_)      => t.copy()(t.id, tpe)
+      case t @ Let(_,_,_)         => t.copy()(t.id, tpe)
+      case t @ Literal(_)         => t.copy()(t.id, tpe)
+      case t @ CaseExpr(_,_)      => t.copy()(t.id, tpe)
+      case t @ CaseClause(_,_,_)  => t.copy()(t.id, tpe)
+      case t @ Alternative(_)     => t.copy()(t.id, tpe)
+      case t @ Parens(_)          => t.copy()(t.id, tpe)
+      case t @ Bind(_,_)          => t.copy()(t.id, tpe)
+      // case t @ Unapply(_,_,_)       => t.copy()(t.id, tpe)
+      case t @ Tagged(_,_)        => t.copy()(t.id, tpe)
+      case t @ TreeSeq(_)         => t
+      case EmptyTree              => EmptyTree
+    }
   }
 }

@@ -10,6 +10,7 @@ import core.Contexts._
 object untyped {
   type Tree = Trees.Tree
   val uTpe = Type.Untyped
+  val uTpeBoolean = Type.UntypedExpect(Bootstraps.BooleanType)
 }
 
 object typed {

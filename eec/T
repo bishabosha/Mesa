@@ -1,82 +1,19 @@
-{-| scope structure
-_root_[Package] {
-  0: foo[Package] {
-    0: bar[Package] {
-      0: ==[Member] {
-        0: x[Member] ∅
-        1: y[Member] ∅
-      }
-      1: isZero[Member] {
-        0: x[Member] ∅
-      }
-      2: otherwise[Member] {
-        0: <empty> {
-          0: a[Member] ∅
-          1: b[Member] ∅
-        }
-      }
-      3: ok[Member] {
-        0: <empty> {
-          0: x[Member] ∅
-          1: <empty> {
-            0: y[Member] ∅
-          }
-        }
-      }
-      4: id[Member] {
-        0: x[Member] ∅
-      }
-    }
-  }
-}
--}
-
 package foo.bar
 
 primitive x == y: Integer -> Integer -> Boolean
 
--- isZero x : Integer -> !Boolean =
---   case !x of
---     !0      => !True
---     !(!l, !r) => !False
---     a @ !b  => !False
---     x | y => !False
---     !any    => !False
+isZero x : Integer -> !Boolean =
+  case x of
+    0      => !True
+    a @ b  => !False
+    any    => !False
 
--- otherwise : !Boolean =
---   (\a: Boolean, b: Boolean => !a) True False
+otherwise : !Boolean =
+  (\a: Boolean, b: Boolean => !a) True False
 
-{-| pseudo C code (var scoping)
-  bool otherwise() {
-    {
-      bool a;
-      bool b;
-      return a
-    }
-  }
--}
-{-| pseudo Scala code
-  def otherwise: Boolean = {
-    val f = (a: Boolean) => (b: Boolean) => a
-    f(True)(False)
-  }
--}
+ok: !Integer = let !x = !1 in
+               let !y = !x in !y
 
--- ok: !Integer = let !x = !1 in
---                let !y = !x in !y
+id x : a -> !a = !x -- if not a built in type name then dont care yet about indexing
 
-{-| pseudo C code (var scoping)
-  !int ok() {
-    {
-      !int !x = !1;
-      {
-        !int !y = !x;
-        return !y;
-      }
-    }
-  }
--}
-
--- id x : a -> a = x -- if not a built in type name then dont care yet about indexing
-
--- branch: !Integer = if True then let !x = 3 in !x else let !y = 4 in !y
+branch: !Integer = if True then let !x = !3 in !x else let !y = !4 in !y

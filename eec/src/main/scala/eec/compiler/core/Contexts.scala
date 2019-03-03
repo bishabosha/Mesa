@@ -77,12 +77,14 @@ object Contexts {
       typeTable += pair
     }
 
-    def getType(name: Name): Checked[Type] = {
-      typeTable.getOrElse[Checked[Type]](
-        name,
-        CompilerError.UnexpectedType(s"no type found for name: ${name.userString}")
-      )
-    }
+    def getType(name: Name): Checked[Type] =
+      if name == Name.From(rootString) && (this eq rootCtx) then
+        rootPkg
+      else
+        typeTable.getOrElse[Checked[Type]](
+          name,
+          CompilerError.UnexpectedType(s"no type found for name: ${name.userString}")
+        )
 
     def rootCtx: RootContext
 
@@ -104,13 +106,12 @@ object Contexts {
       inner(this)
     }
 
-    def lookIn(id: Id): Checked[Context] = {
+    def lookIn(id: Id): Checked[Context] =
       scope.collectFirst[Checked[Context]] {
         case (Sym(`id`, _), c) => c
       }.getOrElse {
         CompilerError.IllegalState(s"No context found for Id(${id})")
       }
-    }
 
     def declarePackage(parent: Name, name: Name): Checked[Type] = {
       import CompilerErrorOps._
@@ -120,7 +121,10 @@ object Contexts {
         parentTpe <- outer.getType(parent)
       } yield (
         parentTpe match {
-          case p @ PackageInfo(_,_) => PackageInfo(p, name)
+          case p @ PackageInfo(_,_) =>
+            val tpe = PackageInfo(p, name)
+            putType(name, tpe)
+            tpe
           case _ =>
             CompilerError.UnexpectedType(s"name `${parent.userString}` does not refer to a package")
         }
@@ -152,10 +156,9 @@ object Contexts {
         CompilerError.IllegalState("Non-fresh _root_ context")
       } else {
         Names.bootstrapped.foreach({ (name, tpe) =>
-          enterLeaf(ctx.rootCtx.fresh, name) given ctx.rootCtx
+          enterLeaf(ctx.rootCtx.fresh(), name) given ctx.rootCtx
           ctx.rootCtx.putType(name -> tpe)
         })
-        ctx.rootCtx.putType(From(rootString), Types.rootPkg)
       }
     }
   }
@@ -171,7 +174,7 @@ object Contexts {
     private[this] val _scope: Scope = new mutable.ArrayBuffer
     private[this] var _id: Id = Id.initId
 
-    def fresh: Id = {
+    def fresh(): Id = {
       val id = _id
       _id = _id.succ
       id

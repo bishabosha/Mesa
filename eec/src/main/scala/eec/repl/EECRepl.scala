@@ -90,16 +90,8 @@ class EECRepl {
           state
         }
 
-      def guarded(string: String)(body: => LoopState): LoopState =
-        if string.isEmpty then {
-          println(s"[ERROR] empty input")
-          state
-        } else {
-          body
-        }
-
-      parseCommand(input) match {
-        case AstExpr(code) => guarded(code) {
+      def Ast(s: String)(f: String => Contextual[Checked[Tree]]): (
+        LoopState) = guarded(s) {
           import TypeOps._
           import ContextOps._
           val rootCtx = new RootContext()
@@ -107,7 +99,7 @@ class EECRepl {
 
           val yieldNamed = for {
             _     <- Context.enterBootstrapped
-            expr  <- parseExpr(code)
+            expr  <- f(s)
             _     <- indexAsExpr(expr).recoverDefault
             ex    <- expr
           } yield ex
@@ -123,6 +115,20 @@ class EECRepl {
 
           state
         }
+
+      def guarded(string: String)(body: => LoopState): LoopState =
+        if string.isEmpty then {
+          println(s"[ERROR] empty input")
+          state
+        } else {
+          body
+        }
+
+      parseCommand(input) match {
+        case AstExpr(code) =>
+          Ast(code)(parseExpr)
+        case AstTop(code) =>
+          Ast(code)(parseEEC)
         case TypeExpr(code) =>
           Typed(code)(parseExpr)
         case TypeTop(code) =>
