@@ -169,7 +169,6 @@ class TyperTest {
   }
 
   def (str: String) typedAs(as: Type): Checked[Tree] = {
-    import Types.TypeOps._
     import core.Contexts._
     import Namers._
     import CompilerErrorOps._
@@ -189,6 +188,7 @@ class TyperTest {
     def impl(parsed: Checked[Tree], checkTpe: String): Unit = {
       import CompilerErrorOps._
       import implied CompilerErrorOps._
+      import implied TypeOps._
       parsed.fold { e =>
         fail(e.userString)
       }{ tree =>
@@ -202,6 +202,7 @@ class TyperTest {
     def impl(parsed: Checked[Tree]): Unit = {
       import CompilerErrorOps._
       import implied TreeOps._
+      import implied TypeOps._
       parsed.fold { e =>
         ()
       }{ tree =>

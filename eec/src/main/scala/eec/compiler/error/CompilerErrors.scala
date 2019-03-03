@@ -22,6 +22,11 @@ object CompilerErrors {
         case _                  => f(o.asInstanceOf[O])
       }
 
+    def (o: Checked[O]) foreach[O, U](f: O => Unit): Unit = o match {
+      case e: CompilerError =>
+      case _                => f(o.asInstanceOf[O])
+    }
+
     def (o: Checked[O]) map[O, U](f: O => U): Checked[U] = o.flatMap(f)
 
     def (o: Checked[O]) flatMap[O, U](f: O => Checked[U]): Checked[U] =
@@ -32,17 +37,34 @@ object CompilerErrors {
 
     def (l: List[A]) flatMapM[A, O](f: A => Checked[O]): Checked[List[O]] = {
       import scala.collection._
-      var rest = l
-      var buffer = new mutable.ListBuffer[O]
-      while (rest.nonEmpty) {
-        f(rest.head) match {
-          case e: CompilerError => return e
-          case t                =>
-            rest = rest.tail
-            buffer += t.asInstanceOf[O]
+      l.foldLeftM(new mutable.ListBuffer[O]) { (acc, a) =>
+        for (o <- f(a)) yield {
+          acc += o
+          acc
         }
       }
-      buffer.toList
+      .map(_.toList)
+    }
+
+    /** shortcutting fold over a list - optimised */
+    def (l: List[A]) foldLeftM[A, O](seed: O)(f: (O, A) => Checked[O]): Checked[O] = {
+      var acc = seed
+      var rest = l
+      while (true) {
+        rest match {
+          case head :: tail =>
+            f(acc, head) match {
+              case e: CompilerError =>
+                return e
+              case t =>
+                rest = tail
+                acc = t.asInstanceOf[O]
+            }
+          case Nil =>
+            return acc
+        }
+      }
+      ???
     }
 
     import eec.util.Showable

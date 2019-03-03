@@ -9,6 +9,7 @@ object Commands {
     case TypeExpr(code: String)
     case TypeTop(code: String)
     case AstFile(path: String)
+    case TypeFile(path: String)
     case SetPrompt(prompt: String)
     case Quit
     case ShowHelp
@@ -22,6 +23,7 @@ object Commands {
       | :ast    <expr>  => Print the AST for the given expression
       | :t      <expr>  => Print the Type for the given expression
       | :tt     <expr>  => Print the Type for the given top level declaration
+      | :tf     <file>  => Print the Type for the given code loaded from file
       | :astf   <file>  => Print the AST for the given code loaded from file
       | :prompt <word>  => Change the REPL prompt
       | :q              => Quit the REPL""".stripMargin
@@ -31,6 +33,7 @@ object Commands {
   private val typeExpr = """:t(?:\s+?(.*))?""".r
   private val typeTop = """:tt(?:\s+?(.*))?""".r
   private val astFile = """:astf(?:\s+((?:\S(?:\s*)?)*))?""".r
+  private val typeFile = """:tf(?:\s+((?:\S(?:\s*)?)*))?""".r
   private val setPrompt = """:prompt(?:\s*?(\S*))?""".r
   private val showHelp = ":help".r
 
@@ -42,6 +45,7 @@ object Commands {
     case typeExpr(code)       => TypeExpr(code.trimOrEmpty)
     case typeTop(code)        => TypeTop(code.trimOrEmpty)
     case astFile(file)        => AstFile(file.trimOrEmpty)
+    case typeFile(file)       => TypeFile(file.trimOrEmpty)
     case setPrompt(newPrompt) => SetPrompt(newPrompt.trimOrEmpty)
     case showHelp()           => ShowHelp
     case _                    => Unknown

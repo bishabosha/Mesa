@@ -33,7 +33,7 @@ _root_[Package] {
 
 package foo.bar
 
--- primitive x == y: Integer -> Integer -> Boolean
+primitive x == y: Integer -> Integer -> Boolean
 
 -- isZero x : Integer -> !Boolean =
 --   case !x of

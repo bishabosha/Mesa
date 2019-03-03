@@ -7,12 +7,10 @@ object Types {
   import core.Names
   import Names._
   import Name._
+  import Type._
   import ast.Trees._
 
   object Bootstraps {
-
-    import Type._
-
     val BooleanType = TypeRef(BooleanTag)
     val DecimalType = TypeRef(DecimalTag)
     val IntegerType = TypeRef(IntegerTag)
@@ -21,7 +19,7 @@ object Types {
   }
 
   enum Type derives Eql {
-    // case PackageInfo(parent: Type, name: Name)
+    case PackageInfo(parent: Type, name: Name)
     case TypeRef(name: Name)
     case FunctionType(arg: Type, body: Type)
     case Product(args: List[Type])
@@ -31,12 +29,20 @@ object Types {
     case Untyped
   }
 
-  object Type {
+  val rootPkg = PackageInfo(NoType, From(rootString))
 
+  object TypeOps {
+
+    import scala.annotation._
+    import util.Showable
     import Type._
-    import eec.util.Showable
+    import util.|>
+    import implied NameOps._
 
-    // val rootPkg = PackageInfo(NoType, From(rootString))
+    def packageName(t: Type): Name = t match {
+      case PackageInfo(_, name) => name
+      case _                    => EmptyName
+    }
 
     implied for Showable[Type] {
 
@@ -48,7 +54,15 @@ object Types {
         names.map(_.userString).mkString(".")
       }
 
-      def (typ: Type) userString: String = typ match {
+      @tailrec
+      private def packageNamed(acc: List[Name], tpe: Type): List[Name] = tpe match {
+        case PackageInfo(parent, name)  => packageNamed(name :: acc, parent)
+        case _                          => acc
+      }
+
+      def (tpe: Type) userString: String = tpe match {
+        case t @ PackageInfo(_,_) =>
+          packageNamed(Nil, t).map(_.userString).mkString("package ", ".", "")
         case FunctionType(f: FunctionType, b) =>
           s"(${f.userString}) -> ${b.userString}"
         case FunctionType(t, b) =>
@@ -67,8 +81,6 @@ object Types {
         case TypeRef(t) =>
           import implied NameOps._
           t.userString
-        // case Derived(tree) =>
-        //   s"<derived from: `${tree.named}`>"
         case WildcardType =>
           "<anytype>"
         case Untyped =>
@@ -77,12 +89,6 @@ object Types {
           "<notype>"
       }
     }
-  }
-
-  object TypeOps {
-
-    import Type._
-    import util.|>
 
     implied fromList for (List[Type] |> Type) {
       def apply(ts: List[Type]) = ts match {

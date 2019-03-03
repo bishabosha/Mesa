@@ -67,15 +67,15 @@ class EECRepl {
       import CompilerErrorOps._
       import implied CompilerErrorOps._
 
-      def Typed(code: String)(f: String => Contextual[Checked[Tree]]): (
-        LoopState) = guarded(code) {
-          import TypeOps._
+      def Typed(s: String)(f: String => Contextual[Checked[Tree]]): (
+        LoopState) = guarded(s) {
+          import implied TypeOps._
           import ContextOps._
           val rootCtx = new RootContext()
           implied for Context = rootCtx
           val yieldTyped = for {
             _     <- Context.enterBootstrapped
-            expr  <- f(code)
+            expr  <- f(s)
             _     <- indexAsExpr(expr).recoverDefault
             typed <- expr.typedAsExpr(Type.WildcardType)
           } yield typed
@@ -149,6 +149,12 @@ class EECRepl {
             }
 
           state
+        }
+        case TypeFile(name) => Typed(name) { n =>
+          for {
+            code  <- loadFile(n)
+            ast   <- parseEEC(code)
+          } yield ast
         }
         case SetPrompt(newPrompt) => guarded(newPrompt) {
           state.copy(prompt = newPrompt)

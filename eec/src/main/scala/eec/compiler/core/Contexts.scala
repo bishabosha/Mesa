@@ -12,11 +12,21 @@ object Contexts {
 
   enum Mode derives Eql {
 
-    case Type, Term, Pat, PatAlt, Packaging
+    case PrimitiveType, Type, Term, Pat, PatAlt
 
     def isPattern = this match {
       case Pat | PatAlt => true
       case _            => false
+    }
+
+    def isType = this match {
+      case Type | PrimitiveType => true
+      case _                    => false
+    }
+
+    def isTerm = this match {
+      case Term => true
+      case _    => false
     }
   }
 
@@ -30,8 +40,7 @@ object Contexts {
       def (m: Mode) userString: String = m match {
         case Pat | PatAlt => "pattern"
         case Term => "term"
-        case Type => "type"
-        case Packaging => "packaging"
+        case PrimitiveType | Type => "type"
       }
     }
   }
@@ -62,7 +71,7 @@ object Contexts {
 
     val outer: Context
     val scope: Scope
-    private[Context] val typeTable: TypeTable
+    private[Contexts] val typeTable: TypeTable
 
     def putType(pair: (Name, Type)): Unit = {
       typeTable += pair
@@ -102,6 +111,21 @@ object Contexts {
         CompilerError.IllegalState(s"No context found for Id(${id})")
       }
     }
+
+    def declarePackage(parent: Name, name: Name): Checked[Type] = {
+      import CompilerErrorOps._
+      import Type._
+      // give package type
+      for {
+        parentTpe <- outer.getType(parent)
+      } yield (
+        parentTpe match {
+          case p @ PackageInfo(_,_) => PackageInfo(p, name)
+          case _ =>
+            CompilerError.UnexpectedType(s"name `${parent.userString}` does not refer to a package")
+        }
+      )
+    }
   }
 
   type Contextual[O] = given Context => O
@@ -122,6 +146,8 @@ object Contexts {
     }
 
     def enterBootstrapped: Contextual[Checked[Unit]] = {
+      import types.Types
+      import Name._
       if ctx.rootCtx.scope.nonEmpty then {
         CompilerError.IllegalState("Non-fresh _root_ context")
       } else {
@@ -129,6 +155,7 @@ object Contexts {
           enterLeaf(ctx.rootCtx.fresh, name) given ctx.rootCtx
           ctx.rootCtx.putType(name -> tpe)
         })
+        ctx.rootCtx.putType(From(rootString), Types.rootPkg)
       }
     }
   }
@@ -162,18 +189,27 @@ object Contexts {
 
     enum Scoping derives Eql {
       case ScopeDef(id: Sym, scope: Scoping)
-      case Branch(scopes: Seq[Scoping])
+      case TypeDef(name: Name, tpe: Type)
+      case Branch(scopes: Seq[Scoping], tpes: Seq[Scoping])
       case Empty
     }
 
-    def (ctx: Context) toScoping: Scoping = ctx match {
-      case c: RootContext =>
-        val foo = c.scope.map(p => ScopeDef(p._1, p._2.toScoping)).toList
-        ScopeDef(RootSym, Branch(foo))
-      case f: Fresh if f.scope.nonEmpty =>
-        Branch(f.scope.map(p => ScopeDef(p._1, p._2.toScoping)).toList)
-      case _ =>
-        Empty
+    def (ctx: Context) toScoping: Scoping = {
+
+      def branch(c: Context): Scoping = {
+        val scopes = c.scope.map(p => ScopeDef(p._1, p._2.toScoping)).toList
+        val tpes = c.typeTable.toList.map(TypeDef(_,_))
+        Branch(scopes, tpes)
+      }
+
+      ctx match {
+        case c: RootContext =>
+          ScopeDef(RootSym, branch(c))
+        case f: Fresh if f.scope.nonEmpty || f.typeTable.nonEmpty =>
+          branch(f)
+        case _ =>
+          Empty
+      }
     }
   }
 
