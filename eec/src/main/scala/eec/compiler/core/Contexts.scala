@@ -5,7 +5,9 @@ package core
 object Contexts {
 
   import types.Types._
+  import Type._
   import core.Names._
+  import Name._
   import error.CompilerErrors._
   import scala.collection._
   import scala.annotation._
@@ -64,6 +66,8 @@ object Contexts {
 
   type TypeTable = mutable.AnyRefMap[Name, Type]
 
+  private val rootPkg = PackageInfo(TypeRef(From(rootString)), From(rootString))
+
   sealed trait Context {
     import Context._
     import Id._
@@ -113,10 +117,14 @@ object Contexts {
         CompilerError.IllegalState(s"No context found for Id(${id})")
       }
 
+    def contains(name: Name): Boolean =
+      name != Name.From(emptyString) && scope.collectFirst({
+        case (Sym(_, `name`), _) => true
+      }).getOrElse(false)
+
     def declarePackage(parent: Name, name: Name): Checked[Type] = {
       import CompilerErrorOps._
       import Type._
-      // give package type
       for {
         parentTpe <- outer.getType(parent)
       } yield (
@@ -126,7 +134,8 @@ object Contexts {
             putType(name, tpe)
             tpe
           case _ =>
-            CompilerError.UnexpectedType(s"name `${parent.userString}` does not refer to a package")
+            CompilerError.UnexpectedType(
+              s"name `${parent.userString}` does not refer to a package")
         }
       )
     }
@@ -138,26 +147,28 @@ object Contexts {
 
     def ctx given (c: Context) = c
 
-    def enterFresh(id: Id, name: Name): Contextual[Context] = {
-      val newCtx = new Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
-      ctx.scope += Sym(id, name) -> newCtx
-      newCtx
-    }
-
-    def enterLeaf(id: Id, name: Name): Contextual[Unit] = {
-      val newCtx = new Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
-      ctx.scope += Sym(id, name) -> newCtx
+    def enterFresh(id: Id, name: Name): Contextual[Checked[Context]] = {
+      import implied NameOps._
+      if ctx.contains(name) then
+        CompilerError.UnexpectedType(s"Illegal shadowing in scope of name: ${name.userString}")
+      else {
+        val newCtx = new Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
+        ctx.scope += Sym(id, name) -> newCtx
+        newCtx
+      }
     }
 
     def enterBootstrapped: Contextual[Checked[Unit]] = {
       import types.Types
       import Name._
+      import CompilerErrorOps._
       if ctx.rootCtx.scope.nonEmpty then {
         CompilerError.IllegalState("Non-fresh _root_ context")
       } else {
         Names.bootstrapped.foreach({ (name, tpe) =>
-          enterLeaf(ctx.rootCtx.fresh(), name) given ctx.rootCtx
-          ctx.rootCtx.putType(name -> tpe)
+          for (_ <- enterFresh(ctx.rootCtx.fresh(), name) given ctx.rootCtx) {
+            ctx.rootCtx.putType(name -> tpe)
+          }
         })
       }
     }
@@ -198,6 +209,7 @@ object Contexts {
     }
 
     def (ctx: Context) toScoping: Scoping = {
+      import Name._
 
       def branch(c: Context): Scoping = {
         val scopes = c.scope.map(p => ScopeDef(p._1, p._2.toScoping)).toList
@@ -207,7 +219,9 @@ object Contexts {
 
       ctx match {
         case c: RootContext =>
-          ScopeDef(RootSym, branch(c))
+          val defs = List(ScopeDef(RootSym, branch(c)))
+          val tpes = List(TypeDef(From(rootString), rootPkg))
+          Branch(defs, tpes)
         case f: Fresh if f.scope.nonEmpty || f.typeTable.nonEmpty =>
           branch(f)
         case _ =>

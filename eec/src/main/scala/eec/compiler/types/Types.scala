@@ -30,8 +30,6 @@ object Types {
     case Untyped
   }
 
-  val rootPkg = PackageInfo(NoType, From(rootString))
-
   object TypeOps {
 
     import scala.annotation._

@@ -18,19 +18,18 @@ object Parsers {
   import error.CompilerErrors._
   import org.antlr.v4.runtime.tree.TerminalNode
   import org.antlr.v4.runtime._
-
   import scala.collection.JavaConversions._
 
   private[parsing] val eecParser =
     genParser andThen { _.translationUnit }
 
+  private[parsing] val statParser =
+    genParser andThen { _.stat }
+
   private[parsing] val exprParser =
     genParser andThen { _.expr }
 
-  private[parsing] val typeParser =
-    genParser andThen { _.`type` }
-
-  private[Parsers] class ParserSyntaxException(msg: String) extends Exception(msg)
+  private[this] class ParserSyntaxException(msg: String) extends Exception(msg)
 
   private[parsing] object TreeParsers {
 
@@ -97,9 +96,9 @@ object Parsers {
       import scala.language.implicitConversions
       import implied NameOps._
       def listToRefId(lst: List[String]): Contextual[Tree] = lst match {
-        case n :: Nil => Ident(n.readAs)(freshId(), uTpe)
-        case n :: tail => Select(listToRefId(tail), n.readAs)(freshId(), uTpe)
-        case Nil => EmptyTree
+        case n :: Nil   => Ident(n.readAs)(freshId(), uTpe)
+        case n :: tail  => Select(listToRefId(tail), n.readAs)(freshId(), uTpe)
+        case Nil        => EmptyTree
       }
       listToRefId(context.id.reverse.map(_.getText).toList)
     }
@@ -129,8 +128,7 @@ object Parsers {
       }
 
     def fromInfixType(context: EECParser.InfixTypeContext): Contextual[Tree] =
-      // if context.prefixType `ne` null then
-        fromPrefixType(context.prefixType)
+      fromPrefixType(context.prefixType)
 
     def fromProductType(context: EECParser.ProductTypeContext): Contextual[Tree] = {
       import scala.language.implicitConversions

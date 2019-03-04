@@ -3,6 +3,7 @@ package repl
 
 class EECRepl {
   
+  import Commands._
   import compiler._
   import types._
   import parsing._
@@ -18,28 +19,40 @@ class EECRepl {
   val defaultPrompt = "eec"
 
   def loop: Unit = {
+    import CompilerErrorOps._
+    import implied CompilerErrorOps._
 
     def (prompt: String) asPrompt: String = s"$prompt> "
 
     @tailrec
     def inner(state: LoopState): Unit = state match {
-      case s @ LoopState(prompt, false) =>
+      case s @ LoopState(prompt, false, _) =>
         println
         print(prompt.asPrompt)
         val nextState = command(s, readLine)
         inner(nextState)
-      case LoopState(_, true) =>
+      case LoopState(_, true, _) =>
         // exit
     }
 
-    val initial = LoopState(defaultPrompt, false)
-    println("starting eec REPL...")
-    print(defaultPrompt.asPrompt)
-    val state = command(initial, readLine)
-    inner(state)
+    newContext.fold
+      { err => println(s"[ERROR] ${err.userString}. Quitting...") }
+      { ctx =>
+        val initial = LoopState(defaultPrompt, false, ctx)
+        println("starting eec REPL...")
+        print(defaultPrompt.asPrompt)
+        val state = command(initial, readLine)
+        inner(state)
+      }
   }
 
-  private[this] case class LoopState(prompt: String, break: Boolean)
+  private[this] def newContext: Checked[Context] = {
+    import CompilerErrorOps._
+    val ctx = new RootContext
+    for (_ <- Context.enterBootstrapped given ctx) yield ctx
+  }
+
+  private[this] case class LoopState(prompt: String, break: Boolean, ctx: Context)
 
   private[this] def loadFile(name: String): Checked[String] = {
     import scala.util.control._
@@ -58,23 +71,19 @@ class EECRepl {
   }
 
   private[this] def command(state: LoopState, input: String): LoopState = {
-
-      import Commands._
       import Command._
       import Typers._
       import ast.Trees._
       import core.Printing.untyped.AstOps._
       import CompilerErrorOps._
+      import Context._
       import implied CompilerErrorOps._
 
-      def Typed(s: String)(f: String => Contextual[Checked[Tree]]): (
-        LoopState) = guarded(s) {
-          import implied TypeOps._
-          import ContextOps._
-          val rootCtx = new RootContext()
-          implied for Context = rootCtx
+      implied for Context = state.ctx
+
+      def Typed(s: String)(f: String => Contextual[Checked[Tree]]): LoopState =
+        guarded(s) {
           val yieldTyped = for {
-            _     <- Context.enterBootstrapped
             expr  <- f(s)
             _     <- indexAsExpr(expr).recoverDefault
             typed <- expr.typedAsExpr(Type.WildcardType)
@@ -83,34 +92,43 @@ class EECRepl {
           yieldTyped.fold
             { error => println(s"[ERROR] ${error.userString}") }
             { typed =>
+              import ContextOps._
+              import implied TypeOps._
               println(typed.tpe.userString)
-              pprintln(rootCtx.toScoping, height = Int.MaxValue)
             }
 
           state
         }
 
-      def Ast(s: String)(f: String => Contextual[Checked[Tree]]): (
-        LoopState) = guarded(s) {
-          import TypeOps._
-          import ContextOps._
-          val rootCtx = new RootContext()
-          implied for Context = rootCtx
-
-          val yieldNamed = for {
-            _     <- Context.enterBootstrapped
-            expr  <- f(s)
+      def Define(s: String): LoopState =
+        guarded(s) {
+          (for {
+            expr  <- parseStat(s)
             _     <- indexAsExpr(expr).recoverDefault
-            ex    <- expr
-          } yield ex
+            typed <- expr.typedAsExpr(Type.WildcardType)
+          } yield typed).fold
+            { error => println(s"[ERROR] ${error.userString}") }
+            { typed =>
+              import Tree._
+              import implied TypeOps._
+              import implied core.Names.NameOps._
+              val DefDef(_, DefSig(name, _), _, _) = typed
+              println(s"defined ${name.userString} : ${typed.tpe.userString}")
+            }
 
-          yieldNamed.fold
+          state
+        }
+
+      def Ast(s: String)(f: String => Contextual[Checked[Tree]]): LoopState =
+        guarded(s) {
+          (for (expr <- f(s))
+            yield expr
+          ).fold
             { err => println(s"[ERROR] ${err.userString}") }
             { expr =>
               import core.Printing.untyped.Ast
               import implied core.Printing.untyped.AstOps._
               pprintln(Convert[Tree, Ast](expr), height = Int.MaxValue)
-              pprintln(rootCtx.toScoping, height = Int.MaxValue)
             }
 
           state
@@ -128,43 +146,38 @@ class EECRepl {
         case AstExpr(code) =>
           Ast(code)(parseExpr)
         case AstTop(code) =>
-          Ast(code)(parseEEC)
+          Ast(code)(parseStat)
+        case AstFile(name) =>
+          Ast(name) { n =>
+            for {
+              code  <- loadFile(n)
+              ast   <- parseEEC(code)
+            } yield ast
+          }
+        case Define(code) =>
+          Define(code)
         case TypeExpr(code) =>
           Typed(code)(parseExpr)
-        case TypeTop(code) =>
-          Typed(code)(parseEEC)
-        case AstFile(name) => guarded(name) {
+        case TypeFile(name) =>
+          Typed(name) { n =>
+            for {
+              code  <- loadFile(n)
+              ast   <- parseEEC(code)
+            } yield ast
+          }
+        case SetPrompt(newPrompt) =>
+          guarded(newPrompt) { state.copy(prompt = newPrompt) }
+        case Reset =>
+          println("Loading a new context")
+          newContext.fold
+            { err =>
+              println(s"[ERROR] ${err.userString}. Quitting...")
+              state.copy(break = true) }
+            { ctx => state.copy(ctx = ctx) }
+        case Ctx =>
           import ContextOps._
-          val rootCtx = new RootContext()
-          implied for Context = rootCtx
-          val yieldAst = for {
-            _     <- Context.enterBootstrapped
-            code  <- loadFile(name)
-            ast   <- parseEEC(code)
-          } yield for {
-            _ <- indexAsExpr(ast).recoverDefault
-          } yield ast
-
-          yieldAst.fold
-            { err => println(s"[ERROR] ${err.userString}") }
-            { ast =>
-              import core.Printing.untyped.Ast
-              import implied core.Printing.untyped.AstOps._
-              pprintln(Convert[Tree, Ast](ast), height = Int.MaxValue)
-              pprintln(rootCtx.toScoping, height = Int.MaxValue)
-            }
-
+          pprintln(ctx.toScoping, height = Int.MaxValue)
           state
-        }
-        case TypeFile(name) => Typed(name) { n =>
-          for {
-            code  <- loadFile(n)
-            ast   <- parseEEC(code)
-          } yield ast
-        }
-        case SetPrompt(newPrompt) => guarded(newPrompt) {
-          state.copy(prompt = newPrompt)
-        }
         case Quit =>
           println("Quitting...")
           state.copy(break = true)

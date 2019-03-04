@@ -16,6 +16,8 @@ object CompilerErrors {
   type Checked[O] = O | CompilerError
 
   object CompilerErrorOps {
+    def failable[O](o: => Checked[O]): Checked[O] = o
+
     def (o: Checked[O]) fold[O, U](e: CompilerError => U)(f: O => U): U =
       o match {
         case err: CompilerError => e(err)
