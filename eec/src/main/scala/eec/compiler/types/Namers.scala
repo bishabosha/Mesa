@@ -85,7 +85,7 @@ object Namers {
 
   def namedCaseClause(pat: Tree, guard: Tree, body: Tree): Contextual[Modal[Checked[Unit]]] =
     for {
-      _ <- indexAsPattern(pat) // all variables in pattern are declared in this current scope
+      _ <- indexAsPattern(pat)
       _ <- index(guard) // idents here are normal refs to variables in this scope
       _ <- index(body)
     } yield ()
@@ -131,20 +131,19 @@ object Namers {
   }
 
   def index(tree: Tree): Contextual[Modal[Checked[Unit]]] = tree match {
-    /* Type Trees */
     /* Pattern Trees */
     case Ident(n)           if mode.isPattern => namedIdentPat(n)(tree.id)
     // case Unapply(t,ts)      if mode.isPattern => namedUnapply(t,ts)
     case Bind(n,t)          if mode.isPattern => namedBind(n,t)(tree.id)
     case Alternative(ts)    if mode.isPattern => namedAlternative(ts)
     /* Term Trees */
-    case PackageDef(t,ts)   if mode == Term   => namedPackageDef(t,ts)
-    case Apply(t,ts)        if mode == Term   => namedApplyTerm(t,ts)
-    case DefDef(_,s,t,b)    if mode == Term   => namedDefDef(s,t,b)
-    case Let(n,v,c)         if mode == Term   => namedLet(n,v,c)(tree.id)
-    case Function(ts,t)     if mode == Term   => namedFunctionTerm(ts,t)(tree.id)
-    case CaseExpr(t,ts)     if mode == Term   => namedCaseExpr(t,ts)
-    case CaseClause(p,g,b)  if mode == Term   => namedCaseClause(p,g,b)
+    case PackageDef(t,ts)   if mode.isTerm    => namedPackageDef(t,ts)
+    case Apply(t,ts)        if mode.isTerm    => namedApplyTerm(t,ts)
+    case DefDef(_,s,t,b)    if mode.isTerm    => namedDefDef(s,t,b)
+    case Let(n,v,c)         if mode.isTerm    => namedLet(n,v,c)(tree.id)
+    case Function(ts,t)     if mode.isTerm    => namedFunctionTerm(ts,t)(tree.id)
+    case CaseExpr(t,ts)     if mode.isTerm    => namedCaseExpr(t,ts)
+    case CaseClause(p,g,b)  if mode.isTerm    => namedCaseClause(p,g,b)
     /* any mode */
     case Parens(ts)                           => namedParens(ts)
     case Literal(_)
@@ -154,6 +153,6 @@ object Namers {
     /* error case */
     case _ =>
       import implied TreeOps._
-      throw new IllegalStateException(s"Please implement Name pass for `${tree.userString}`")
+      CompilerError.IllegalState(s"Namer implementation missing for `${tree.userString}`")
   }
 }
