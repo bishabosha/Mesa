@@ -22,91 +22,87 @@ object Namers {
     Convert[Tree, List[(Id, Name)]]
   }
 
-  def namedDefDef(sig: Tree, tpeAs: Tree, body: Tree): (
-    Contextual[Modal[Checked[Unit]]]) = {
-      val DefSig(name, names) = sig
-      enterFresh(sig.id, name).map { ctx1 =>
-        implied for Context = ctx1
-        for {
-          _ <-  names.mapE { t =>
-                  val Ident(name) = t
-                  enterFresh(t.id, name)
-                }
-          _ <-  index(body)
-        } yield ()
-      }
+  def namedDefDef(name: Name, args: List[Tree], sigId: Id)
+                 (tpeAs: Tree, body: Tree): Contextual[Modal[Checked[Unit]]] = {
+    enterFresh(sigId, name).map { ctx1 =>
+      implied for Context = ctx1
+      for {
+        _ <-  args.mapE { t =>
+                val Ident(name) = t
+                enterFresh(t.id, name)
+              }
+        _ <-  index(body)
+      } yield ()
+    }
+  }
+
+  def namedFunctionTerm(args: List[Tree], body: Tree)
+                       (id: Id): Contextual[Modal[Checked[Unit]]] =
+    enterFresh(id, anon).map { ctx1 =>
+      implied for Context = ctx1
+      for {
+        _ <-  args.mapE { t =>
+                val Tagged(name, _) = t
+                enterFresh(t.id, name)
+              }
+        _ <-  index(body)
+      } yield ()
     }
 
-  def namedFunctionTerm(args: List[Tree], body: Tree)(id: Id): (
-    Contextual[Modal[Checked[Unit]]]) =
-      for {
-        ctx1  <-  enterFresh(id, anon)
-        _     <-  checked {
-                    implied for Context = ctx1
-                    for {
-                      _ <-  args.mapE { t =>
-                              val Tagged(name, _) = t
-                              enterFresh(t.id, name)
-                            }
-                      _ <-  index(body)
-                    } yield ()
-                  }
-      } yield ()
+  def namedPackageDef
+      (pid: Tree, stats: List[Tree]): Contextual[Modal[Checked[Unit]]] = {
+    val cPkgCtx = toPairs(pid).foldLeftE(ctx) { (pkgCtx, pair) =>
+      implied for Context = pkgCtx
+      val (id, pkgName) = pair
+      enterFresh(id, pkgName)
+    }
+    cPkgCtx.flatMap { pkgCtx =>
+      implied for Context = pkgCtx
+      for (_ <- stats.mapE(index(_)))
+        yield ()
+    }
+  }
 
-  def namedPackageDef(pid: Tree, stats: List[Tree]): (
-    Contextual[Modal[Checked[Unit]]]) =
-      for {
-        ctx1  <-  toPairs(pid).foldLeftE(ctx) { (ctx1, pair) =>
-                    implied for Context = ctx1
-                    val (id, n) = pair
-                    enterFresh(id, n)
-                  }
-        _     <-  checked {
-                    implied for Context = ctx1
-                    stats.mapE(index(_))
-                  }
-      } yield ()
+  def namedApplyTerm
+      (fun: Tree, args: List[Tree]): Contextual[Modal[Checked[Unit]]] =
+    for {
+      _ <- index(fun)
+      _ <- args.mapE(index)
+    } yield ()
 
-  def namedApplyTerm(fun: Tree, args: List[Tree]): (
-    Contextual[Modal[Checked[Unit]]]) =
-      for {
-        _ <- index(fun)
-        _ <- args.mapE(index)
-      } yield ()
+  def namedLet(letId: Tree, value: Tree, continuation: Tree)
+              (id: Id): Contextual[Modal[Checked[Unit]]] =
+    for {
+      _ <-  index(value)
+      _ <-  enterFresh(id, anon).map { ctx1 =>
+              implied for Context = ctx1
+              val Ident(name) = letId
+              for {
+                _ <- enterFresh(letId.id, name)
+                _ <- index(continuation)
+              } yield ()
+            }
+    } yield ()
 
-  def namedLet(letId: Tree, value: Tree, continuation: Tree)(id: Id): (
-    Contextual[Modal[Checked[Unit]]]) =
-      for {
-        _ <-  index(value)
-        _ <-  enterFresh(id, anon).map { ctx1 =>
+  def namedCaseExpr
+      (selector: Tree, cases: List[Tree]): Contextual[Modal[Checked[Unit]]] =
+    for {
+      _ <-  index(selector)
+      _ <-  cases.mapE { caseClause =>
+              enterFresh(caseClause.id, anon).map { ctx1 =>
                 implied for Context = ctx1
-                val Ident(name) = letId
-                for {
-                  _ <- enterFresh(letId.id, name)
-                  _ <- index(continuation)
-                } yield ()
+                index(caseClause)
               }
-      } yield ()
+            }
+    } yield ()
 
-  def namedCaseExpr(selector: Tree, cases: List[Tree]): (
-    Contextual[Modal[Checked[Unit]]]) =
-      for {
-        _ <-  index(selector)
-        _ <-  cases.mapE { caseClause =>
-                enterFresh(caseClause.id, anon).map { ctx1 =>
-                  implied for Context = ctx1
-                  index(caseClause)
-                }
-              }
-      } yield ()
-
-  def namedCaseClause(pat: Tree, guard: Tree, body: Tree): (
-    Contextual[Modal[Checked[Unit]]]) =
-      for {
-        _ <- indexAsPattern(pat)
-        _ <- index(guard) // idents here are normal refs to variables in this scope
-        _ <- index(body)
-      } yield ()
+  def namedCaseClause
+      (pat: Tree, guard: Tree, body: Tree): Contextual[Modal[Checked[Unit]]] =
+    for {
+      _ <- indexAsPattern(pat)
+      _ <- index(guard) // idents here are normal refs to variables in this scope
+      _ <- index(body)
+    } yield ()
 
   // def namedUnapply(functor: Tree, args: List[Tree]): Contextual[Modal[Checked[Unit]]] = {
   //   args.foreach(index)
@@ -118,12 +114,12 @@ object Namers {
       yield ()
   }
 
-  def namedBind(name: Name, pat: Tree)(id: Id): (
-    Contextual[Modal[Checked[Unit]]]) =
-      for {
-        _ <- enterFresh(id, name)
-        _ <- index(pat)
-      } yield ()
+  def namedBind(name: Name, pat: Tree)
+               (id: Id): Contextual[Modal[Checked[Unit]]] =
+    for {
+      _ <- enterFresh(id, name)
+      _ <- index(pat)
+    } yield ()
 
   def namedParens(args: List[Tree]): Contextual[Modal[Checked[Unit]]] =
     for (_ <- args.mapE(index))
@@ -155,7 +151,11 @@ object Namers {
     /* Term Trees */
     case PackageDef(t,ts)   if mode.isTerm    => namedPackageDef(t,ts)
     case Apply(t,ts)        if mode.isTerm    => namedApplyTerm(t,ts)
-    case DefDef(_,s,t,b)    if mode.isTerm    => namedDefDef(s,t,b)
+    case DefDef(
+      _,
+      s @ DefSig(n, ns),
+      t,
+      b)                    if mode.isTerm    => namedDefDef(n,ns,s.id)(t,b)
     case Let(n,v,c)         if mode.isTerm    => namedLet(n,v,c)(tree.id)
     case Function(ts,t)     if mode.isTerm    => namedFunctionTerm(ts,t)(tree.id)
     case CaseExpr(t,ts)     if mode.isTerm    => namedCaseExpr(t,ts)

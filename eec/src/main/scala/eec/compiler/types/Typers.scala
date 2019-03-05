@@ -60,13 +60,15 @@ object Typers {
         CompilerError.UnexpectedType(s"Types do not unify to ${tpe.userString}")
     }
 
-  def checkFunWithProto(funTyp: Type, proto: Type, pt: Type)(tree: => Tree): (
-    Checked[Type]) = {
-      def unifyReturnType(funTyp: Type, proto: Type): Checked[Type] = funTyp match {
+  def checkFunWithProto(funTyp: Type, proto: Type, pt: Type)
+                       (tree: => Tree): Checked[Type] = {
+    def unifyReturnType(funTyp: Type, proto: Type): Checked[Type] =
+      funTyp match {
         case AppliedType(f, args) => proto match {
           case AppliedType(`f`, args1) =>
             if args.length != args1.length then
-              CompilerError.UnexpectedType(s"Can not unify applied types $args, $args1")
+              CompilerError.UnexpectedType(
+                s"Can not unify applied types $args, $args1")
             else {
               val argsUnified = args.zip(args1).map { (t1, t2) =>
                 if t1 == WildcardType then t2 else t1
@@ -75,49 +77,50 @@ object Typers {
             }
           case WildcardType =>
             funTyp
-          case _ => CompilerError.UnexpectedType(s"Can not unify applied types $funTyp, $proto")
+          case _ => CompilerError.UnexpectedType(
+            s"Can not unify applied types $funTyp, $proto")
         }
         case _ => funTyp
       }
 
-      def unifyArgs(arg: Type, ret: Type): Checked[Type] = ret match {
-        case AppliedType(f, List(WildcardType)) =>
-          AppliedType(f, List(arg))
-        case _ => ret
-      }
-
-      (funTyp, proto) match {
-        case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
-          if arg =!= arg1 then
-            for {
-              uniRet <- unifyReturnType(ret, ret1)
-            } yield (
-              if uniRet =!= ret1 then
-                unifyArgs(arg1, uniRet)
-              else {
-                import implied TreeOps._
-                import implied TypeOps._
-                val retStr  = ret.userString
-                val ret1Str = ret1.userString
-                CompilerError.UnexpectedType(
-                  s"Function Definition type `$retStr` does not match return type `$ret1Str`.")
-              }
-            )
-          else {
-            import implied TreeOps._
-            import implied TypeOps._
-            val argStr  = arg.userString
-            val retStr  = ret.userString
-            val arg1Str = arg1.userString
-            val ret1Str = ret1.userString
-            val treeStr = tree.userString
-            CompilerError.UnexpectedType(
-              s"Function definition `$argStr -> $retStr` does not match args. Expected `$argStr` but was `$arg1Str` in application expr:\n$treeStr")
-          }
-        case _ =>
-          CompilerError.IllegalState("Can not apply to non function type")
-      }
+    def unifyArgs(arg: Type, ret: Type): Checked[Type] = ret match {
+      case AppliedType(f, List(WildcardType)) =>
+        AppliedType(f, List(arg))
+      case _ => ret
     }
+
+    (funTyp, proto) match {
+      case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
+        if arg =!= arg1 then
+          for {
+            uniRet <- unifyReturnType(ret, ret1)
+          } yield (
+            if uniRet =!= ret1 then
+              unifyArgs(arg1, uniRet)
+            else {
+              import implied TreeOps._
+              import implied TypeOps._
+              val retStr  = ret.userString
+              val ret1Str = ret1.userString
+              CompilerError.UnexpectedType(
+                s"Function Definition type `$retStr` does not match return type `$ret1Str`.")
+            }
+          )
+        else {
+          import implied TreeOps._
+          import implied TypeOps._
+          val argStr  = arg.userString
+          val retStr  = ret.userString
+          val arg1Str = arg1.userString
+          val ret1Str = ret1.userString
+          val treeStr = tree.userString
+          CompilerError.UnexpectedType(
+            s"Function definition `$argStr -> $retStr` does not match args. Expected `$argStr` but was `$arg1Str` in application expr:\n$treeStr")
+        }
+      case _ =>
+        CompilerError.IllegalState("Can not apply to non function type")
+    }
+  }
 
   def (tree: Tree) typedAsExpr(pt: Type): Contextual[Checked[Tree]] = {
     implied for Mode = Mode.Term
@@ -147,88 +150,88 @@ object Typers {
     case StringConstant(_)  => Bootstraps.StringType
   }
 
-  def typedFunctionTerm(args: List[Tree], body: Tree)(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = {
-
-      def function(args1: List[Tree], body1: Tree): Checked[Tree] = {
-        val tpes  = args1.map(_.tpe)
-        val fType = tpes.foldRight(body1.tpe) { FunctionType(_,_) }
-        if !fType.isComputationType then
-          CompilerError.UnexpectedType("Function does not have computational co-domain")
-        else
-          Function(args1, body1)(id, fType)
-      }
-
-      for {
-        fCtx  <- ctx.lookIn(id)
-        args1 <- args.mapE(_.typed(any) given fCtx)
-        body1 <- body.typed(any) given fCtx
-        f     <- function(args1, body1)
-      } yield f
+  def typedFunctionTerm(args: List[Tree], body: Tree)
+                       (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+    def function(args1: List[Tree], body1: Tree): Checked[Tree] = {
+      val tpes  = args1.map(_.tpe)
+      val fType = tpes.foldRight(body1.tpe) { FunctionType(_,_) }
+      if !fType.isComputationType then
+        CompilerError.UnexpectedType(
+          "Function does not have computational co-domain")
+      else
+        Function(args1, body1)(id, fType)
     }
 
-  def typedFunctionType(args: List[Tree], body: Tree)(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = {
-      def function(args1: List[Tree], body1: Tree): Checked[Tree] = {
-        import Mode._
-        val argTpes = toType(args1.map(_.tpe))
-        val fType = FunctionType(argTpes, body1.tpe)
-        if mode != PrimitiveType && !fType.isComputationType then
-          CompilerError.UnexpectedType("Function does not have computational co-domain")
-        else
-          Function(args1, body1)(id, fType)
-      }
-
-      for {
-        args1 <- args.mapE(_.typed(any))
-        body1 <- body.typed(any)
-        f     <- function(args1, body1)
-      } yield f
-    }
-
-  def typedTagged(arg: Name, tpeTree: Tree)(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = 
-      for (tpeTree1 <- tpeTree.typedAsType(pt))
-        yield {
-          ctx.putType(arg -> tpeTree1.tpe)
-          Tagged(arg, tpeTree1)(id, tpeTree1.tpe)
-        }
-
-  def typedParens(ts: List[Tree])(id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
-
-      def typeAsTuple(ts: List[Tree], pt: Type): Checked[List[Tree]] = {
-        if pt == any then
-          ts.mapE(_.typed(any))
-        else {
-          val ptAsTuple = typeToList(pt)
-          if ts.length != ptAsTuple.length then
-            CompilerError.UnexpectedType("Tuple lengths do not match")
-          else
-            ts.zip(ptAsTuple).mapE { _.typed(_) }
-        }
-      }
-
-      for {
-        ts1 <- typeAsTuple(ts, pt)
-      } yield {
-        val tupleTyp = toType(ts1.map(_.tpe))
-        if tupleTyp =!= pt then {
-          Parens(ts1)(id, tupleTyp)
-        } else {
-          import Mode._
-          import implied TypeOps._
-          import implied TreeOps._
-          val tupleTypeStr  = tupleTyp.userString
-          val expectedStr   = pt.userString
-          val treeStr       = Parens(ts)(Id.noId, NoType).userString
-          CompilerError.UnexpectedType(
-            s"expected `$expectedStr` but was `$tupleTypeStr` in $mode:\n$treeStr")
-        }
-      }
+    for {
+      fCtx  <- ctx.lookIn(id)
+      args1 <- args.mapE(_.typed(any) given fCtx)
+      body1 <- body.typed(any) given fCtx
+      f     <- function(args1, body1)
+    } yield f
   }
 
-  def typedApplyType(functor: Tree, args: List[Tree])(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = {
+  def typedFunctionType(args: List[Tree], body: Tree)
+                       (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+    def function(args1: List[Tree], body1: Tree): Checked[Tree] = {
+      import Mode._
+      val argTpes = toType(args1.map(_.tpe))
+      val fType = FunctionType(argTpes, body1.tpe)
+      if mode != PrimitiveType && !fType.isComputationType then
+        CompilerError.UnexpectedType("Function does not have computational co-domain")
+      else
+        Function(args1, body1)(id, fType)
+    }
+
+    for {
+      args1 <- args.mapE(_.typed(any))
+      body1 <- body.typed(any)
+      f     <- function(args1, body1)
+    } yield f
+  }
+
+  def typedTagged(arg: Name, tpeTree: Tree)
+                 (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = 
+    for (tpeTree1 <- tpeTree.typedAsType(pt))
+      yield {
+        ctx.putType(arg -> tpeTree1.tpe)
+        Tagged(arg, tpeTree1)(id, tpeTree1.tpe)
+      }
+
+  def typedParens(ts: List[Tree])
+                 (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+    def typeAsTuple(ts: List[Tree], pt: Type): Checked[List[Tree]] = {
+      if pt == any then
+        ts.mapE(_.typed(any))
+      else {
+        val ptAsTuple = typeToList(pt)
+        if ts.length != ptAsTuple.length then
+          CompilerError.UnexpectedType("Tuple lengths do not match")
+        else
+          ts.zip(ptAsTuple).mapE { _.typed(_) }
+      }
+    }
+
+    for {
+      ts1 <- typeAsTuple(ts, pt)
+    } yield {
+      val tupleTyp = toType(ts1.map(_.tpe))
+      if tupleTyp =!= pt then {
+        Parens(ts1)(id, tupleTyp)
+      } else {
+        import Mode._
+        import implied TypeOps._
+        import implied TreeOps._
+        val tupleTypeStr  = tupleTyp.userString
+        val expectedStr   = pt.userString
+        val treeStr       = Parens(ts)(Id.noId, NoType).userString
+        CompilerError.UnexpectedType(
+          s"expected `$expectedStr` but was `$tupleTypeStr` in $mode:\n$treeStr")
+      }
+    }
+  }
+
+  def typedApplyType(functor: Tree, args: List[Tree])
+                    (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
       /*TODO: type application for generic functors
         form type prototype by typing args and then forming typeTpe:
           [...args1] => pt
@@ -247,83 +250,84 @@ object Typers {
       }
     }
 
-  def typedApplyTerm(fun: Tree, args: List[Tree])(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = {
-      for {
-        args1     <- args.mapE(_.typed(any))
-        funProto  <- FunctionType(toType(args1.map(_.tpe)), pt)
-        fun1      <- fun.typed(any)
-        tpe       <- checkFunWithProto(fun1.tpe, funProto, pt)(Apply(fun, args)(Id.noId, Type.NoType))
-      } yield Apply(fun1, args1)(id, tpe)
-    }
-
-  def typedLet(letId: Tree, value: Tree, continuation: Tree)(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = {
-
-      import implied TreeOps._
-      import implied core.Names.NameOps._
-
-      val Ident(name) = letId
-
-      def unwrapCompApply(tpe: Type): Checked[Type] = tpe match {
-        case AppliedType(TypeRef(Name.ComputationTag), List(t)) =>
-          t
-        case _ =>
-          CompilerError.UnexpectedType(s"Can not infer type of `!${name.userString} = ${value.userString}` as of ! type.")
-      }
-
-      def contIsComp(tpe: Type): Checked[Type] =
-        if tpe.isComputationType then
-          tpe
-        else
-          CompilerError.UnexpectedType("Let body does not have computation type.")
-
-      for {
-        lCtx          <- ctx.lookIn(id)
-        value1        <- value.typed(any) // need to typecheck value1 as being comp type
-        value1Inner   <- unwrapCompApply(value1.tpe)
-        letId1        <- Ident(name)(letId.id, value1Inner)
-        _             <- lCtx.putType(name -> value1Inner)
-        continuation1 <- continuation.typed(pt) given lCtx
-        tpe           <- contIsComp(continuation1.tpe)
-      } yield Let(letId1, value1, continuation1)(id, tpe)
+  def typedApplyTerm(fun: Tree, args: List[Tree])
+                    (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+    for {
+      args1     <-  args.mapE(_.typed(any))
+      funProto  <-  FunctionType(toType(args1.map(_.tpe)), pt)
+      fun1      <-  fun.typed(any)
+      tpe       <-  checkFunWithProto(fun1.tpe, funProto, pt)(
+                      Apply(fun, args)(Id.noId, Type.NoType))
+    } yield Apply(fun1, args1)(id, tpe)
   }
 
-  def typedCaseExpr(selector: Tree, cases: List[Tree])(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = {
+  def typedLet(letId: Tree, value: Tree, continuation: Tree)
+              (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+    import implied TreeOps._
+    import implied core.Names.NameOps._
 
-      def (ts: List[Tree]) mapAsCaseClauses(selTpe: Type)(pt: Type): (
-        Contextual[Modal[Checked[List[Tree]]]]) = {
-          ts.mapE({
-            case t @ CaseClause(p,g,b) => typedCaseClause(p, g, b, selTpe)(t.id, pt)
-            case unknown => CompilerError.IllegalState(
-                s"$unknown is not Tree.CaseClause(_,_,_,_)")
-          })
-        }
+    val Ident(name) = letId
 
-      def selectorTpe(selector: Tree): Type = selector.tpe match {
-        case UntypedExpect(t) => t
-        case _                => any
-      }
-
-      for {
-        selector1 <- selector.typed(selectorTpe(selector))
-        cases1    <- cases.mapAsCaseClauses(selector1.tpe)(pt)
-        tpe       <- cases1.unifiedTpe
-      } yield CaseExpr(selector1, cases1)(id, tpe)
+    def unwrapCompApply(tpe: Type): Checked[Type] = tpe match {
+      case AppliedType(TypeRef(Name.ComputationTag), List(t)) =>
+        t
+      case _ =>
+        CompilerError.UnexpectedType(s"Can not infer type of `!${name.userString} = ${value.userString}` as of ! type.")
     }
 
-  def typedCaseClause(pat: Tree, guard: Tree, body: Tree, selTpe: Type)(
-    id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] =
-      for {
-        ccCtx   <- ctx.lookIn(id)
-        pat1    <- pat.typedAsPattern(selTpe) given ccCtx
-        guard1  <- guard.typedAsExpr(Bootstraps.BooleanType) given ccCtx
-        body1   <- body.typedAsExpr(pt) given ccCtx
-      } yield CaseClause(pat1, guard1, body1)(id, body1.tpe)
+    def contIsComp(tpe: Type): Checked[Type] =
+      if tpe.isComputationType then
+        tpe
+      else
+        CompilerError.UnexpectedType("Let body does not have computation type.")
 
-  // def typedUnapply(f: Tree, args: List[Tree])(id: Id, pt: Type): (
-  //   Contextual[Modal[Checked[Tree]]]) = {
+    for {
+      lCtx          <- ctx.lookIn(id)
+      value1        <- value.typed(any) // need to typecheck value1 as being comp type
+      value1Inner   <- unwrapCompApply(value1.tpe)
+      letId1        <- Ident(name)(letId.id, value1Inner)
+      _             <- lCtx.putType(name -> value1Inner)
+      continuation1 <- continuation.typed(pt) given lCtx
+      tpe           <- contIsComp(continuation1.tpe)
+    } yield Let(letId1, value1, continuation1)(id, tpe)
+  }
+
+  def typedCaseExpr(selector: Tree, cases: List[Tree])
+                   (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+    def (ts: List[Tree]) mapAsCaseClauses(selTpe: Type)(
+      pt: Type): Contextual[Modal[Checked[List[Tree]]]] = {
+        ts.mapE({
+          case t @ CaseClause(p,g,b) =>
+            typedCaseClause(p, g, b, selTpe)(t.id, pt)
+          case unknown =>
+            CompilerError.IllegalState(
+              s"$unknown is not Tree.CaseClause(_,_,_,_)")
+        })
+      }
+
+    def selectorTpe(selector: Tree): Type = selector.tpe match {
+      case UntypedExpect(t) => t
+      case _                => any
+    }
+
+    for {
+      selector1 <- selector.typed(selectorTpe(selector))
+      cases1    <- cases.mapAsCaseClauses(selector1.tpe)(pt)
+      tpe       <- cases1.unifiedTpe
+    } yield CaseExpr(selector1, cases1)(id, tpe)
+  }
+
+  def typedCaseClause(pat: Tree, guard: Tree, body: Tree, selTpe: Type)
+                     (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] =
+    for {
+      ccCtx   <- ctx.lookIn(id)
+      pat1    <- pat.typedAsPattern(selTpe) given ccCtx
+      guard1  <- guard.typedAsExpr(Bootstraps.BooleanType) given ccCtx
+      body1   <- body.typedAsExpr(pt) given ccCtx
+    } yield CaseClause(pat1, guard1, body1)(id, body1.tpe)
+
+  // def typedUnapply(f: Tree, args: List[Tree])
+  //                 (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
   //     import TypeOps._
 
   //     def (f: Tree) typedAsFunctor(pt: Type): Checked[Tree] = pt match {
@@ -370,7 +374,8 @@ object Typers {
   //       Unapply(f1, args1)(id, tpe) // need to lookup id1 to get idArgs, if idArgs types match args1 then ok
   //   }
 
-  def typedBind(name: Name, body: Tree)(id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+  def typedBind(name: Name, body: Tree)
+               (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
     import Mode._
     for {
       body1 <- body.typed(pt)
@@ -386,67 +391,57 @@ object Typers {
     }
   }
 
-  def typedAlternative(patterns: List[Tree])(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = {
-      implied for Mode = Mode.PatAlt
-      for {
-        patterns1 <- patterns.mapE(_.typed(pt))
-        tpe       <- patterns1.unifiedTpe
-      } yield Alternative(patterns1)(id, tpe)
-    }
+  def typedAlternative(patterns: List[Tree])
+                      (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+    implied for Mode = Mode.PatAlt
+    for {
+      patterns1 <- patterns.mapE(_.typed(pt))
+      tpe       <- patterns1.unifiedTpe
+    } yield Alternative(patterns1)(id, tpe)
+  }
 
-  def typedPackageDef(pid: Tree, stats: List[Tree])(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = {
-      import TypeOps._
-      import implied TreeOps._
-      import Name._
+  def typedPackageDef(pid: Tree, stats: List[Tree])
+                     (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+    import TypeOps._
+    import implied TreeOps._
+    import Name._
 
-      val toIdNamePairs = Convert[Tree, List[(Id, Name)]]
+    val toIdNamePairs = Convert[Tree, List[(Id, Name)]]
 
-      def typePackaging(tree: Tree): Checked[(Context, Tree)] =
-        toIdNamePairs(tree) match {
-          case (id, name) :: tail =>
-            for {
-              next  <- ctx.lookIn(id)
-              tpe   <- ctx.declarePackage(From(rootString), name)
-            } yield (
-              tail.foldLeftE(next, Ident(name)(id, tpe)) { (acc, pair) =>
-                val (current, parent) = acc
-                val (id, name) = pair
-                for {
-                  next  <- current.lookIn(id)
-                  tpe   <- current.declarePackage(packageName(parent.tpe), name)
-                } yield {
-                  (next, Select(parent, name)(id, tpe))
-                }
+    def typePackaging(tree: Tree): Checked[(Context, Tree)] =
+      toIdNamePairs(tree) match {
+        case (id, name) :: tail =>
+          for {
+            next  <- ctx.lookIn(id)
+            tpe   <- ctx.declarePackage(From(rootString), name)
+          } yield (
+            tail.foldLeftE(next, Ident(name)(id, tpe)) { (acc, pair) =>
+              val (current, parent) = acc
+              val (id, name) = pair
+              for {
+                next  <- current.lookIn(id)
+                tpe   <- current.declarePackage(packageName(parent.tpe), name)
+              } yield {
+                (next, Select(parent, name)(id, tpe))
               }
-            )
-          case _ =>
-            (ctx, EmptyTree)
-        }
-
-      for {
-        pair    <- typePackaging(pid)
-        pkgCtx  <- pair._1
-        pid1    <- pair._2
-        stats1  <- typedStats(stats) given pkgCtx
-      } yield {
-        PackageDef(pid1, stats1)(id, pid1.tpe)
+            }
+          )
+        case _ =>
+          (ctx, EmptyTree)
       }
+
+    for {
+      pair    <- typePackaging(pid)
+      pkgCtx  <- pair._1
+      pid1    <- pair._2
+      stats1  <- stats.mapE(_.typed(any) given pkgCtx)
+    } yield {
+      PackageDef(pid1, stats1)(id, pid1.tpe)
     }
+  }
 
-  def typedStats(stats: List[Tree]): (
-    Contextual[Modal[Checked[List[Tree]]]]) =
-      stats.mapE(_.typed(any))
-
-  def typedDefDef(
-    modifiers: Set[Modifier],
-    sig: Tree,
-    tpeAs: Tree,
-    body: Tree)
-  ( id: Id,
-    pt: Type
-  ): Contextual[Modal[Checked[Tree]]] = {
+  def typedDefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)
+                 (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
     import TypeOps._
     val typeTpeAs =
       if modifiers.contains(Modifier.Primitive) then
@@ -462,30 +457,32 @@ object Typers {
     } yield DefDef(modifiers, sig1, tpeAs1, body1)(id, tpe)
   }
 
-  def typedDefSig(name: Name, args: List[Tree])(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) = {
+  def typedDefSig(name: Name, args: List[Tree])
+                 (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
       import TypeOps._
       import implied TreeOps._
       import implied NameOps._
 
-      def mapArgs(args: List[Tree], pts: List[Type]): Contextual[Checked[List[Tree]]] =
-        args
-          .flatMap(Convert[Tree, List[(Id, Name)]])
-          .zip(pts)
-          .mapE { (pair, tpe) =>
-            val (id, name) = pair
-            for {
-              nameCtx <- ctx.lookIn(id)
-            } yield {
-              ctx.putType(name, tpe)
-              Ident(name)(id, tpe)
+      def mapArgs(
+        args: List[Tree], pts: List[Type]): Contextual[Checked[List[Tree]]] =
+          args
+            .flatMap(Convert[Tree, List[(Id, Name)]])
+            .zip(pts)
+            .mapE { (pair, tpe) =>
+              val (id, name) = pair
+              for {
+                nameCtx <- ctx.lookIn(id)
+              } yield {
+                ctx.putType(name, tpe)
+                Ident(name)(id, tpe)
+              }
             }
-          }
 
       val pts = toCurriedList(pt)
 
       if pts.length <= args.length then
-        CompilerError.UnexpectedType(s"Function declaration arguments do not match declared type for declaration ${name.userString}. REF: $args; $pts")
+        CompilerError.UnexpectedType(
+          s"Function declaration arguments do not match declared type for declaration ${name.userString}. REF: $args; $pts")
       else
         for {
           bodyCtx   <- ctx.lookIn(id)
@@ -494,18 +491,20 @@ object Typers {
         } yield DefSig(name, args1)(id, pt)
     }
 
-  def typedSelectType(from: Tree, name: Name)(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) =
-      CompilerError.SyntaxError("Member selections do not exist for types.")
+  def typedSelectType(from: Tree, name: Name)
+                     (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] =
+    CompilerError.SyntaxError("Member selections do not exist for types.")
 
-  def typedSelectTerm(from: Tree, name: Name)(id: Id, pt: Type): (
-    Contextual[Modal[Checked[Tree]]]) =
-      CompilerError.SyntaxError("Member selections do not exist for terms.")
+  def typedSelectTerm(from: Tree, name: Name)
+                     (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] =
+    CompilerError.SyntaxError("Member selections do not exist for terms.")
 
-  def typedIdentType(name: Name)(id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] =
-    Ident(name)(id, TypeRef(name))
+  def typedIdentType(name: Name)(
+    id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] =
+      Ident(name)(id, TypeRef(name))
 
-  def typedIdentPat(name: Name)(id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+  def typedIdentPat(name: Name)
+                   (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
     import Mode._
     import Name._
     if mode == PatAlt && name != Wildcard then
@@ -518,25 +517,28 @@ object Typers {
     }
   }
 
-  def typedIdentTerm(name: Name)(id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
-    for {
-      fstCtx    <- ctx.firstCtx(name)
-      idRefTpe  <- fstCtx.getType(name)
-    } yield {
-      if idRefTpe =!= pt then {
-        Ident(name)(id, idRefTpe)
-      } else {
-        import implied NameOps._
-        import implied TypeOps._
-        val nameStr     = name.userString
-        val idRefTpeStr = idRefTpe.userString
-        val ptStr       = pt.userString
-        CompilerError.UnexpectedType(s"Expected type for identifier $nameStr of `$ptStr` but was `$idRefTpe`")
+  def typedIdentTerm(name: Name)
+                    (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+      for {
+        fstCtx    <- ctx.firstCtx(name)
+        idRefTpe  <- fstCtx.getType(name)
+      } yield {
+        if idRefTpe =!= pt then {
+          Ident(name)(id, idRefTpe)
+        } else {
+          import implied NameOps._
+          import implied TypeOps._
+          val nameStr     = name.userString
+          val idRefTpeStr = idRefTpe.userString
+          val ptStr       = pt.userString
+          CompilerError.UnexpectedType(
+            s"Expected type for identifier $nameStr of `$ptStr` but was `$idRefTpe`")
+        }
       }
     }
-  }
 
-  def typedLiteral(constant: Constant)(id: Id): Contextual[Modal[Checked[Tree]]] =
+  def typedLiteral(constant: Constant)
+                  (id: Id): Contextual[Modal[Checked[Tree]]] =
     Literal(constant)(id, constantTpe(constant))
 
   def check(typed: Tree)(pt: Type): Contextual[Modal[Checked[Tree]]] = {
@@ -597,8 +599,8 @@ object Typers {
       case Literal(c)                         => typedLiteral(c)(tree.id)
       case Parens(ts)                         => typedParens(ts)(tree.id, pt)
       case t @ ( TreeSeq(_)
-                | CaseClause(_,_,_)
-                | EmptyTree)                  => t
+               | CaseClause(_,_,_)
+               | EmptyTree)                   => t
       /* error case */
       case _ =>
         import implied TreeOps._

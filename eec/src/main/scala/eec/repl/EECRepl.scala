@@ -185,7 +185,7 @@ class EECRepl {
           println(helpText)
           state
         case Unknown =>
-          println(s"[ERROR] unrecognised command: `$input`. Try `:help`")
+          println(s"[ERROR] unrecognised command: `${trimOrEmpty(input)}`. Try `:help`")
           state
       }
     }

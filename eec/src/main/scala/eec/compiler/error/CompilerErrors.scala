@@ -48,6 +48,10 @@ object CompilerErrors {
       .map(_.toList)
     }
 
+    inline def (l: List[A]) foldLeftEO[A, O, U](seed: O)(f: (O, A) => Checked[O])(t: O => Checked[U]): Checked[U] = {
+      l.foldLeftE(seed)(f).flatMap(t)
+    }
+
     /** shortcutting fold over a list - optimised */
     def (l: List[A]) foldLeftE[A, O](seed: O)(f: (O, A) => Checked[O]): Checked[O] = {
       var acc = seed
