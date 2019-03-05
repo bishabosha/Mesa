@@ -12,7 +12,7 @@ val parseEEC: String => Contextual[Checked[Tree]] =
   eecParser toTreeParser fromTranslationUnit
 
 val parseStat: String => Contextual[Checked[Tree]] =
-  statParser toTreeParser fromStat
+  statParser toTreeParser fromStatAsTop
 
 val parseExpr: String => Contextual[Checked[Tree]] =
-  exprParser toTreeParser fromExpr
+  exprParser toTreeParser fromExprAsTop

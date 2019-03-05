@@ -25,10 +25,10 @@ object Parsers {
     genParser andThen { _.translationUnit }
 
   private[parsing] val statParser =
-    genParser andThen { _.stat }
+    genParser andThen { _.statAsTop }
 
   private[parsing] val exprParser =
-    genParser andThen { _.expr }
+    genParser andThen { _.exprAsTop }
 
   private[this] class ParserSyntaxException(msg: String) extends Exception(msg)
 
@@ -529,6 +529,12 @@ object Parsers {
         fromDef(context.`def`)
       else
         fromDcl(context.dcl)
+
+    def fromStatAsTop(context: EECParser.StatAsTopContext): Contextual[Tree] =
+      fromStat(context.stat)
+
+    def fromExprAsTop(context: EECParser.ExprAsTopContext): Contextual[Tree] =
+      fromExpr(context.expr)
 
     def fromTranslationUnit
           (context: EECParser.TranslationUnitContext): Contextual[Tree] = {

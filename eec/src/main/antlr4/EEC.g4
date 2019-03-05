@@ -203,8 +203,12 @@ statSeq: stat (Sep? stat)*;
 
 stat: def | dcl;
 
+statAsTop: stat EOF;
+
+exprAsTop: expr EOF;
+
 translationUnit:
-	Sep* packageInfo Sep* /*(topStatSeq Sep?)? */ (statSeq Sep*)?;
+	Sep* packageInfo Sep* /*(topStatSeq Sep?)? */ (statSeq Sep*)? EOF;
 
 //
 // Lexer Defs
