@@ -90,20 +90,14 @@ class TyperTest {
           _ => ()""".typed                  -> "()",
       """case () of
           x => x""".typed                   -> "()",
-      // """case !() of
-      //     !x => x""".typed                  -> "()",
       """case () of
           c @ x => (c, x)""".typed          -> "((), ())",
-      // """case !() of
-      //     !() | !() => ()""".typed          -> "()",
-      // """case (!(), (!(), !())) of
-      //     (!x, (_, !y)) => (x, y)""".typed  -> "((), ())",
       """case () of
           _ if True => ()""".typed          -> "()",
       """case () of
           () | () => ()""".typed            -> "()",
       """case "hello" of
-          "" | _ => ()""".typed             -> "()", // alternatives don't unify
+          "" | _ => ()""".typed             -> "()",
       """case ((), ()) of
           ((), ())  => ()
           _         => ()""".typed          -> "()",
