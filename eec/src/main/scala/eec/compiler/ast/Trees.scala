@@ -61,6 +61,17 @@ object Trees {
       }
     }
 
+    implied uniqName for (Tree |> Name) {
+      def apply(tree: Tree) = tree match {
+        case DefSig(name, _)      => name
+        case DefDef(_, sig, _, _) => apply(sig)
+        case Tagged(name, _)      => name
+        case Bind(name, _)        => name
+        case Ident(name)          => name
+        case _                    => Name.From(emptyString)
+      }
+    }
+
     implied toNames for (Tree |> List[Name]) {
       def apply(t: Tree) = toNames(Nil, t)
     }

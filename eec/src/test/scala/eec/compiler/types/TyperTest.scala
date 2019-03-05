@@ -178,8 +178,8 @@ class TyperTest {
     val rootCtx = new RootContext()
     implied for Context = rootCtx
     for {
-      expr   <- parseExpr(str)
       _      <- Context.enterBootstrapped
+      expr   <- parseExpr(str)
       _      <- indexAsExpr(expr)
       expr1  <- expr.typedAsExpr(as)
     } yield expr1
@@ -192,11 +192,9 @@ class TyperTest {
       import CompilerErrorOps._
       import implied CompilerErrorOps._
       import implied TypeOps._
-      parsed.fold { e =>
-        fail(e.userString)
-      }{ tree =>
-        assertEquals(checkTpe, tree.tpe.userString)
-      }
+      parsed.fold
+        { err => fail(err.userString) }
+        { tpd => assertEquals(checkTpe, tpd.tpe.userString) }
     }
     seq.foreach { impl(_,_) }
   }
@@ -206,11 +204,11 @@ class TyperTest {
       import CompilerErrorOps._
       import implied TreeOps._
       import implied TypeOps._
-      parsed.fold { e =>
-        ()
-      }{ tree =>
-        fail(s"Typed successfully as ${tree.tpe.userString} for expr:\n${tree.userString}")
-      }
+      parsed.fold
+        { err => () }
+        { tpd => fail(
+          s"Typed successfully as ${tpd.tpe.userString} for expr:\n${tpd.userString}")
+        }
     }
     seq.foreach { impl }
   }

@@ -205,9 +205,15 @@ object Typers {
       else {
         val ptAsTuple = typeToList(pt)
         if ts.length != ptAsTuple.length then
+          if ptAsTuple.length == 1 then {
+          import implied TypeOps._
+          val ptStr = pt.userString
+          CompilerError.UnexpectedType(s"expected `$ptStr` but was a Tuple.")
+        } else {
           CompilerError.UnexpectedType("Tuple lengths do not match")
-        else
+        } else {
           ts.zip(ptAsTuple).mapE { _.typed(_) }
+        }
       }
     }
 
@@ -443,18 +449,23 @@ object Typers {
   def typedDefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)
                  (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
     import TypeOps._
+    import implied TreeOps._
+    val getName = Convert[Tree, Name]
     val typeTpeAs =
       if modifiers.contains(Modifier.Primitive) then
         typedAsPrimitive
       else
         typedAsType
-    for {
+    val tpd = for {
       tpeAs1  <- typeTpeAs(tpeAs)(any)
       tpe     <- tpeAs1.tpe
       sig1    <- sig.typed(tpe)
       bodyCtx <- ctx.lookIn(sig1.id)
       body1   <- body.typed(toReturnType(sig1, tpe)) given bodyCtx
+      _       <- ctx.putType(getName(sig), tpe)
     } yield DefDef(modifiers, sig1, tpeAs1, body1)(id, tpe)
+    Context.commitId(sig.id)
+    tpd
   }
 
   def typedDefSig(name: Name, args: List[Tree])
@@ -486,7 +497,6 @@ object Typers {
       else
         for {
           bodyCtx   <- ctx.lookIn(id)
-          _         <- ctx.putType(name, pt)
           args1     <- mapArgs(args, pts) given bodyCtx
         } yield DefSig(name, args1)(id, pt)
     }
@@ -571,8 +581,6 @@ object Typers {
 
   def (tree: Tree) typed(pt: Type): Contextual[Modal[Checked[Tree]]] = {
     import Mode._
-    import implied TypeOps._
-    // println(s"DEBUG:\ntyped `$tree`\nas `${pt.userString}`\nmode: `${mode.userString}`")
     def inner(tree: Tree, pt: Type) = tree match {
       /* Type Trees */
       case Select(t,n)      if mode.isType    => typedSelectType(t,n)(tree.id, pt)
@@ -604,7 +612,8 @@ object Typers {
       /* error case */
       case _ =>
         import implied TreeOps._
-        CompilerError.IllegalState(s"Typing not implemented for <${mode.userString}, ${tree.userString}>")
+        CompilerError.IllegalState(
+          s"Typing not implemented for <${mode.userString}, ${tree.userString}>")
     }
     inner(tree, pt).map(check(_)(pt))
   }

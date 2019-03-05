@@ -117,17 +117,17 @@ object Contexts {
         CompilerError.IllegalState(s"No context found for Id(${id})")
       }
 
-    def contains(name: Name): Boolean =
-      name != Name.From(emptyString) && scope.collectFirst({
-        case (Sym(_, `name`), _) => true
-      }).getOrElse(false)
+    def contains(name: Name): Boolean = {
+      name != Name.From(emptyString) && (
+        scope.collectFirst({ case (Sym(_, `name`), _) => () })
+             .isDefined
+      )
+    }
 
     def declarePackage(parent: Name, name: Name): Checked[Type] = {
       import CompilerErrorOps._
       import Type._
-      for {
-        parentTpe <- outer.getType(parent)
-      } yield (
+      for (parentTpe <- outer.getType(parent)) yield (
         parentTpe match {
           case p @ PackageInfo(_,_) =>
             val tpe = PackageInfo(p, name)
@@ -158,11 +158,22 @@ object Contexts {
       }
     }
 
+    def commitId(id: Id): Contextual[Unit] = {
+      val found = ctx.scope.collectFirst {
+        case sym @ (Sym(`id`, name), _) => (sym, name)
+      }
+      found.foreach { (sym, name) =>
+        if !ctx.typeTable.contains(name) then {
+          ctx.scope -= sym
+        }
+      }
+    }
+
     def enterBootstrapped: Contextual[Checked[Unit]] = {
       import types.Types
       import Name._
       import CompilerErrorOps._
-      if ctx.rootCtx.scope.nonEmpty then {
+      if ctx.rootCtx.scope.nonEmpty || ctx.rootCtx.id != Id.initId then {
         CompilerError.IllegalState("Non-fresh _root_ context")
       } else {
         Names.bootstrapped.foreach({ (name, tpe) =>
@@ -191,6 +202,7 @@ object Contexts {
       id
     }
 
+    def id = _id
     override val typeTable = _typeTable
     override def rootCtx = this
     override val outer = this
@@ -202,30 +214,40 @@ object Contexts {
     import Scoping._
 
     enum Scoping derives Eql {
-      case ScopeDef(id: Sym, scope: Scoping)
-      case TypeDef(name: Name, tpe: Type)
-      case Branch(scopes: Seq[Scoping], tpes: Seq[Scoping])
+      case ScopeDef(name: Scoping, tpe: Scoping, scope: Seq[Scoping])
+      case ForName(name: String)
+      case TypeDef(tpe: String)
+      case NoType
       case Empty
     }
 
-    def (ctx: Context) toScoping: Scoping = {
+    def (ctx: Context) toScoping: Seq[Scoping] = {
       import Name._
+      import implied NameOps._
+      import implied TypeOps._
 
-      def branch(c: Context): Scoping = {
-        val scopes = c.scope.map(p => ScopeDef(p._1, p._2.toScoping)).toList
-        val tpes = c.typeTable.toList.map(TypeDef(_,_))
-        Branch(scopes, tpes)
+      def branch(c: Context): Seq[Scoping] = {
+        val scopes = c.scope.filter { pair =>
+          val (Sym(_, name), context) = pair
+          context.scope.nonEmpty || name != Name.From(emptyString)
+        }.map { pair =>
+          val (sym, context) = pair
+          ScopeDef(
+            ForName(sym.name.userString),
+            c.typeTable.get(sym.name).map(t => TypeDef(t.userString)).getOrElse(NoType), 
+            context.toScoping
+          )
+        }.toList
+        scopes
       }
 
       ctx match {
         case c: RootContext =>
-          val defs = List(ScopeDef(RootSym, branch(c)))
-          val tpes = List(TypeDef(From(rootString), rootPkg))
-          Branch(defs, tpes)
+          List(ScopeDef(ForName(RootSym.name.userString), TypeDef(rootPkg.userString), branch(c)))
         case f: Fresh if f.scope.nonEmpty || f.typeTable.nonEmpty =>
           branch(f)
         case _ =>
-          Empty
+          Nil
       }
     }
   }
