@@ -15,6 +15,7 @@ object Parsers {
   import core.Constants._
   import core.Constants.Constant._
   import util.Convert
+  import util.PostConditions._
   import error.CompilerErrors._
   import org.antlr.v4.runtime.tree.TerminalNode
   import org.antlr.v4.runtime._
@@ -106,7 +107,7 @@ object Parsers {
     def fromStableId(context: EECParser.StableIdContext): Contextual[Tree] = {
       val ids = {
         import scala.language.implicitConversions
-        context.id.map(fromId).ensuring(_.size <= 2)
+        context.id.map(fromId).ensuring(result.size <= 2)
       }
       if ids.size == 1 then {
         ids(0)
@@ -132,9 +133,7 @@ object Parsers {
 
     def fromProductType(context: EECParser.ProductTypeContext): Contextual[Tree] = {
       import scala.language.implicitConversions
-      val types = context.`type`
-        .map(fromType)
-        .ensuring(l => l.size == 0 || l.size == 2)
+      val types = context.`type`.map(fromType)
       Parens(types.toList)(freshId(), uTpe)
     }
 
@@ -173,7 +172,7 @@ object Parsers {
       exprs: java.util.List[EECParser.ExprContext]): Contextual[Tree] = {
         import scala.language.implicitConversions
         import implied TreeOps._
-        val Seq(expr, arg) = exprs.map(fromExpr).ensuring(_.size == 2)
+        val Seq(expr, arg) = exprs.map(fromExpr).ensuring(result.size == 2)
         val args = Convert[Tree, List[Tree]](arg)
         Apply(expr, args)(freshId(), uTpe)
       }
@@ -192,7 +191,7 @@ object Parsers {
           context.Varid.getText.readAs
         else
           context.Wildcard.getText.readAs
-      var exprs = context.expr.ensuring(_.size == 2)
+      var exprs = context.expr.ensuring(result.size == 2)
       var value = fromExpr(exprs.get(0))
       var continuation = fromExpr(exprs.get(1))
       val ident = Ident(name)(freshId(), uTpe)
@@ -209,11 +208,11 @@ object Parsers {
     def fromExpr1(context: EECParser.Expr1Context): Contextual[Tree] =
       if context.infixExpr `ne` null then {
         fromInfixExpr(context.infixExpr)
-      } else {
+      } else { // If else
         import scala.language.implicitConversions
         import types.Types.TypeOps._
         val exprs = context.expr
-          .ensuring(_.size == 3)
+          .ensuring(result.size == 3)
           .map(fromExpr)
         val patTrue   = Literal(BooleanConstant(true))(freshId(), uTpe)
         val patFalse  = Literal(BooleanConstant(false))(freshId(), uTpe)
@@ -226,7 +225,7 @@ object Parsers {
     def fromInfixExpr(context: EECParser.InfixExprContext): Contextual[Tree] =
       if context.prefixExpr `ne` null then {
         fromPrefixExpr(context.prefixExpr)
-      } else {
+      } else { // infix application
         val id =
           if context.OpId `ne` null then {
             import implied NameOps._
@@ -236,7 +235,7 @@ object Parsers {
           }
         import scala.language.implicitConversions
         val infixes = context.infixExpr
-          .ensuring(_.size == 2)
+          .ensuring(result.size == 2)
           .map(fromInfixExpr)
         val firstApply = Apply(id, List(infixes(0)))(freshId(), uTpe)
         Apply(firstApply, List(infixes(1)))(freshId(), uTpe)
@@ -245,8 +244,9 @@ object Parsers {
     def fromPrefixExpr(context: EECParser.PrefixExprContext): Contextual[Tree] = {
       val simpleExpr = fromSimpleExpr(context.simpleExpr)
       if context.Bang `ne` null then {
+        import Name._
         import NameOps._
-        val tag = Ident(Name.ComputationTag)(freshId(), uTpe)
+        val tag = Ident(ComputationTag)(freshId(), uTpe)
         Apply(tag, List(simpleExpr))(freshId(), uTpe)
       } else {
         simpleExpr
@@ -336,27 +336,21 @@ object Parsers {
           Ident(context.Varid.getText.readAs)(freshId(), uTpe)
         } else if context.literal `ne` null then {
           fromLiteral(context.literal)
-        } /*else if context.simplePattern `ne` null then { // Bang present <- removing Bang for semantics unknown
-          val simplePat = fromSimplePattern(context.simplePattern)
-          val computation = Ident(Name.ComputationTag)(freshId(), uTpe)
-          Unapply(computation, List(simplePat))(freshId(), uTpe)
-        }*/ else { // tuple
-          fromUpToPairPatten(context.upToPairPatten)
+        } else { // tuple
+          fromPatterns(context.patterns)
         }
 
-    def fromUpToPairPatten(
-        context: EECParser.UpToPairPattenContext): Contextual[Tree] = {
-          val patterns = {
-            import scala.language.implicitConversions
-            context.pattern.map(fromPattern)
-          }
-          if patterns.size == 1 then {
-            patterns(0)
-          } else {
-            assert(patterns.size == 2)
-            Parens(patterns.toList)(freshId(), uTpe)
-          }
+    def fromPatterns(
+      context: EECParser.PatternsContext): Contextual[Tree] = {
+        val patterns = {
+          import scala.language.implicitConversions
+          context.pattern.map(fromPattern)
         }
+        if patterns.size == 1 then
+          patterns(0)
+        else
+          Parens(patterns.toList)(freshId(), uTpe)
+      }
 
     def fromGuard(context: EECParser.GuardContext): Contextual[Tree] =
       fromInfixExpr(context.infixExpr)
@@ -427,17 +421,17 @@ object Parsers {
         fromPrefixOpSig(context.prefixOpSig)
       } else if context.OpId `ne` null then {
         var args = context.Varid
-          .ensuring(_.size == 2)
-          .map(_.getText.readAs)
-          .map(n => Ident(n)(freshId(), uTpe))
+          .ensuring { result.size == 2 }
+          .map { _.getText.readAs }
+          .map { Ident(_)(freshId(), uTpe) }
           .toList
         DefSig(context.OpId.getText.readAs, args)(freshId(), uTpe)
       } else {
         var varids = context.Varid
-          .ensuring(_.size == 3)
-          .map(_.getText.readAs)
+          .ensuring { result.size == 3 }
+          .map { _.getText.readAs }
         val name = varids(1)
-        val args = List(varids(0), varids(2)).map(n => Ident(n)(freshId(), uTpe))
+        val args = List(varids(0), varids(2)).map { Ident(_)(freshId(), uTpe) }
         DefSig(name, args)(freshId(), uTpe)
       }
     }

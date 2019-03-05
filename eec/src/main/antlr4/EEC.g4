@@ -71,7 +71,7 @@ prefixType: simpleType | Bang simpleType;
 
 simpleType: qualId | '(' type ')' | productType;
 
-productType: '(' type ',' type ')' | '()';
+productType: '(' type (',' type)+ ')' | '()';
 
 ascription: ':' type;
 
@@ -113,7 +113,7 @@ cases: caseClause (Sep? caseClause)*;
 
 caseClause: pattern guard? '=>' expr;
 
-exprsInParens: '(' (expr (',' expr)?)? ')' | '()';
+exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 
 //argumentExpr: '()' | '(' expr? ')';
 
@@ -140,14 +140,13 @@ simplePattern
    : Wildcard
    | Varid
    | literal
-  //  | '!' simplePattern <- semantics not really proven
 //   | stableId ('(' patterns? ')')?
 //   | stableId '(' (patterns? ',')? (Varid '@')? '_' '*' ')'
-   | '(' upToPairPatten? ')'
+   | '(' patterns? ')'
    | '()'
    ;
 
-upToPairPatten: pattern (',' pattern)?;
+patterns: pattern (',' pattern)*;
 
 guard: 'if' infixExpr;
 

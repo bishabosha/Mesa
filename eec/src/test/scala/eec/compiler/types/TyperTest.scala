@@ -61,15 +61,18 @@ class TyperTest {
 
   @Test def typecheckProducts(): Unit = {
     passesTypeCheck(
-      "()".typed      -> "()",
-      "(())".typed    -> "()",
-      "((),())".typed -> "((), ())")
+      "()".typed            -> "()",
+      "(())".typed          -> "()",
+      "((),())".typed       -> "((), ())",
+      "((),(),())".typed    -> "((), (), ())",
+      "((),(),(),())".typed -> "((), (), (), ())")
   }
 
   @Test def typecheckCompute(): Unit = {
     passesTypeCheck(
       "!()".typed       -> "! ()",
-      "!((),())".typed  -> "! ((), ())")
+      "!((),())".typed  -> "! ((), ())",
+      "(!(),!())".typed -> "(! (), ! ())")
   }
 
   @Test def typecheckIf(): Unit = {
@@ -111,7 +114,11 @@ class TyperTest {
       """case ((), ((), ())) of
           (a, (_, b)) => (a, b)""".typed    -> "((), ())",
       """case ((), ((), ())) of
-          (_, (_, _)) => ()""".typed        -> "()")
+          (_, (_, _)) => ()""".typed        -> "()",
+      """case ((), (), ()) of
+          ((), (), ()) => ()""".typed       -> "()",
+      """case ((), (), (), ()) of
+          ((), (), (), ()) => ()""".typed   -> "()")
     failsTypeCheck(
       """case () of
           (a | _) => ()""".typed, // name in alternative
@@ -131,11 +138,12 @@ class TyperTest {
 
   @Test def typecheckLambda(): Unit = {
     passesTypeCheck(
-      "\\t: () => ()".typed         -> "() -> ()",
-      "\\t: () -> () => ()".typed   -> "(() -> ()) -> ()",
-      "\\t: (), u: () => ()".typed  -> "() -> () -> ()",
-      "\\t: ((), ()) => ()".typed   -> "((), ()) -> ()",
-      "\\t: ! () => ()".typed       -> "! () -> ()")
+      "\\t: () => ()".typed               -> "() -> ()",
+      "\\t: () -> () => ()".typed         -> "(() -> ()) -> ()",
+      "\\t: (), u: () => ()".typed        -> "() -> () -> ()",
+      "\\t: ((), ()) => ()".typed         -> "((), ()) -> ()",
+      "\\t: ((), (), (), ()) => ()".typed -> "((), (), (), ()) -> ()",
+      "\\t: ! () => ()".typed             -> "! () -> ()")
     failsTypeCheck(
       "\\f: () -> Char => ()".typed, // f.tpe is not computation co-domain
       "\\f: () => 0".typed) // lambda tpe is not computation co-domain

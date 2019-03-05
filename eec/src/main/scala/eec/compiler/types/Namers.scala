@@ -10,11 +10,12 @@ object Namers {
   import CompilerErrorOps._
   import core.Contexts._
   import core.Names._
+  import Name._
   import Context._
   import Mode._
   import util.Convert
 
-  private[this] val anon = Name.From(emptyString)
+  private[this] val anon = From(emptyString)
 
   private[this] val toPairs = {
     import implied TreeOps._
@@ -24,71 +25,88 @@ object Namers {
   def namedDefDef(sig: Tree, tpeAs: Tree, body: Tree): (
     Contextual[Modal[Checked[Unit]]]) = {
       val DefSig(name, names) = sig
-      for {
-        ctx1  <-  enterFresh(sig.id, name)
-        _     <-  names.mapE { t =>
-                    val Ident(name) = t
-                    for (_ <- enterFresh(t.id, name) given ctx1)
-                      yield ()
-                  }
-        _     <-  index(body) given ctx1
-      } yield ()
+      enterFresh(sig.id, name).map { ctx1 =>
+        implied for Context = ctx1
+        for {
+          _ <-  names.mapE { t =>
+                  val Ident(name) = t
+                  enterFresh(t.id, name)
+                }
+          _ <-  index(body)
+        } yield ()
+      }
     }
 
   def namedFunctionTerm(args: List[Tree], body: Tree)(id: Id): (
     Contextual[Modal[Checked[Unit]]]) =
       for {
         ctx1  <-  enterFresh(id, anon)
-        _     <-  args.mapE { t =>
-                    val Tagged(name, _) = t
-                    for (_ <- enterFresh(t.id, name) given ctx1)
-                      yield ()
+        _     <-  checked {
+                    implied for Context = ctx1
+                    for {
+                      _ <-  args.mapE { t =>
+                              val Tagged(name, _) = t
+                              enterFresh(t.id, name)
+                            }
+                      _ <-  index(body)
+                    } yield ()
                   }
-        _     <-  index(body) given ctx1
       } yield ()
 
-  def namedPackageDef(pid: Tree, stats: List[Tree]): Contextual[Modal[Checked[Unit]]] =
-    for {
-      ctx1  <-  toPairs(pid).foldLeftE(ctx) { (ctx1, pair) =>
-                  val (id, n) = pair
-                  for (ctx <- enterFresh(id, n) given ctx1)
-                    yield ctx
+  def namedPackageDef(pid: Tree, stats: List[Tree]): (
+    Contextual[Modal[Checked[Unit]]]) =
+      for {
+        ctx1  <-  toPairs(pid).foldLeftE(ctx) { (ctx1, pair) =>
+                    implied for Context = ctx1
+                    val (id, n) = pair
+                    enterFresh(id, n)
+                  }
+        _     <-  checked {
+                    implied for Context = ctx1
+                    stats.mapE(index(_))
+                  }
+      } yield ()
+
+  def namedApplyTerm(fun: Tree, args: List[Tree]): (
+    Contextual[Modal[Checked[Unit]]]) =
+      for {
+        _ <- index(fun)
+        _ <- args.mapE(index)
+      } yield ()
+
+  def namedLet(letId: Tree, value: Tree, continuation: Tree)(id: Id): (
+    Contextual[Modal[Checked[Unit]]]) =
+      for {
+        _ <-  index(value)
+        _ <-  enterFresh(id, anon).map { ctx1 =>
+                implied for Context = ctx1
+                val Ident(name) = letId
+                for {
+                  _ <- enterFresh(letId.id, name)
+                  _ <- index(continuation)
+                } yield ()
+              }
+      } yield ()
+
+  def namedCaseExpr(selector: Tree, cases: List[Tree]): (
+    Contextual[Modal[Checked[Unit]]]) =
+      for {
+        _ <-  index(selector)
+        _ <-  cases.mapE { caseClause =>
+                enterFresh(caseClause.id, anon).map { ctx1 =>
+                  implied for Context = ctx1
+                  index(caseClause)
                 }
-      _     <-  stats.mapE(index(_) given ctx1)
-    } yield ()
+              }
+      } yield ()
 
-  def namedApplyTerm(fun: Tree, args: List[Tree]): Contextual[Modal[Checked[Unit]]] =
-    for {
-      _ <- index(fun)
-      _ <- args.mapE(index)
-    } yield ()
-
-  def namedLet(letId: Tree, value: Tree, continuation: Tree)(id: Id): Contextual[Modal[Checked[Unit]]] =
-    for {
-      _     <-  index(value)
-      ctx1  <-  enterFresh(id, anon)
-      _     <-  failable {
-                  val Ident(name) = letId
-                  enterFresh(letId.id, name) given ctx1
-                }
-      _     <-  index(continuation) given ctx1
-    } yield ()
-
-  def namedCaseExpr(selector: Tree, cases: List[Tree]): Contextual[Modal[Checked[Unit]]] =
-    for {
-      _ <-  index(selector)
-      _ <-  cases.mapE { caseClause =>
-              for (ctx1 <- enterFresh(caseClause.id, anon))
-                yield index(caseClause) given ctx1
-            }
-    } yield ()
-
-  def namedCaseClause(pat: Tree, guard: Tree, body: Tree): Contextual[Modal[Checked[Unit]]] =
-    for {
-      _ <- indexAsPattern(pat)
-      _ <- index(guard) // idents here are normal refs to variables in this scope
-      _ <- index(body)
-    } yield ()
+  def namedCaseClause(pat: Tree, guard: Tree, body: Tree): (
+    Contextual[Modal[Checked[Unit]]]) =
+      for {
+        _ <- indexAsPattern(pat)
+        _ <- index(guard) // idents here are normal refs to variables in this scope
+        _ <- index(body)
+      } yield ()
 
   // def namedUnapply(functor: Tree, args: List[Tree]): Contextual[Modal[Checked[Unit]]] = {
   //   args.foreach(index)
@@ -100,25 +118,23 @@ object Namers {
       yield ()
   }
 
-  def namedBind(name: Name, pat: Tree)(id: Id): Contextual[Modal[Checked[Unit]]] =
-    for {
-      _ <- enterFresh(id, name)
-      _ <- index(pat)
-    } yield ()
+  def namedBind(name: Name, pat: Tree)(id: Id): (
+    Contextual[Modal[Checked[Unit]]]) =
+      for {
+        _ <- enterFresh(id, name)
+        _ <- index(pat)
+      } yield ()
 
-  def namedParens(args: List[Tree]): Contextual[Modal[Checked[Unit]]] = {
+  def namedParens(args: List[Tree]): Contextual[Modal[Checked[Unit]]] =
     for (_ <- args.mapE(index))
       yield ()
-  }
 
-  def namedIdentPat(name: Name)(id: Id): Contextual[Modal[Checked[Unit]]] = {
-    import CompilerErrorOps._
-    if name != Name.Wildcard then
+  def namedIdentPat(name: Name)(id: Id): Contextual[Modal[Checked[Unit]]] =
+    if name != Wildcard then
       for (_ <- enterFresh(id, name))
         yield ()
     else
       ()
-  }
 
   def indexAsPattern(tree: Tree): Contextual[Checked[Unit]] = {
     implied for Mode = Mode.Pat
@@ -153,6 +169,7 @@ object Namers {
     /* error case */
     case _ =>
       import implied TreeOps._
-      CompilerError.IllegalState(s"Namer implementation missing for `${tree.userString}`")
+      CompilerError.IllegalState(
+        s"Namer implementation missing for `${tree.userString}`")
   }
 }

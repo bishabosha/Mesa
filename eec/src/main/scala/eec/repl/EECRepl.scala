@@ -102,18 +102,20 @@ class EECRepl {
 
       def Define(s: String): LoopState =
         guarded(s) {
-          (for {
-            expr  <- parseStat(s)
-            _     <- indexAsExpr(expr).recoverDefault
-            typed <- expr.typedAsExpr(Type.WildcardType)
-          } yield typed).fold
-            { error => println(s"[ERROR] ${error.userString}") }
-            { typed =>
+          val typed = for {
+            exp <- parseStat(s)
+            _   <- indexAsExpr(exp).recoverDefault
+            tpd <- exp.typedAsExpr(Type.WildcardType)
+          } yield tpd
+
+          typed.fold
+            { err => println(s"[ERROR] ${err.userString}") }
+            { tpd =>
               import Tree._
               import implied TypeOps._
               import implied core.Names.NameOps._
-              val DefDef(_, DefSig(name, _), _, _) = typed
-              println(s"defined ${name.userString} : ${typed.tpe.userString}")
+              val DefDef(_, DefSig(name, _), _, _) = tpd
+              println(s"defined ${name.userString} : ${tpd.tpe.userString}")
             }
 
           state
@@ -121,14 +123,12 @@ class EECRepl {
 
       def Ast(s: String)(f: String => Contextual[Checked[Tree]]): LoopState =
         guarded(s) {
-          (for (expr <- f(s))
-            yield expr
-          ).fold
+          f(s).fold
             { err => println(s"[ERROR] ${err.userString}") }
-            { expr =>
+            { ast =>
               import core.Printing.untyped.Ast
               import implied core.Printing.untyped.AstOps._
-              pprintln(Convert[Tree, Ast](expr), height = Int.MaxValue)
+              pprintln(Convert[Tree, Ast](ast), height = Int.MaxValue)
             }
 
           state

@@ -1,0 +1,14 @@
+\a => a
+
+\ -*
+
+A -* B
+
+(,,,,)
+
+!A * B
+
+data Triple = 
+  Left A | Middle B | End C
+
+explain why match on !_ is unsound
