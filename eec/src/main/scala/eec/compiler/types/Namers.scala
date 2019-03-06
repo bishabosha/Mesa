@@ -18,7 +18,7 @@ object Namers {
   private[this] val anon = From(emptyString)
 
   def namedDefDef(name: Name, args: List[Tree], sigId: Id)
-                 (tpeAs: Tree, body: Tree): Contextual[Modal[Checked[Unit]]] = {
+                 (tpeAs: Tree, body: Tree) given Context, Mode: Checked[Unit] = {
     enterFresh(sigId, name).map { ctx1 =>
       implied for Context = ctx1
       for {
@@ -32,7 +32,7 @@ object Namers {
   }
 
   def namedFunctionTerm(args: List[Tree], body: Tree)
-                       (id: Id): Contextual[Modal[Checked[Unit]]] =
+                       (id: Id) given Context, Mode: Checked[Unit] =
     enterFresh(id, anon).map { ctx1 =>
       implied for Context = ctx1
       for {
@@ -45,7 +45,7 @@ object Namers {
     }
 
   def namedPackageDef
-      (pid: Tree, stats: List[Tree]): Contextual[Modal[Checked[Unit]]] = {
+      (pid: Tree, stats: List[Tree]) given Context, Mode: Checked[Unit] = {
     import TreeOps._
     val cPkgCtx = pid.toNamePairs.foldLeftE(ctx) { (pkgCtx, pair) =>
       implied for Context = pkgCtx
@@ -60,14 +60,14 @@ object Namers {
   }
 
   def namedApplyTerm
-      (fun: Tree, args: List[Tree]): Contextual[Modal[Checked[Unit]]] =
+      (fun: Tree, args: List[Tree]) given Context, Mode: Checked[Unit] =
     for {
       _ <- index(fun)
       _ <- args.mapE(index)
     } yield ()
 
   def namedLet(letId: Tree, value: Tree, continuation: Tree)
-              (id: Id): Contextual[Modal[Checked[Unit]]] =
+              (id: Id) given Context, Mode: Checked[Unit] =
     for {
       _ <-  index(value)
       _ <-  enterFresh(id, anon).map { ctx1 =>
@@ -81,7 +81,7 @@ object Namers {
     } yield ()
 
   def namedCaseExpr
-      (selector: Tree, cases: List[Tree]): Contextual[Modal[Checked[Unit]]] =
+      (selector: Tree, cases: List[Tree]) given Context, Mode: Checked[Unit] =
     for {
       _ <-  index(selector)
       _ <-  cases.mapE { caseClause =>
@@ -93,48 +93,48 @@ object Namers {
     } yield ()
 
   def namedCaseClause
-      (pat: Tree, guard: Tree, body: Tree): Contextual[Modal[Checked[Unit]]] =
+      (pat: Tree, guard: Tree, body: Tree) given Context, Mode: Checked[Unit] =
     for {
       _ <- indexAsPattern(pat)
       _ <- index(guard) // idents here are normal refs to variables in this scope
       _ <- index(body)
     } yield ()
 
-  def namedAlternative(alts: List[Tree]): Contextual[Modal[Checked[Unit]]] = {
+  def namedAlternative(alts: List[Tree]) given Context, Mode: Checked[Unit] = {
     implied for Mode = Mode.PatAlt
     for (_ <- alts.mapE(index))
       yield ()
   }
 
   def namedBind(name: Name, pat: Tree)
-               (id: Id): Contextual[Modal[Checked[Unit]]] =
+               (id: Id) given Context, Mode: Checked[Unit] =
     for {
       _ <- enterFresh(id, name)
       _ <- index(pat)
     } yield ()
 
-  def namedParens(args: List[Tree]): Contextual[Modal[Checked[Unit]]] =
+  def namedParens(args: List[Tree]) given Context, Mode: Checked[Unit] =
     for (_ <- args.mapE(index))
       yield ()
 
-  def namedIdentPat(name: Name)(id: Id): Contextual[Modal[Checked[Unit]]] =
+  def namedIdentPat(name: Name)(id: Id) given Context, Mode: Checked[Unit] =
     if name != Wildcard then
       for (_ <- enterFresh(id, name))
         yield ()
     else
       ()
 
-  def indexAsPattern(tree: Tree): Contextual[Checked[Unit]] = {
+  def indexAsPattern(tree: Tree) given Context: Checked[Unit] = {
     implied for Mode = Mode.Pat
     index(tree)
   }
 
-  def indexAsExpr(tree: Tree): Contextual[Checked[Unit]] = {
+  def indexAsExpr(tree: Tree) given Context: Checked[Unit] = {
     implied for Mode = Mode.Term
     index(tree)
   }
 
-  def index(tree: Tree): Contextual[Modal[Checked[Unit]]] = tree match {
+  def index(tree: Tree) given Context, Mode: Checked[Unit] = tree match {
     /* Pattern Trees */
     case Ident(n)           if mode.isPattern => namedIdentPat(n)(tree.id)
     case Bind(n,t)          if mode.isPattern => namedBind(n,t)(tree.id)

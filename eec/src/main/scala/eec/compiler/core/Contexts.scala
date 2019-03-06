@@ -147,7 +147,7 @@ object Contexts {
 
     def ctx given (c: Context) = c
 
-    def enterFresh(id: Id, name: Name): Contextual[Checked[Context]] = {
+    def enterFresh(id: Id, name: Name) given Context: Checked[Context] = {
       import implied NameOps._
       if ctx.contains(name) then
         CompilerError.UnexpectedType(s"Illegal shadowing in scope of name: ${name.userString}")
@@ -158,7 +158,7 @@ object Contexts {
       }
     }
 
-    def commitId(id: Id): Contextual[Unit] = {
+    def commitId(id: Id) given Context: Unit = {
       val found = ctx.scope.collectFirst {
         case sym @ (Sym(`id`, name), _) => (sym, name)
       }
