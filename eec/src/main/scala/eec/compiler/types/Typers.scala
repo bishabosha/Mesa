@@ -62,46 +62,23 @@ object Typers {
 
   def checkFunWithProto(funTyp: Type, proto: Type, pt: Type)
                        (tree: => Tree): Checked[Type] = {
-    // def unifyReturnType(funTyp: Type, proto: Type): Checked[Type] =
-    //   funTyp match {
-    //     case AppliedType(f, args) => proto match {
-    //       case AppliedType(`f`, args1) =>
-    //         import implied TypeOps._
-    //         if args.length != args1.length then
-    //           CompilerError.UnexpectedType(
-    //             s"Can not unify applied types `${args.map(_.userString)}`, `${args1.map(_.userString)}`")
-    //         else {
-    //           val argsUnified = args.zip(args1).map { (t1, t2) =>
-    //             if t1 == WildcardType then t2 else t1
-    //           }
-    //           AppliedType(f, argsUnified)
-    //         }
-    //       case WildcardType =>
-    //         funTyp
-    //       case _ =>
-    //         import implied TypeOps._
-    //         CompilerError.UnexpectedType(
-    //           s"Can not unify applied types `${funTyp.userString}`, `${proto.userString}`")
-    //     }
-    //     case _ => funTyp
-    //   }
 
-    def unifyArgSubstitutions(arg: Type, app: Type): List[(Name, Type)] = arg match {
+    def getSubstitutions(arg: Type, app: Type): List[(Name, Type)] = arg match {
       case AppliedType(f, args1) => app match {
         case AppliedType(g, args2) if args1.size == args2.size =>
-          unifyArgSubstitutions(f,g) ::: args1.zip(args2).flatMap(unifyArgSubstitutions)
+          getSubstitutions(f,g) ::: args1.zip(args2).flatMap(getSubstitutions)
         case _ =>
           Nil
       }
       case FunctionType(a1, b1) => app match {
         case FunctionType(a2, b2) =>
-          unifyArgSubstitutions(a1,a2) ::: unifyArgSubstitutions(b1,b2)
+          getSubstitutions(a1,a2) ::: getSubstitutions(b1,b2)
         case _ =>
           Nil
       }
       case Product(tpes1) => app match {
         case Product(tpes2) if tpes1.size == tpes2.size =>
-          tpes1.zip(tpes2).flatMap(unifyArgSubstitutions)
+          tpes1.zip(tpes2).flatMap(getSubstitutions)
         case _ =>
           Nil
       }
@@ -111,36 +88,29 @@ object Typers {
         Nil
     }
 
-    def unify(toSub: Name, subBy: Type, tpe: Type): Type = tpe match {
+    def unify(sub: Name, by: Type, tpe: Type): Type = tpe match {
       case FunctionType(arg, body) =>
-        FunctionType(unify(toSub, subBy, arg), unify(toSub, subBy, body))
+        FunctionType(unify(sub, by, arg), unify(sub, by, body))
       case AppliedType(f, args) =>
-        AppliedType(unify(toSub, subBy, f), args.map(unify(toSub, subBy, _)))
+        AppliedType(unify(sub, by, f), args.map(unify(sub, by, _)))
       case Product(tpes) =>
-        Product(tpes.map(unify(toSub, subBy, _)))
-      case Generic(`toSub`) =>
-        subBy
-      case id =>
-        id 
+        Product(tpes.map(unify(sub, by, _)))
+      case Generic(`sub`) =>
+        by
+      case _ =>
+        tpe 
     }
-
-    /* TODO temporary until HK type application */
-    // def unifyArgs(arg: Type, ret: Type): Checked[Type] = ret match {
-    //   case AppliedType(f, List(WildcardType)) =>
-    //     AppliedType(f, List(arg))
-    //   case _ => ret
-    // }
 
     (funTyp, proto) match {
       case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
-        val substitutions = unifyArgSubstitutions(arg, arg1)
-        val FunctionType(arg2, ret2) = substitutions.foldLeft(funTyp)((acc, tpe) => unify(tpe._1, tpe._2, acc))
+        val substitutions = getSubstitutions(arg, arg1)
+        val FunctionType(arg2, ret2) =
+          substitutions.foldLeft(funTyp) { (acc, pair) =>
+            val (sub, by) = pair
+            unify(sub, by, acc)
+          }
         if arg1 =!= arg2 then
-          // for {
-          //   uniRet <- unifyReturnType(ret2, ret1)
-          // } yield (
             if ret2 =!= ret1 then
-              // unifyArgs(arg1, ret2)
               ret2
             else {
               import implied TreeOps._
@@ -150,7 +120,6 @@ object Typers {
               CompilerError.UnexpectedType(
                 s"Function Definition type `$retStr` does not match return type `$ret1Str`.")
             }
-          // )
         else {
           import implied TreeOps._
           import implied TypeOps._
