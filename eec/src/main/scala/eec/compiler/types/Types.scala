@@ -71,46 +71,51 @@ object Types {
       }
 
     implied for Showable[Type] {
-
-      private def (tree: Tree) named: String = {
-        import TreeOps._
-        import util.Convert
-        import implied NameOps._
-        val names = tree.toNames
-        names.map(_.userString).mkString(".")
-      }
-
-      @tailrec
-      private def packageNamed(acc: List[Name], tpe: Type): List[Name] = tpe match {
-        case PackageInfo(parent, name)  => packageNamed(name :: acc, parent)
-        case _                          => acc
-      }
+      import implied NameOps._
 
       def (tpe: Type) userString: String = {
-        import implied NameOps._
+        inline def packaged(t: Type): String = {
+          @tailrec
+          def packageNamed(acc: List[Name], tpe: Type): List[Name] =
+            tpe match {
+              case PackageInfo(parent, name) =>
+                packageNamed(name :: acc, parent)
+              case _ =>
+                acc
+            }
+          packageNamed(Nil, t)
+            .map(_.userString)
+            .mkString("package ", ".", "")
+        }
+        
+        inline def applied(t: Type, ts: List[Type]): String = {
+          val args = ts.map {
+            case f @ FunctionType(_,_) => s"(${f.userString})"
+            case f => f.userString
+          }.mkString(" ")
+          if args.isEmpty then
+            t.userString
+          else
+            s"${t.userString} $args"
+        }
+
+        inline def fromFunction(arg: Type, body: Type): String = arg match {
+          case FunctionType(_,_) => s"(${arg.userString}) -> ${body.userString}"
+          case _                 => s"${arg.userString} -> ${body.userString}"
+        }
+
         tpe match {
-          case t @ PackageInfo(_,_) =>
-            packageNamed(Nil, t).map(_.userString).mkString("package ", ".", "")
-          case FunctionType(f: FunctionType, b) =>
-            s"(${f.userString}) -> ${b.userString}"
-          case FunctionType(t, b) =>
-            s"${t.userString} -> ${b.userString}"
+          case PackageInfo(_,_) =>
+            packaged(tpe)
+          case FunctionType(arg, body) =>
+            fromFunction(arg, body)
           case Product(ts) =>
             ts.map(_.userString).mkString("(", ", ", ")")
           case AppliedType(t, ts) =>
-            val args = ts.map {
-              case f @ FunctionType(_,_) => s"(${f.userString})"
-              case f => f.userString
-            }.mkString(" ")
-            if args.isEmpty then
-              t.userString
-            else
-              s"${t.userString} $args"
+            applied(t, ts)
           case TypeRef(t) =>
-            import implied NameOps._
             t.userString
           case Generic(t) =>
-            import implied NameOps._
             t.userString
           case WildcardType =>
             "<anytype>"
