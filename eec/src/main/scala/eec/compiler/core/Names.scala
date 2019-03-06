@@ -18,12 +18,12 @@ object Names {
   val rootString: String  = "_root_"
 
   val bootstrapped = List(
-    (ComputationTag, FunctionType(Generic(Wildcard), AppliedType(TypeRef(ComputationTag), List(Generic(Wildcard))))),
-    (IntegerTag, TypeRef(IntegerTag)),
-    (DecimalTag, TypeRef(DecimalTag)),
-    (BooleanTag, TypeRef(BooleanTag)),
-    (StringTag, TypeRef(StringTag)),
-    (CharTag, TypeRef(CharTag))
+    ComputationTag  -> FunctionType(Generic(Wildcard), AppliedType(TypeRef(ComputationTag), List(Generic(Wildcard)))),
+    IntegerTag      -> TypeRef(IntegerTag),
+    DecimalTag      -> TypeRef(DecimalTag),
+    BooleanTag      -> TypeRef(BooleanTag),
+    StringTag       -> TypeRef(StringTag),
+    CharTag         -> TypeRef(CharTag)
   )
 
   object NameOps {
