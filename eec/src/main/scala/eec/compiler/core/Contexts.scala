@@ -14,7 +14,7 @@ object Contexts {
 
   enum Mode derives Eql {
 
-    case PrimitiveType, Type, Term, Pat, PatAlt
+    case PrimitiveType, Typing, Term, Pat, PatAlt
 
     def isPattern = this match {
       case Pat | PatAlt => true
@@ -22,7 +22,7 @@ object Contexts {
     }
 
     def isType = this match {
-      case Type | PrimitiveType => true
+      case Typing | PrimitiveType => true
       case _                    => false
     }
 
@@ -42,7 +42,7 @@ object Contexts {
       def (m: Mode) userString: String = m match {
         case Pat | PatAlt => "pattern"
         case Term => "term"
-        case PrimitiveType | Type => "type"
+        case PrimitiveType | Typing => "typing"
       }
     }
   }
