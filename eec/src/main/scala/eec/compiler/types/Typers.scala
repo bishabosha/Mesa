@@ -344,54 +344,6 @@ object Typers {
       body1   <- body.typedAsExpr(pt) given ccCtx
     } yield CaseClause(pat1, guard1, body1)(id, body1.tpe)
 
-  // def typedUnapply(f: Tree, args: List[Tree])
-  //                 (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
-  //     import TypeOps._
-
-  //     def (f: Tree) typedAsFunctor(pt: Type): Checked[Tree] = pt match {
-  //       case AppliedType(TypeRef(name), args) =>
-  //         for {
-  //           nameCtx <- ctx.firstCtx(name)
-  //           fTpe  <- nameCtx.getType(name) // lookup type for name
-  //           f1    <- f.typedAsExpr(fTpe) // fTpe should be type lambda
-  //         } yield f1
-  //       case _ =>
-  //         CompilerError.UnexpectedType(s"expected Functor type, but was ${pt.userString}")
-  //     }
-
-  //     def (ts: List[Tree]) typedAsFunctorArgs(fTpe: Type, pt: Type): Checked[List[Tree]] = fTpe match {
-  //       case FunctionType(WildcardType, AppliedType(TypeRef(name), args)) =>
-  //         pt match {
-  //           case AppliedType(TypeRef(`name`), ptArgs) =>
-  //             if ptArgs.length != args.length then
-  //               CompilerError.UnexpectedType("Functor type does not unify with expected type")
-  //             else if ts.length != args.length then
-  //               CompilerError.UnexpectedType("Functor args lengths do not match")
-  //             else {
-  //               ts.zip(ptArgs).mapE { _.typed(_) }
-  //             }
-  //           case _ =>
-  //             CompilerError.IllegalState("Unapply does not match Functor type.")
-  //         }
-  //       case _ =>
-  //         CompilerError.IllegalState("Functor type which is not single arg.")
-  //     }
-
-  //     def unifyUnapply(fType: Type, args: List[Type]): Checked[Type] = fType match {
-  //       case FunctionType(WildcardType, AppliedType(TypeRef(name), _)) =>
-  //         AppliedType(TypeRef(name), args)
-  //       case _ =>
-  //         CompilerError.IllegalState("Functor type which is not single arg.")
-  //     }
-
-  //     for {
-  //       f1    <- f.typedAsFunctor(pt)
-  //       args1 <- args.typedAsFunctorArgs(f1.tpe, pt)
-  //       tpe   <- unifyUnapply(f1.tpe, args1.map(_.tpe))
-  //     } yield
-  //       Unapply(f1, args1)(id, tpe) // need to lookup id1 to get idArgs, if idArgs types match args1 then ok
-  //   }
-
   def typedBind(name: Name, body: Tree)
                (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
     import Mode._
@@ -421,13 +373,11 @@ object Typers {
   def typedPackageDef(pid: Tree, stats: List[Tree])
                      (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
     import TypeOps._
-    import implied TreeOps._
+    import TreeOps._
     import Name._
 
-    val toIdNamePairs = Convert[Tree, List[(Id, Name)]]
-
     def typePackaging(tree: Tree): Checked[(Context, Tree)] =
-      toIdNamePairs(tree) match {
+      tree.toNamePairs match {
         case (id, name) :: tail =>
           for {
             next  <- ctx.lookIn(id)
@@ -483,34 +433,35 @@ object Typers {
   def typedDefSig(name: Name, args: List[Tree])
                  (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
       import TypeOps._
-      import implied TreeOps._
-      import implied NameOps._
+      import TreeOps._
 
-      def mapArgs(
-        args: List[Tree], pts: List[Type]): Contextual[Checked[List[Tree]]] =
-          args
-            .flatMap(Convert[Tree, List[(Id, Name)]])
-            .zip(pts)
-            .mapE { (pair, tpe) =>
-              val (id, name) = pair
-              for {
-                nameCtx <- ctx.lookIn(id)
-              } yield {
-                ctx.putType(name, tpe)
-                Ident(name)(id, tpe)
-              }
+      def mapArgs
+          (args: List[Tree], pts: List[Type]): Contextual[Checked[List[Tree]]] =
+        args
+          .flatMap(_.toNamePairs)
+          .zip(pts)
+          .mapE { (pair, tpe) =>
+            val (id, name) = pair
+            for {
+              nameCtx <- ctx.lookIn(id)
+            } yield {
+              ctx.putType(name, tpe)
+              Ident(name)(id, tpe)
             }
+          }
 
       val pts = toCurriedList(pt)
 
-      if pts.length <= args.length then
+      if pts.length <= args.length then {
+        import implied NameOps._
         CompilerError.UnexpectedType(
           s"Function declaration arguments do not match declared type for declaration ${name.userString}. REF: $args; $pts")
-      else
+      } else {
         for {
           bodyCtx   <- ctx.lookIn(id)
           args1     <- mapArgs(args, pts) given bodyCtx
         } yield DefSig(name, args1)(id, pt)
+      }
     }
 
   def typedSelectType(from: Tree, name: Name)
@@ -609,7 +560,6 @@ object Typers {
       case Function(ts,t)   if mode.isType    => typedFunctionType(ts,t)(tree.id, pt)
       /* Pattern Trees */
       case Ident(n)         if mode.isPattern => typedIdentPat(n)(tree.id, pt)
-      // case Unapply(t,ts)    if mode.isPattern => typedUnapply(t,ts)(tree.id, pt)
       case Bind(n,t)        if mode.isPattern => typedBind(n,t)(tree.id, pt)
       case Alternative(ts)  if mode.isPattern => typedAlternative(ts)(tree.id, pt)
       /* Term Trees */

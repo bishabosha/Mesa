@@ -17,11 +17,6 @@ object Namers {
 
   private[this] val anon = From(emptyString)
 
-  private[this] val toPairs = {
-    import implied TreeOps._
-    Convert[Tree, List[(Id, Name)]]
-  }
-
   def namedDefDef(name: Name, args: List[Tree], sigId: Id)
                  (tpeAs: Tree, body: Tree): Contextual[Modal[Checked[Unit]]] = {
     enterFresh(sigId, name).map { ctx1 =>
@@ -51,7 +46,8 @@ object Namers {
 
   def namedPackageDef
       (pid: Tree, stats: List[Tree]): Contextual[Modal[Checked[Unit]]] = {
-    val cPkgCtx = toPairs(pid).foldLeftE(ctx) { (pkgCtx, pair) =>
+    import TreeOps._
+    val cPkgCtx = pid.toNamePairs.foldLeftE(ctx) { (pkgCtx, pair) =>
       implied for Context = pkgCtx
       val (id, pkgName) = pair
       enterFresh(id, pkgName)
@@ -104,10 +100,6 @@ object Namers {
       _ <- index(body)
     } yield ()
 
-  // def namedUnapply(functor: Tree, args: List[Tree]): Contextual[Modal[Checked[Unit]]] = {
-  //   args.foreach(index)
-  // }
-
   def namedAlternative(alts: List[Tree]): Contextual[Modal[Checked[Unit]]] = {
     implied for Mode = Mode.PatAlt
     for (_ <- alts.mapE(index))
@@ -145,7 +137,6 @@ object Namers {
   def index(tree: Tree): Contextual[Modal[Checked[Unit]]] = tree match {
     /* Pattern Trees */
     case Ident(n)           if mode.isPattern => namedIdentPat(n)(tree.id)
-    // case Unapply(t,ts)      if mode.isPattern => namedUnapply(t,ts)
     case Bind(n,t)          if mode.isPattern => namedBind(n,t)(tree.id)
     case Alternative(ts)    if mode.isPattern => namedAlternative(ts)
     /* Term Trees */

@@ -27,7 +27,6 @@ object Printing {
       case Alternative(bodys: List[Ast])
       case Parens(exprs: List[Ast])
       case Bind(name: Name, body: Ast)
-      // case UntoAst(id: Ast, args: List[Ast])
       case Tagged(arg: Name, tpeAs: Ast)
       case TreeSeq(args: List[Ast])
       case EmptyAst
@@ -52,7 +51,6 @@ object Printing {
         case Tree.Alternative(bodys) => Alternative(bodys.map(toAst(_)))
         case Tree.Parens(exprs) => Parens(exprs.map(toAst(_)))
         case Tree.Bind(name, body) => Bind(name, toAst(body))
-        // case Tree.UntoAst(id, args) => UntoAst(id.toAst, args.map(_.toAst))
         case Tree.Tagged(arg, tpeAs) => Tagged(arg, toAst(tpeAs))
         case Tree.TreeSeq(args) => TreeSeq(args.map(toAst(_)))
         case Tree.EmptyTree => EmptyAst

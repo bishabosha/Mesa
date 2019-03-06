@@ -38,7 +38,6 @@ object Types {
     import Type._
     import Tree._
     import util.|>
-    import implied NameOps._
 
     def packageName(t: Type): Name = t match {
       case PackageInfo(_, name) => name
@@ -53,9 +52,6 @@ object Types {
       }
       inner(Nil, t).reverse
     }
-
-//  lift f : (a -> !b) -> !a -> !b
-//  [f], [a -> !b, !a, !b] => !a -> !b
 
     def toReturnType(defSig: Tree, t: Type): Type =
       defSig match {
@@ -77,10 +73,10 @@ object Types {
     implied for Showable[Type] {
 
       private def (tree: Tree) named: String = {
-        import implied TreeOps._
-        import implied NameOps._
+        import TreeOps._
         import util.Convert
-        val names = Convert[Tree, List[Name]](tree)
+        import implied NameOps._
+        val names = tree.toNames
         names.map(_.userString).mkString(".")
       }
 
@@ -90,47 +86,50 @@ object Types {
         case _                          => acc
       }
 
-      def (tpe: Type) userString: String = tpe match {
-        case t @ PackageInfo(_,_) =>
-          packageNamed(Nil, t).map(_.userString).mkString("package ", ".", "")
-        case FunctionType(f: FunctionType, b) =>
-          s"(${f.userString}) -> ${b.userString}"
-        case FunctionType(t, b) =>
-          s"${t.userString} -> ${b.userString}"
-        case Product(ts) =>
-          ts.map(_.userString).mkString("(", ", ", ")")
-        case AppliedType(t, ts) =>
-          val args = ts.map {
-            case f @ FunctionType(_,_) => s"(${f.userString})"
-            case f => f.userString
-          }.mkString(" ")
-          if args.isEmpty then
+      def (tpe: Type) userString: String = {
+        import implied NameOps._
+        tpe match {
+          case t @ PackageInfo(_,_) =>
+            packageNamed(Nil, t).map(_.userString).mkString("package ", ".", "")
+          case FunctionType(f: FunctionType, b) =>
+            s"(${f.userString}) -> ${b.userString}"
+          case FunctionType(t, b) =>
+            s"${t.userString} -> ${b.userString}"
+          case Product(ts) =>
+            ts.map(_.userString).mkString("(", ", ", ")")
+          case AppliedType(t, ts) =>
+            val args = ts.map {
+              case f @ FunctionType(_,_) => s"(${f.userString})"
+              case f => f.userString
+            }.mkString(" ")
+            if args.isEmpty then
+              t.userString
+            else
+              s"${t.userString} $args"
+          case TypeRef(t) =>
+            import implied NameOps._
             t.userString
-          else
-            s"${t.userString} $args"
-        case TypeRef(t) =>
-          import implied NameOps._
-          t.userString
-        case Generic(t) =>
-          import implied NameOps._
-          t.userString
-        case WildcardType =>
-          "<anytype>"
-        case Untyped | UntypedExpect(_) =>
-          "<untyped>"
-        case NoType =>
-          "<notype>"
+          case Generic(t) =>
+            import implied NameOps._
+            t.userString
+          case WildcardType =>
+            "<anytype>"
+          case Untyped | UntypedExpect(_) =>
+            "<untyped>"
+          case NoType =>
+            "<notype>"
+        }
       }
     }
 
-    implied fromList for (List[Type] |> Type) {
+    implied for (List[Type] |> Type) {
       def apply(ts: List[Type]) = ts match {
         case tpe :: Nil => tpe
         case types      => Product(types)
       }
     }
 
-    implied toList for (Type |> List[Type]) {
+    implied for (Type |> List[Type]) {
       def apply(t: Type) = t match {
         case Product(ls)  => ls
         case tpe          => tpe :: Nil
@@ -153,7 +152,6 @@ object Types {
       case t @ Alternative(_)     => t.copy()(t.id, tpe)
       case t @ Parens(_)          => t.copy()(t.id, tpe)
       case t @ Bind(_,_)          => t.copy()(t.id, tpe)
-      // case t @ Unapply(_,_,_)       => t.copy()(t.id, tpe)
       case t @ Tagged(_,_)        => t.copy()(t.id, tpe)
       case t @ TreeSeq(_)         => t
       case EmptyTree              => EmptyTree

@@ -44,11 +44,6 @@ object Parsers {
     Convert[Tree, List[Tree]]
   }
 
-  private[this] val toNames: Tree |> List[Name] = {
-    import implied TreeOps._
-    Convert[Tree, List[Name]]
-  }
-
   private[parsing] object TreeParsers {
 
     def freshId(): Contextual[Id] = ctx.rootCtx.fresh()
@@ -171,8 +166,9 @@ object Parsers {
       if ids.size == 1 then {
         ids(0)
       } else {
+        import TreeOps._
         val src = ids(0)
-        val List(select) = toNames(ids(1))
+        val List(select) = ids(1).toNames
         Select(src, select)(freshId(), uTpe)
       }
     }
@@ -447,7 +443,8 @@ object Parsers {
     }
 
     def fromBinding(context: EECParser.BindingContext): Contextual[Tree] = {
-      val List(name) = toNames(fromId(context.id))
+      import TreeOps._
+      val List(name) = fromId(context.id).toNames
       val typ = fromType(context.`type`)
       Tagged(name, typ)(freshId(), uTpe)
     }
