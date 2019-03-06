@@ -62,60 +62,103 @@ object Typers {
 
   def checkFunWithProto(funTyp: Type, proto: Type, pt: Type)
                        (tree: => Tree): Checked[Type] = {
-    def unifyReturnType(funTyp: Type, proto: Type): Checked[Type] =
-      funTyp match {
-        case AppliedType(f, args) => proto match {
-          case AppliedType(`f`, args1) =>
-            if args.length != args1.length then
-              CompilerError.UnexpectedType(
-                s"Can not unify applied types $args, $args1")
-            else {
-              val argsUnified = args.zip(args1).map { (t1, t2) =>
-                if t1 == WildcardType then t2 else t1
-              }
-              AppliedType(f, argsUnified)
-            }
-          case WildcardType =>
-            funTyp
-          case _ => CompilerError.UnexpectedType(
-            s"Can not unify applied types $funTyp, $proto")
-        }
-        case _ => funTyp
-      }
+    // def unifyReturnType(funTyp: Type, proto: Type): Checked[Type] =
+    //   funTyp match {
+    //     case AppliedType(f, args) => proto match {
+    //       case AppliedType(`f`, args1) =>
+    //         import implied TypeOps._
+    //         if args.length != args1.length then
+    //           CompilerError.UnexpectedType(
+    //             s"Can not unify applied types `${args.map(_.userString)}`, `${args1.map(_.userString)}`")
+    //         else {
+    //           val argsUnified = args.zip(args1).map { (t1, t2) =>
+    //             if t1 == WildcardType then t2 else t1
+    //           }
+    //           AppliedType(f, argsUnified)
+    //         }
+    //       case WildcardType =>
+    //         funTyp
+    //       case _ =>
+    //         import implied TypeOps._
+    //         CompilerError.UnexpectedType(
+    //           s"Can not unify applied types `${funTyp.userString}`, `${proto.userString}`")
+    //     }
+    //     case _ => funTyp
+    //   }
 
-    def unifyArgs(arg: Type, ret: Type): Checked[Type] = ret match {
-      case AppliedType(f, List(WildcardType)) =>
-        AppliedType(f, List(arg))
-      case _ => ret
+    def unifyArgSubstitutions(arg: Type, app: Type): List[(Name, Type)] = arg match {
+      case AppliedType(f, args1) => app match {
+        case AppliedType(g, args2) if args1.size == args2.size =>
+          unifyArgSubstitutions(f,g) ::: args1.zip(args2).flatMap(unifyArgSubstitutions)
+        case _ =>
+          Nil
+      }
+      case FunctionType(a1, b1) => app match {
+        case FunctionType(a2, b2) =>
+          unifyArgSubstitutions(a1,a2) ::: unifyArgSubstitutions(b1,b2)
+        case _ =>
+          Nil
+      }
+      case Product(tpes1) => app match {
+        case Product(tpes2) if tpes1.size == tpes2.size =>
+          tpes1.zip(tpes2).flatMap(unifyArgSubstitutions)
+        case _ =>
+          Nil
+      }
+      case Generic(name) =>
+        (name, app) :: Nil
+      case _ =>
+        Nil
     }
+
+    def unify(toSub: Name, subBy: Type, tpe: Type): Type = tpe match {
+      case FunctionType(arg, body) =>
+        FunctionType(unify(toSub, subBy, arg), unify(toSub, subBy, body))
+      case AppliedType(f, args) =>
+        AppliedType(unify(toSub, subBy, f), args.map(unify(toSub, subBy, _)))
+      case Product(tpes) =>
+        Product(tpes.map(unify(toSub, subBy, _)))
+      case Generic(`toSub`) =>
+        subBy
+      case id =>
+        id 
+    }
+
+    /* TODO temporary until HK type application */
+    // def unifyArgs(arg: Type, ret: Type): Checked[Type] = ret match {
+    //   case AppliedType(f, List(WildcardType)) =>
+    //     AppliedType(f, List(arg))
+    //   case _ => ret
+    // }
 
     (funTyp, proto) match {
       case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
-        if arg =!= arg1 then
-          for {
-            uniRet <- unifyReturnType(ret, ret1)
-          } yield (
-            if uniRet =!= ret1 then
-              unifyArgs(arg1, uniRet)
+        val substitutions = unifyArgSubstitutions(arg, arg1)
+        val FunctionType(arg2, ret2) = substitutions.foldLeft(funTyp)((acc, tpe) => unify(tpe._1, tpe._2, acc))
+        if arg1 =!= arg2 then
+          // for {
+          //   uniRet <- unifyReturnType(ret2, ret1)
+          // } yield (
+            if ret2 =!= ret1 then
+              // unifyArgs(arg1, ret2)
+              ret2
             else {
               import implied TreeOps._
               import implied TypeOps._
-              val retStr  = ret.userString
+              val retStr  = ret2.userString
               val ret1Str = ret1.userString
               CompilerError.UnexpectedType(
                 s"Function Definition type `$retStr` does not match return type `$ret1Str`.")
             }
-          )
+          // )
         else {
           import implied TreeOps._
           import implied TypeOps._
-          val argStr  = arg.userString
-          val retStr  = ret.userString
+          val arg2Str  = arg2.userString
           val arg1Str = arg1.userString
-          val ret1Str = ret1.userString
           val treeStr = tree.userString
           CompilerError.UnexpectedType(
-            s"Function definition `$argStr -> $retStr` does not match args. Expected `$argStr` but was `$arg1Str` in application expr:\n$treeStr")
+            s"Function definition `${funTyp.userString}` does not match args. Expected `$arg2Str` but was `$arg1Str` in application expr:\n$treeStr\nARG2:$arg2\nARG1:$arg1")
         }
       case _ =>
         CompilerError.IllegalState("Can not apply to non function type")
@@ -509,9 +552,17 @@ object Typers {
                      (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] =
     CompilerError.SyntaxError("Member selections do not exist for terms.")
 
-  def typedIdentType(name: Name)(
-    id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] =
-      Ident(name)(id, TypeRef(name))
+  def typedIdentType(name: Name)
+                    (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {
+    val lookup = ctx.firstCtx(name).flatMap(_.getType(name))
+    val tpe = lookup.fold { notFound => Generic(name) }{ tpe =>
+      if Context.isDefined(tpe) then
+        TypeRef(name)
+      else
+        Generic(name)
+    }
+    Ident(name)(id, tpe)
+  }
 
   def typedIdentPat(name: Name)
                    (id: Id, pt: Type): Contextual[Modal[Checked[Tree]]] = {

@@ -183,6 +183,8 @@ object Contexts {
         })
       }
     }
+
+    def isDefined(tpe: Type): Boolean = Names.bootstrapped.map(_._2).contains(tpe)
   }
 
   class Fresh private[Contexts] (override val outer: Context, override val scope: Scope, override val typeTable: TypeTable) extends Context {

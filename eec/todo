@@ -1,15 +1,18 @@
 [x] desugar operators into list of calls
 [-] test how diff postfix levels interact
 [?] lazy implementation of tuple
-[?] desugar `case x [: !_] of !(a, _) => a ; !x => x` to `let !p = x in case p of (a, _) => a; x => x`
+[-] desugar `case x [: !_] of !(a, _) => a ; !x => x` to `let !p = x in case p of (a, _) => a; x => x`
 
-`products a lazy interpretation: components are only evaluated once projected out. (So, e.g., the linearity in the rule
-for 1 is correct because 1 is the empty product and ∗ can never be projected.)`
-    -> Tuples are lazy evaluated
+"They rely on giving the products a lazy interpretation: components are only
+evaluated once projected out. (So, e.g., the linearity in the rule for 1
+is correct because 1 is the empty product and () can never be projected.)"
 
-`Γ | ∆ ⊢ (λx: A.t)(u) = t[u/x]: B`
+* In branch `unification1`- realised i need to make scope have separate types for
+  names that refer to terms and names that refer to pure types
+    - e.g. when ! is used as a type `! Integer`, and also to refer to the
+      constructor of ! types, e.g. `!0 : ! Integer`
 
-`let x = 2 in t` = `(λx.t)(2)`
-
-if stoup has value, type must be comp type, if a value is in the stoop, then the rhs depends linearly on the value in
-the stoup, the value in the stoup may also move out of the stoup and remain a valid *type* judgement
+* Note however that since types can currently be only defined in the _root_ pkg
+  and there is no user mechanism to define them, then it is safe to substitute
+  `TypeRef(a)`, where `a` is unknown, with any concrete type - substitution must
+  be propagated

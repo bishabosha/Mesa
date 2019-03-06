@@ -21,6 +21,7 @@ object Types {
   enum Type derives Eql {
     case PackageInfo(parent: Type, name: Name)
     case TypeRef(name: Name)
+    case Generic(name: Name)
     case FunctionType(arg: Type, body: Type)
     case Product(args: List[Type])
     case AppliedType(typ: Type, args: List[Type])
@@ -108,6 +109,9 @@ object Types {
           else
             s"${t.userString} $args"
         case TypeRef(t) =>
+          import implied NameOps._
+          t.userString
+        case Generic(t) =>
           import implied NameOps._
           t.userString
         case WildcardType =>
