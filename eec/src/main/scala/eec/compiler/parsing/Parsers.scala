@@ -145,18 +145,19 @@ object Parsers {
       Ident(name)(freshId(), uTpe)
     }
 
+    def namesToTree(lst: List[Name]): Contextual[Tree] = lst match {
+      case n :: Nil   => Ident(n)(freshId(), uTpe)
+      case n :: tail  => Select(namesToTree(tail), n)(freshId(), uTpe)
+      case Nil        => EmptyTree
+    }
+
     def fromQualId(context: EECParser.QualIdContext): Contextual[Tree] = {
-      import implied NameOps._
-      def listToRefId(lst: List[String]): Contextual[Tree] = lst match {
-        case n :: Nil   => Ident(n.readAs)(freshId(), uTpe)
-        case n :: tail  => Select(listToRefId(tail), n.readAs)(freshId(), uTpe)
-        case Nil        => EmptyTree
-      }
       val tokens = {
+        import implied NameOps._
         import scala.language.implicitConversions
-        context.id.map(_.getText).toList.reverse
+        context.id.map(_.getText.readAs).toList.reverse
       }
-      listToRefId(tokens)
+      namesToTree(tokens)
     }
 
     def fromStableId(context: EECParser.StableIdContext): Contextual[Tree] = {
@@ -167,10 +168,8 @@ object Parsers {
       if ids.size == 1 then {
         ids(0)
       } else {
-        import TreeOps._
-        val src = ids(0)
-        val List(select) = ids(1).toNames
-        Select(src, select)(freshId(), uTpe)
+        import implied TreeOps._
+        namesToTree(ids.toList.map(Convert[Tree, Name]))
       }
     }
 
@@ -209,9 +208,9 @@ object Parsers {
 
     def fromPrefixType
           (context: EECParser.PrefixTypeContext): Contextual[Tree] = {
-      val simpleType = fromSimpleType(context.simpleType)
-      val tag   = Ident(Name.ComputationTag)(freshId(), uTpe)
-      val args  = simpleType :: Nil
+      val simpleType  = fromSimpleType(context.simpleType)
+      val tag         = Ident(Name.ComputationTag)(freshId(), uTpe)
+      val args        = simpleType :: Nil
       Apply(tag, args)(freshId(), uTpe)
     }
 
@@ -236,8 +235,8 @@ object Parsers {
     def fromExprSeqAsApply
           (exprs: java.util.List[EECParser.ExprContext]): Contextual[Tree] = {
       import scala.language.implicitConversions
-      val Seq(expr, arg) = exprs.map(fromExpr).ensuring(result.size == 2)
-      val args = toList(arg)
+      val Seq(expr, arg)  = exprs.map(fromExpr).ensuring(result.size == 2)
+      val args            = toList(arg)
       Apply(expr, args)(freshId(), uTpe)
     }
 
