@@ -333,12 +333,14 @@ object Typers {
 
   def typedCaseClause(pat: Tree, guard: Tree, body: Tree, selTpe: Type)
                      (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
-    for {
-      ccCtx   <- ctx.lookIn(id)
-      pat1    <- pat.typedAsPattern(selTpe) given ccCtx
-      guard1  <- guard.typedAsExpr(Bootstraps.BooleanType) given ccCtx
-      body1   <- body.typedAsExpr(pt) given ccCtx
-    } yield CaseClause(pat1, guard1, body1)(id, body1.tpe)
+    ctx.lookIn(id).flatMap { ccCtx =>
+      implied for Context = ccCtx
+      for {
+        pat1    <- pat.typedAsPattern(selTpe)
+        guard1  <- guard.typedAsExpr(Bootstraps.BooleanType)
+        body1   <- body.typedAsExpr(pt)
+      } yield CaseClause(pat1, guard1, body1)(id, body1.tpe)
+    }
 
   def typedBind(name: Name, body: Tree)
                (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
@@ -392,14 +394,16 @@ object Typers {
       }
 
     for {
-      pair    <- typePackaging(pid)
-      pkgCtx  <- pair._1
-      pid1    <- pair._2
-      stats1  <- checked {
-                  implied for Context = pkgCtx
-                  stats.mapE(_.typed(any))
-                }
-    } yield PackageDef(pid1, stats1)(id, pid1.tpe)
+      pair    <-  typePackaging(pid)
+      stats1  <-  checked {
+                    val (pkgCtx, _) = pair
+                    implied for Context = pkgCtx
+                    stats.mapE(_.typed(any))
+                  }
+    } yield {
+      val (_, pid1) = pair
+      PackageDef(pid1, stats1)(id, pid1.tpe)
+    }
   }
 
   def typedDefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)
@@ -455,8 +459,11 @@ object Typers {
         s"Function declaration arguments do not match declared type for declaration ${name.userString}. REF: $args; $pts")
     } else {
       for {
-        bodyCtx   <- ctx.lookIn(id)
-        args1     <- mapArgs(args, pts) given bodyCtx
+        bodyCtx   <-  ctx.lookIn(id)
+        args1     <-  checked {
+                        implied for Context = bodyCtx
+                        mapArgs(args, pts)
+                      }
       } yield DefSig(name, args1)(id, pt)
     }
   }
@@ -560,8 +567,7 @@ object Typers {
       case Let(
         i @ Ident(n),
         v,
-        c
-      )                     if mode.isTerm    => typedLet(n,i.id)(v,c)(tree.id, pt)
+        c)                  if mode.isTerm    => typedLet(n,i.id)(v,c)(tree.id, pt)
       case Function(ts,t)   if mode.isTerm    => typedFunctionTerm(ts,t)(tree.id, pt)
       case Tagged(n,t)      if mode.isTerm    => typedTagged(n,t)(tree.id, pt)
       case CaseExpr(t,ts)   if mode.isTerm    => typedCaseExpr(t,ts)(tree.id, pt)

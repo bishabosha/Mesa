@@ -17,29 +17,28 @@ object Namers {
 
   private[this] val anon = From(emptyString)
 
+  private[this] val toName = {
+    import implied TreeOps._
+    Convert[Tree, Name]
+  }
+
   def namedDefDef(name: Name, args: List[Tree], sigId: Id)
-                 (tpeAs: Tree, body: Tree) given Context, Mode: Checked[Unit] = {
-    enterFresh(sigId, name).map { ctx1 =>
+                 (tpeAs: Tree, body: Tree) given Context, Mode: Checked[Unit] =
+    enterFresh(sigId, name).flatMap { ctx1 =>
+      import TreeOps._
       implied for Context = ctx1
       for {
-        _ <-  args.mapE { t =>
-                val Ident(name) = t
-                enterFresh(t.id, name)
-              }
+        _ <-  args.flatMap(toNamePairs).mapE(enterFresh)
         _ <-  index(body)
       } yield ()
     }
-  }
 
   def namedFunctionTerm(args: List[Tree], body: Tree)
                        (id: Id) given Context, Mode: Checked[Unit] =
-    enterFresh(id, anon).map { ctx1 =>
+    enterFresh(id, anon).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
-        _ <-  args.mapE { t =>
-                val Tagged(name, _) = t
-                enterFresh(t.id, name)
-              }
+        _ <-  args.map(t => t.id -> toName(t)).mapE(enterFresh)
         _ <-  index(body)
       } yield ()
     }
@@ -66,15 +65,14 @@ object Namers {
       _ <- args.mapE(index)
     } yield ()
 
-  def namedLet(letId: Tree, value: Tree, continuation: Tree)
+  def namedLet(letName: Name, letId: Id)(value: Tree, continuation: Tree)
               (id: Id) given Context, Mode: Checked[Unit] =
     for {
       _ <-  index(value)
-      _ <-  enterFresh(id, anon).map { ctx1 =>
+      _ <-  enterFresh(id, anon).flatMap { ctx1 =>
               implied for Context = ctx1
-              val Ident(name) = letId
               for {
-                _ <- enterFresh(letId.id, name)
+                _ <- enterFresh(letId, letName)
                 _ <- index(continuation)
               } yield ()
             }
@@ -85,7 +83,7 @@ object Namers {
     for {
       _ <-  index(selector)
       _ <-  cases.mapE { caseClause =>
-              enterFresh(caseClause.id, anon).map { ctx1 =>
+              enterFresh(caseClause.id, anon).flatMap { ctx1 =>
                 implied for Context = ctx1
                 index(caseClause)
               }
@@ -147,7 +145,10 @@ object Namers {
       s @ DefSig(n, ns),
       t,
       b)                    if mode.isTerm    => namedDefDef(n,ns,s.id)(t,b)
-    case Let(n,v,c)         if mode.isTerm    => namedLet(n,v,c)(tree.id)
+    case Let(
+      i @ Ident(n),
+      v,
+      c)                    if mode.isTerm    => namedLet(n,i.id)(v,c)(tree.id)
     case Function(ts,t)     if mode.isTerm    => namedFunctionTerm(ts,t)(tree.id)
     case CaseExpr(t,ts)     if mode.isTerm    => namedCaseExpr(t,ts)
     case CaseClause(p,g,b)  if mode.isTerm    => namedCaseClause(p,g,b)

@@ -24,17 +24,16 @@ object CompilerErrors {
         case _                  => f(o.asInstanceOf[O])
       }
 
-    def (o: Checked[O]) foreach[O, U](f: O => Unit): Unit = o match {
-      case e: CompilerError =>
-      case _                => f(o.asInstanceOf[O])
-    }
-
-    def (o: Checked[O]) map[O, U](f: O => U): Checked[U] = o.flatMap(f)
+    def (o: Checked[O]) map[O, U](f: O => U): Checked[U] =
+      o match {
+        case err: CompilerError => err
+        case _                  => f(o.asInstanceOf[O])
+      }
 
     def (o: Checked[O]) flatMap[O, U](f: O => Checked[U]): Checked[U] =
       o match {
-        case e: CompilerError => e
-        case _                => f(o.asInstanceOf[O])
+        case err: CompilerError => err
+        case _                  => f(o.asInstanceOf[O])
       }
 
     def (l: List[A]) mapE[A, O](f: A => Checked[O]): Checked[List[O]] = {

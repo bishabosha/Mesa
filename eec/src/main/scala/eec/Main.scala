@@ -10,7 +10,7 @@ object Main {
       println("  -e    => run EEC REPL")
       println("  -help => view these options")
     } else if args.contains("-e") then {
-      new EECRepl().loop
+      Repl.loop()
     } else {
       println("No valid option specified. See options with -help")
     }

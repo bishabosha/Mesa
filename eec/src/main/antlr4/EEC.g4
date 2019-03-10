@@ -15,65 +15,21 @@ qualId: id ('.' id)*;
 
 stableId: id | id '.' id;
 
-//operator: Bang | OpId;
-
 //
 // -- Types
 //
 
+type: infixType | func;
 
-//
-// -- Brandon's types for project
-//
+func: infixType ('->' infixType)+;
 
-// transform: typet '=>' typet;
+infixType: simpleType | prefixType;
 
-// typet: bType | function;
+productType: '(' type (',' type)* ')' | '()';
 
-// function: bType ('->' bType)+;
+prefixType: /*(*/ Bang /*| qualId)*/ simpleType;//+;
 
-// bType: aType | functor;
-
-// functor: id fvar+;
-
-// fvar: aType polarity?;
-
-// polarity: '+' | '-';
-
-// aType: id | '(' typet ')';
-
-
-//
-// -- Revised rules for parser update
-//
-
-// typeN: bType | func;
-
-// func: bType ('->' bType)+;
-
-// bType: aType | pType | tType;
-
-// tType: '(' typeN (',' typeN)* ')' | '()';
-
-// pType: (Bang | qualId) aType+;
-
-// aType: qualId | '(' typeN ')';
-
-//
-//
-//
-
-type: infixType '->' type | infixType;
-
-infixType: prefixType; //| productType;
-
-prefixType: simpleType | Bang simpleType;
-
-simpleType: qualId | '(' type ')' | productType;
-
-productType: '(' type (',' type)+ ')' | '()';
-
-ascription: ':' type;
+simpleType: qualId | productType;
 
 //
 // -- Expressions
@@ -89,7 +45,6 @@ caseExpr: 'case' expr 'of' cases;
 
 expr1
    : 'if' expr 'then' expr 'else' expr
-//   | infixExpr ascription
    | infixExpr
    ;
 
@@ -104,9 +59,7 @@ simpleExpr
    : literal
    | stableId
 //   | simpleExpr1 '.' Id  // nice for records
-//   | '_'
    | exprsInParens
-//   | simpleExpr argumentExpr
    ;
 
 cases: caseClause (Sep? caseClause)*;
@@ -114,8 +67,6 @@ cases: caseClause (Sep? caseClause)*;
 caseClause: pattern guard? '=>' expr;
 
 exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
-
-//argumentExpr: '()' | '(' expr? ')';
 
 //
 // -- Patterns
@@ -181,15 +132,13 @@ def: defDef;
 
 defDef: defSig (':' type)/*?*/ '=' expr Sep?;
 
-defSig: infixDefSig | Varid Varid*;
+defSig: infixDefSig | alphaId Varid*;
 
 infixDefSig:
-	Varid (OpId | '`' Varid '`') Varid
+	Varid (OpId | '`' alphaId '`') Varid
 	| prefixOpSig;
 
-
 prefixOpSig: '(' OpId ')' Varid Varid;
-
 
 //fixity: Fixity IntegerLiteral operator (',' operator)*;
 

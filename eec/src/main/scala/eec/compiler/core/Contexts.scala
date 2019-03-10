@@ -177,7 +177,7 @@ object Contexts {
         CompilerError.IllegalState("Non-fresh _root_ context")
       } else {
         Names.bootstrapped.foreach({ (name, tpe) =>
-          for (_ <- enterFresh(ctx.rootCtx.fresh(), name) given ctx.rootCtx) {
+          for (_ <- enterFresh(ctx.rootCtx.fresh(), name) given ctx.rootCtx) yield {
             ctx.rootCtx.putType(name -> tpe)
           }
         })

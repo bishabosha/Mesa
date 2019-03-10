@@ -3,7 +3,7 @@ package com.example
 primitive x + y: Integer -> Integer -> Integer
 primitive s1 ++ s2: String -> String -> String
 primitive debug x: a -> String
-primitive putStrLn s: String -> ()
+primitive putStrLn s: String -> !()
 primitive readInteger: !Integer
 
 earthDiameter: Decimal = 12.742e+10
@@ -42,11 +42,10 @@ not b: Boolean -> !Boolean =
 
 isZero x : Integer -> !Boolean =
   case x of
-    zero @ 0  => !True  -- trivial binding
-    (1 | 2)   => !False -- trivial alternative
-    _ if True => !False -- trivial guard
+    0 => !True
+    _ => !False
 
-main: () =
+main: !() =
   let !x    = readInteger in
   let !zero = isZero x    in
   if zero then

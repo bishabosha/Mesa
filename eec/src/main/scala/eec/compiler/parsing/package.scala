@@ -9,10 +9,10 @@ import error.CompilerErrors._
 import core.Contexts._
 
 val parseEEC: String => Contextual[Checked[Tree]] =
-  eecParser toTreeParser fromTranslationUnit
+  eecParser `toTreeParser` fromTranslationUnit
 
 val parseStat: String => Contextual[Checked[Tree]] =
-  statParser toTreeParser fromStatAsTop
+  statParser `toTreeParser` fromStatAsTop
 
 val parseExpr: String => Contextual[Checked[Tree]] =
-  exprParser toTreeParser fromExprAsTop
+  exprParser `toTreeParser` fromExprAsTop

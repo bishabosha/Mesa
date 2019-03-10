@@ -1,8 +1,0 @@
-Opaque Types
-enums
-union Types
-contextual abstractions
-  - implied instance
-  - context queries
-extension methods
-inline
