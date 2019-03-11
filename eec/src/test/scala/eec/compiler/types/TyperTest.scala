@@ -73,6 +73,10 @@ class TyperTest {
       "!()".typed       -> "! ()",
       "!((),())".typed  -> "! ((), ())",
       "(!(),!())".typed -> "(! (), ! ())")
+    failsTypeCheck(
+      "\\c: ! a b => ()".typed,
+      "! () ()".typed
+    )
   }
 
   @Test def typecheckIf(): Unit = {

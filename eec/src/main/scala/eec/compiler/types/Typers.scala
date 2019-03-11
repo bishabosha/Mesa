@@ -107,16 +107,21 @@ object Typers {
             val (sub, by) = pair
             unify(sub, by, acc)
           }
+        val FunctionType(_, ret3) =
+          substitutions.foldLeft(proto) { (acc, pair) =>
+            val (sub, by) = pair
+            unify(sub, by, acc)
+          }
         if arg1 =!= arg2 then
-            if ret2 =!= ret1 then
+            if ret2 =!= ret3 then
               ret2
             else {
               import implied TreeOps._
               import implied TypeOps._
-              val retStr  = ret2.userString
-              val ret1Str = ret1.userString
+              val ret2Str = ret2.userString
+              val ret3Str = ret3.userString
               CompilerError.UnexpectedType(
-                s"Function Definition type `$retStr` does not match return type `$ret1Str`.")
+                s"Function Definition type `$ret2Str` does not match return type `$ret3Str`.")
             }
         else {
           import implied TreeOps._
@@ -128,7 +133,7 @@ object Typers {
             s"Function definition `${funTyp.userString}` does not match args. Expected `$arg2Str` but was `$arg1Str` in application expr:\n$treeStr\nARG2:$arg2\nARG1:$arg1")
         }
       case _ =>
-        CompilerError.IllegalState("Can not apply to non function type")
+        CompilerError.IllegalState(s"Can not apply to non function type, RAW:\n$funTyp\n$proto")
     }
   }
 
@@ -173,18 +178,14 @@ object Typers {
 
   def typedFunctionTerm(args: List[Tree], body: Tree)
                        (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
-    for {
-      fCtx  <-  ctx.lookIn(id)
-      args1 <-  checked {
-                  implied for Context = fCtx
-                  args.mapE(_.typed(any))
-                }
-      body1 <-  checked {
-                  implied for Context = fCtx
-                  body.typed(any)
-                }
-      f     <-  functionTerm(args1, body1)(id)
-    } yield f
+    ctx.lookIn(id).flatMap { fCtx =>
+      implied for Context = fCtx
+      for {
+        args1 <-  args.mapE(_.typed(any))
+        body1 <-  body.typed(any)
+        f     <-  functionTerm(args1, body1)(id)
+      } yield f
+    }
 
   private def functionType(args1: List[Tree], body1: Tree)
                           (id: Id) given Mode: Checked[Tree] = {
@@ -233,41 +234,88 @@ object Typers {
 
   def typedParens(ts: List[Tree])
                  (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
-    for {
-      ts1 <- typeAsTuple(ts, pt)
-    } yield {
-      val tupleTyp = toType(ts1.map(_.tpe))
-      if tupleTyp =!= pt then {
-        Parens(ts1)(id, tupleTyp)
-      } else {
-        import implied TypeOps._
-        import implied TreeOps._
-        val tupleTypeStr  = tupleTyp.userString
-        val expectedStr   = pt.userString
-        val treeStr       = Parens(ts)(Id.noId, NoType).userString
-        CompilerError.UnexpectedType(
-          s"expected `$expectedStr` but was `$tupleTypeStr` in $mode:\n$treeStr")
+    for (ts1 <- typeAsTuple(ts, pt))
+      yield {
+        val tupleTyp = toType(ts1.map(_.tpe))
+        if tupleTyp =!= pt then {
+          Parens(ts1)(id, tupleTyp)
+        } else {
+          import implied TypeOps._
+          import implied TreeOps._
+          val tupleTypeStr  = tupleTyp.userString
+          val expectedStr   = pt.userString
+          val treeStr       = Parens(ts)(Id.noId, NoType).userString
+          CompilerError.UnexpectedType(
+            s"expected `$expectedStr` but was `$tupleTypeStr` in $mode:\n$treeStr")
+        }
       }
+
+  private def unifyConstructorToHkType
+      (constructor: Type, args: List[Type]): Checked[Type] = {
+    import TypeOps._
+    val res :: args0 = toCurriedList(constructor).reverse
+    res match {
+      case _ if args0.length == args.length =>
+        res
+      case _ =>
+        import implied TypeOps._
+        val argsOrdered = args0.reverse
+        val argsExpect = argsOrdered.map(_.userString).mkString("[", ", ", "]")
+        val argsPassed = args.map(_.userString).mkString("[", ", ", "]")
+        val hint =
+          if args0.length == 0 then
+            " Perhaps functor type is unknown."
+          else
+            ""
+        CompilerError.UnexpectedType(
+          s"HK args do not match. Expected $argsExpect but got $argsPassed.$hint")
     }
+  }
+
+  // private def unifyConstructorToHkTypeFull
+  //     (constructor: Type, args: List[Type]): Checked[Type] = {
+  //   import TypeOps._
+  //   val res :: args0 = toCurriedList(constructor).reverse
+  //   res match {
+  //     case Generic(_) =>
+  //       import TypeOps._
+  //       val newArgs = args.foldRight(Nil: List[Type])((t, acc) =>
+  //         t match {
+  //           case g @ Generic(_) => g :: acc
+  //           case _ => acc
+  //         }
+  //       )
+  //       val res1 = AppliedType(res, args)
+  //       toFunctionType((res1 :: newArgs).reverse)
+  //     case _ if args0.length == args.length =>
+  //       constructor
+  //     case _ =>
+  //       import implied TypeOps._
+  //       val argsOrdered = args0.reverse
+  //       val argsExpect = argsOrdered.map(_.userString).mkString("[", ", ", "]")
+  //       val argsPassed = args.map(_.userString).mkString("[", ", ", "]")
+  //       CompilerError.UnexpectedType(
+  //         s"HK args do not match. Expected $argsExpect but got $argsPassed")
+  //   }
+  // }
 
   def typedApplyType(functor: Tree, args: List[Tree])
                     (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
     for {
-      functor1  <- functor.typed(any)
-      args1     <- args.mapE(_.typed(any))
-    } yield {
-      val selTpe  = functor1.tpe
-      val argTpes = args1.map(_.tpe)
-      val tpe     = AppliedType(selTpe, argTpes)
-      Apply(functor1, args1)(id, tpe)
-    }
+      functor1  <-  functor.typed(any)
+      args1     <-  args.mapE(_.typed(any))
+      applied   <-  unifyConstructorToHkType(functor1.tpe, args1.map(_.tpe))
+      funProto  <-  FunctionType(toType(args1.map(_.tpe)), applied)
+      tpe       <-  checkFunWithProto(functor1.tpe, funProto, pt)(
+                      Apply(functor, args)(Id.noId, Type.NoType))
+    } yield Apply(functor1, args1)(id, tpe)
 
   def typedApplyTerm(fun: Tree, args: List[Tree])
                     (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
     for {
+      fun1      <-  fun.typed(any)
       args1     <-  args.mapE(_.typed(any))
       funProto  <-  FunctionType(toType(args1.map(_.tpe)), pt)
-      fun1      <-  fun.typed(any)
       tpe       <-  checkFunWithProto(fun1.tpe, funProto, pt)(
                       Apply(fun, args)(Id.noId, Type.NoType))
     } yield Apply(fun1, args1)(id, tpe)
@@ -297,13 +345,13 @@ object Typers {
                           implied for Context = lCtx
                           continuation.typed(pt)
                         }
-      _             <-  checked {
+      _             <-  checked (
                           if continuation1.tpe.isComputationType then
                             ()
                           else
                             CompilerError.UnexpectedType(
                               "Let body does not have computation type.")
-                        }
+                        )
     } yield Let(letId1, value1, continuation1)(id, continuation1.tpe)
 
   def typedCaseExpr(selector: Tree, cases: List[Tree])
@@ -420,8 +468,7 @@ object Typers {
       tpeAs1  <- typeTpeAs(tpeAs)(any)
       tpe     <- tpeAs1.tpe
       sig1    <- sig.typed(tpe)
-      bodyCtx <- ctx.lookIn(sig1.id)
-      body1   <- checked {
+      body1   <- ctx.lookIn(sig1.id).flatMap { bodyCtx =>
                   implied for Context = bodyCtx
                   body.typed(toReturnType(sig1, tpe))
                 }
@@ -436,19 +483,18 @@ object Typers {
     import TypeOps._
     import TreeOps._
 
-    def mapArgs
-        (args: List[Tree], pts: List[Type]) given Context: Checked[List[Tree]] =
+    def mapArgs(args: List[Tree], pts: List[Type])
+        given Context: Checked[List[Tree]] =
       args
         .flatMap(_.toNamePairs)
         .zip(pts)
         .mapE { (pair, tpe) =>
           val (id, name) = pair
-          for {
-            nameCtx <- ctx.lookIn(id)
-          } yield {
-            ctx.putType(name, tpe)
-            Ident(name)(id, tpe)
-          }
+          for (nameCtx <- ctx.lookIn(id))
+            yield {
+              ctx.putType(name, tpe)
+              Ident(name)(id, tpe)
+            }
         }
 
     val pts = toCurriedList(pt)
@@ -458,13 +504,11 @@ object Typers {
       CompilerError.UnexpectedType(
         s"Function declaration arguments do not match declared type for declaration ${name.userString}. REF: $args; $pts")
     } else {
-      for {
-        bodyCtx   <-  ctx.lookIn(id)
-        args1     <-  checked {
-                        implied for Context = bodyCtx
-                        mapArgs(args, pts)
-                      }
-      } yield DefSig(name, args1)(id, pt)
+      ctx.lookIn(id).flatMap { bodyCtx =>
+        implied for Context = bodyCtx
+        for (args1 <- mapArgs(args, pts))
+          yield DefSig(name, args1)(id, pt)
+      }
     }
   }
 
@@ -479,20 +523,22 @@ object Typers {
   def typedIdentType(name: Name)
                     (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
     val lookup = ctx.firstCtx(name).flatMap(_.getType(name))
-    val tpe = lookup.fold { notFound => Generic(name) }{ tpe =>
-      if Context.isDefined(tpe) then
-        TypeRef(name)
-      else
-        Generic(name)
-    }
+    val tpe = lookup.fold
+      { notFound => Generic(name) }
+      { tpe =>
+        if Context.isDefined(tpe) then
+          tpe
+        else
+          Generic(name)
+      }
     Ident(name)(id, tpe)
   }
 
   def typedIdentPat(name: Name)
                    (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
-    if mode == PatAlt && name != Wildcard then
+    if mode == PatAlt && name != Wildcard then {
       CompilerError.SyntaxError("Illegal variable in pattern alternative")
-    else {
+    } else {
       if name != Wildcard then {
         ctx.putType(name -> pt)
       }

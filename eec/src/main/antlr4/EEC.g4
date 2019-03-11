@@ -27,7 +27,7 @@ infixType: simpleType | prefixType;
 
 productType: '(' type (',' type)* ')' | '()';
 
-prefixType: /*(*/ Bang /*| qualId)*/ simpleType;//+;
+prefixType: (Bang | qualId) simpleType+;
 
 simpleType: qualId | productType;
 
