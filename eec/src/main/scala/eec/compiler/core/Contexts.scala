@@ -66,6 +66,8 @@ object Contexts {
 
   type TypeTable = mutable.AnyRefMap[Name, Type]
 
+  type PrimTable = mutable.Buffer[Name]
+
   private val rootPkg = PackageInfo(TypeRef(From(rootString)), From(rootString))
 
   sealed trait Context {
@@ -76,6 +78,15 @@ object Contexts {
     val outer: Context
     val scope: Scope
     private[Contexts] val typeTable: TypeTable
+    private[Contexts] val primTable: PrimTable
+
+    def isPrimitive(name: Name): Boolean = {
+      primTable.contains(name)
+    }
+
+    def setPrimitive(name: Name): Unit = {
+      primTable += name
+    }
 
     def putType(pair: (Name, Type)): Unit = {
       typeTable += pair
@@ -152,7 +163,7 @@ object Contexts {
       if ctx.contains(name) then
         CompilerError.UnexpectedType(s"Illegal shadowing in scope of name: ${name.userString}")
       else {
-        val newCtx = new Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap)
+        val newCtx = new Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap, new mutable.ArrayBuffer)
         ctx.scope += Sym(id, name) -> newCtx
         newCtx
       }
@@ -187,7 +198,7 @@ object Contexts {
     def isDefined(tpe: Type): Boolean = Names.bootstrapped.map(_._2).contains(tpe)
   }
 
-  class Fresh private[Contexts] (override val outer: Context, override val scope: Scope, override val typeTable: TypeTable) extends Context {
+  class Fresh private[Contexts] (override val outer: Context, override val scope: Scope, override val typeTable: TypeTable, override val primTable: PrimTable) extends Context {
     override def rootCtx = outer.rootCtx
   }
 
@@ -196,6 +207,7 @@ object Contexts {
 
     private[this] val _typeTable: TypeTable = new mutable.AnyRefMap
     private[this] val _scope: Scope = new mutable.ArrayBuffer
+    private[this] val _primTable: PrimTable = new mutable.ArrayBuffer
     private[this] var _id: Id = Id.initId
 
     def fresh(): Id = {
@@ -206,6 +218,7 @@ object Contexts {
 
     def id = _id
     override val typeTable = _typeTable
+    override val primTable = _primTable
     override def rootCtx = this
     override val outer = this
     override val scope = _scope

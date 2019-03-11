@@ -75,8 +75,6 @@ exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 pattern: pattern1 ('|' pattern1)*;
 
 pattern1
-//   : Varid ':' typePat
-//   | '_' ':' typePat
    : pattern2
    ;
 
@@ -91,7 +89,7 @@ simplePattern
    : Wildcard
    | Varid
    | literal
-//   | stableId ('(' patterns? ')')?
+   | Patid pattern+
 //   | stableId '(' (patterns? ',')? (Varid '@')? '_' '*' ')'
    | '(' patterns? ')'
    | '()'

@@ -104,6 +104,10 @@ object Namers {
       yield ()
   }
 
+  def namedUnapply(args: List[Tree]) given Context, Mode: Checked[Unit] =
+    for (_ <- args.mapE(index))
+      yield ()
+
   def namedBind(name: Name, pat: Tree)
                (id: Id) given Context, Mode: Checked[Unit] =
     for {
@@ -137,6 +141,7 @@ object Namers {
     case Ident(n)           if mode.isPattern => namedIdentPat(n)(tree.id)
     case Bind(n,t)          if mode.isPattern => namedBind(n,t)(tree.id)
     case Alternative(ts)    if mode.isPattern => namedAlternative(ts)
+    case Unapply(_,ts)      if mode.isPattern => namedUnapply(ts)
     /* Term Trees */
     case PackageDef(t,ts)   if mode.isTerm    => namedPackageDef(t,ts)
     case Apply(t,ts)        if mode.isTerm    => namedApplyTerm(t,ts)

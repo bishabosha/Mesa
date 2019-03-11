@@ -10,7 +10,7 @@ object Names {
 
   enum Name derives Eql {
     case From(name: String)
-    case ComputationTag, IntegerTag, DecimalTag,
+    case ComputationTag, IntegerTag, DecimalTag, EitherTag,
       BooleanTag, StringTag, CharTag, Wildcard, EmptyName
   }
 
@@ -18,7 +18,8 @@ object Names {
   val rootString: String  = "_root_"
 
   val bootstrapped = List(
-    ComputationTag  -> FunctionType(Generic(From("a")), AppliedType(TypeRef(ComputationTag), List(Generic(From("a"))))),
+    ComputationTag  -> FunctionType(Generic(From("$v")), AppliedType(TypeRef(ComputationTag), List(Generic(From("$v"))))),
+    EitherTag       -> FunctionType(Generic(From("$l")), FunctionType(Generic(From("$r")), AppliedType(TypeRef(EitherTag), List(Generic(From("$l")), Generic(From("$r")))))),
     IntegerTag      -> TypeRef(IntegerTag),
     DecimalTag      -> TypeRef(DecimalTag),
     BooleanTag      -> TypeRef(BooleanTag),
@@ -40,6 +41,7 @@ object Names {
         case BooleanTag     => "Boolean"
         case StringTag      => "String"
         case CharTag        => "Char"
+        case EitherTag      => "Either"
         case EmptyName      => emptyString
         case From(n)        => n
       }
@@ -54,6 +56,7 @@ object Names {
         case "Boolean"  => BooleanTag
         case "String"   => StringTag
         case "Char"     => CharTag
+        case "Either"   => EitherTag
         case str        => From(str)
       }
     }

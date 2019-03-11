@@ -25,6 +25,7 @@ object Trees {
     case Alternative(bodys: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
     case Parens(exprs: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
     case Bind(name: Name, body: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
+    case Unapply(name: Name, args: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
     case Tagged(arg: Name, tpeAs: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
     case TreeSeq(args: List[Tree]) extends Tree(Id.noId, Type.NoType)
     case EmptyTree extends Tree(Id.noId, Type.NoType)

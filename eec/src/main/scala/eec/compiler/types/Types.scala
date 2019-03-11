@@ -89,14 +89,20 @@ object Types {
         }
         
         inline def applied(t: Type, ts: List[Type]): String = {
-          val args = ts.map {
-            case f @ FunctionType(_,_) => s"(${f.userString})"
-            case f => f.userString
-          }.mkString(" ")
-          if args.isEmpty then
+          if ts.isEmpty then
             t.userString
-          else
-            s"${t.userString} $args"
+          else {
+            val args = ts.map {
+              case f @ (FunctionType(_,_) | AppliedType(_,_)) =>
+                val str = f.userString
+                s"($str)"
+              case f =>
+                f.userString
+            }
+            val functorStr = t.userString
+            val argsStr = args.mkString(" ")
+            s"$functorStr $argsStr"
+          }
         }
 
         inline def fromFunction(arg: Type, body: Type): String = arg match {
@@ -157,6 +163,7 @@ object Types {
       case t @ Alternative(_)     => t.copy()(t.id, tpe)
       case t @ Parens(_)          => t.copy()(t.id, tpe)
       case t @ Bind(_,_)          => t.copy()(t.id, tpe)
+      case t @ Unapply(_,_)       => t.copy()(t.id, tpe)
       case t @ Tagged(_,_)        => t.copy()(t.id, tpe)
       case t @ TreeSeq(_)         => t
       case EmptyTree              => EmptyTree

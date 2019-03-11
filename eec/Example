@@ -5,10 +5,17 @@ primitive s1 ++ s2: String -> String -> String
 primitive debug x: a -> String
 primitive putStrLn s: String -> !()
 primitive readInteger: !Integer
+primitive Left x: l -> Either l r
+primitive Right x: r -> Either l r
 
 earthDiameter: Decimal = 12.742e+10
 
 movie: String = "12 Monkeys"
+
+fold e lu ru: Either z y -> (z -> !u) -> (y -> !u) -> !u =
+  case e of
+    Left  l => lu l;
+    Right r => ru r
 
 json: String = """{
   "title": "12 Monkeys",

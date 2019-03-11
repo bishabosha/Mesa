@@ -467,6 +467,19 @@ object Parsers {
     Ident(name)(freshId(), uTpe)
   }
 
+  private[this] def fromFunctorPattern
+      (context: EECParser.SimplePatternContext): Contextual[Tree] = {
+    val functor = {
+      import implied NameOps._
+      context.Patid.getText.readAs
+    }
+    val args = {
+      import scala.language.implicitConversions
+      context.pattern.map(fromPattern).toList
+    }
+    Unapply(functor, args)(freshId(), uTpe)
+  }
+
   private[this] def fromUnitPattern: Contextual[Tree] =
     Parens(Nil)(freshId(), uTpe)
 
@@ -480,6 +493,8 @@ object Parsers {
       fromVaridPattern(context)
     else if defined(context.literal) then
       fromLiteral(context.literal)
+    else if defined(context.Patid) then
+      fromFunctorPattern(context)
     else
       fromPatterns(context.patterns)
 
