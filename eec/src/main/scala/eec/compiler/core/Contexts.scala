@@ -74,6 +74,36 @@ object Contexts {
     private[Contexts] val primTable: PrimTable
   }
 
+  class Fresh private[Contexts] (
+      override val outer: Context,
+      override val scope: Scope,
+      override val typeTable: TypeTable,
+      override val primTable: PrimTable) extends Context {
+    override def rootCtx = outer.rootCtx
+  }
+
+  class RootContext extends Context {
+    import Id._
+
+    private[this] val _typeTable: TypeTable = new mutable.AnyRefMap
+    private[this] val _scope: Scope = new mutable.ArrayBuffer
+    private[this] val _primTable: PrimTable = new mutable.ArrayBuffer
+    private[this] var _id: Id = Id.initId
+
+    def fresh(): Id = {
+      val id = _id
+      _id = _id.succ
+      id
+    }
+
+    def id = _id
+    override val typeTable = _typeTable
+    override val primTable = _primTable
+    override def rootCtx = this
+    override val outer = this
+    override val scope = _scope
+  }
+
   object Context {
 
     import implied NameOps._
@@ -112,9 +142,14 @@ object Contexts {
     def enterFresh(id: Id, name: Name) given Context: Checked[Context] = {
       import implied NameOps._
       if contains(name) then
-        CompilerError.UnexpectedType(s"Illegal shadowing in scope of name: ${name.userString}")
+        CompilerError.UnexpectedType(
+          s"Illegal shadowing in scope of name: ${name.userString}")
       else {
-        val newCtx = new Fresh(ctx, new mutable.ArrayBuffer, new mutable.AnyRefMap, new mutable.ArrayBuffer)
+        val newCtx = new Fresh(
+          ctx,
+          new mutable.ArrayBuffer,
+          new mutable.AnyRefMap,
+          new mutable.ArrayBuffer)
         ctx.scope += Sym(id, name) -> newCtx
         newCtx
       }
@@ -149,10 +184,11 @@ object Contexts {
       else
         ctx.typeTable.getOrElse[Checked[Type]](
           name,
-          CompilerError.UnexpectedType(s"no type found for name: ${name.userString}")
+          CompilerError.UnexpectedType(
+            s"no type found for name: ${name.userString}")
         )
 
-    def enterBootstrapped: Contextual[Checked[Unit]] = {
+    def enterBootstrapped given Context: Checked[Unit] = {
       import types.Types
       import Name._
       import CompilerErrorOps._
@@ -160,16 +196,18 @@ object Contexts {
       if root.scope.nonEmpty || root.id != Id.initId then {
         CompilerError.IllegalState("Non-fresh _root_ context")
       } else {
-        Names.bootstrapped.foreach({ (name, tpe) =>
-          for (_ <- enterFresh(root.fresh(), name) given root) yield {
-            implied for Context = root
-            Context.putType(name -> tpe)
-          }
-        })
+        implied for Context = root
+        Names.bootstrapped.foreach { (name, tpe) =>
+          for (_ <- enterFresh(root.fresh(), name))
+            yield {
+              putType(name -> tpe)
+            }
+        }
       }
     }
 
-    def declarePackage(parent: Name, name: Name) given Context: Checked[Type] = {
+    def declarePackage(parent: Name, name: Name)
+                      given Context: Checked[Type] = {
       import CompilerErrorOps._
       import Type._
       val outer = ctx.outer
@@ -189,33 +227,8 @@ object Contexts {
       }
     }
 
-    def isDefined(tpe: Type): Boolean = Names.bootstrapped.map(_._2).contains(tpe)
-  }
-
-  class Fresh private[Contexts] (override val outer: Context, override val scope: Scope, override val typeTable: TypeTable, override val primTable: PrimTable) extends Context {
-    override def rootCtx = outer.rootCtx
-  }
-
-  class RootContext extends Context {
-    import Id._
-
-    private[this] val _typeTable: TypeTable = new mutable.AnyRefMap
-    private[this] val _scope: Scope = new mutable.ArrayBuffer
-    private[this] val _primTable: PrimTable = new mutable.ArrayBuffer
-    private[this] var _id: Id = Id.initId
-
-    def fresh(): Id = {
-      val id = _id
-      _id = _id.succ
-      id
-    }
-
-    def id = _id
-    override val typeTable = _typeTable
-    override val primTable = _primTable
-    override def rootCtx = this
-    override val outer = this
-    override val scope = _scope
+    def isDefined(tpe: Type): Boolean =
+      Names.bootstrapped.map(_._2).contains(tpe)
   }
 
   object ContextOps {
@@ -243,7 +256,9 @@ object Contexts {
           val (sym, context) = pair
           ScopeDef(
             ForName(sym.name.userString),
-            c.typeTable.get(sym.name).map(t => TypeDef(t.userString)).getOrElse(NoType), 
+            c.typeTable.get(sym.name).map { t =>
+              TypeDef(t.userString)
+            }.getOrElse(NoType),
             context.toScoping
           )
         }.toList
@@ -252,7 +267,9 @@ object Contexts {
 
       ctx match {
         case c: RootContext =>
-          List(ScopeDef(ForName(rootSym.name.userString), TypeDef(rootPkg.userString), branch(c)))
+          List(
+            ScopeDef(ForName(rootSym.name.userString),
+            TypeDef(rootPkg.userString), branch(c)))
         case f: Fresh if f.scope.nonEmpty || f.typeTable.nonEmpty =>
           branch(f)
         case _ =>
