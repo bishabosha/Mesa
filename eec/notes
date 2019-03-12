@@ -17,3 +17,9 @@ explain (,) -> (,*)
 
 explain also that at first, never had the stoup, which is required for !_
 with example that is unsound
+
+first choice for patt match was to try and unify after patterns are bound,
+which caused conflicts such as `Either l r != l` and having to rebind types
+  - at least for checking, the codomains should be unified for constructor and
+    functor type, then the subpatterns are checked on that
+  - unknown yet for wildcard check

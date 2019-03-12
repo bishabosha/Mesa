@@ -39,7 +39,7 @@ class TopDefTest {
 
   @Test def patternMatchEither(): Unit = {
     passesTypeCheck(
-      """fold e lu ru: Either x y -> (x -> !u) -> (y -> !u) -> !u =
+      """cat2 e lu ru: Either x y -> (x -> !u) -> (y -> !u) -> !u =
           case e of
             Left  a => lu a;
             Right b => ru b"""
@@ -48,12 +48,27 @@ class TopDefTest {
 
   @Test def patternMatchEitherArbitraryDepth(): Unit = {
     passesTypeCheck(
-      """fold_ e xu yu zu: (Either (Either x y) z) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+      """cat4_alt0 e wu xu yu zu: Either (Either w x) (Either y z) -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
           case e of
-            Left  (Left a) => xu a;
-            Left  (Right b) => yu a;
-            Right c => zu c"""
-      -> "(Either (Either x y) z) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u")
+            Left  (Left a)  => wu a;
+            Left  (Right b) => xu b;
+            Right (Left c)  => yu c;
+            Right (Right d) => zu d"""
+      -> "Either (Either w x) (Either y z) -> (w -> ! u) -> (x -> ! u) -> (y -> ! u) -> (z -> ! u) -> ! u",
+      """cat4_alt1 e wu xu yu zu: Either (Either (Either w x) y) z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+          case e of
+            Left  (Left  (Left a))  => wu a;
+            Left  (Left  (Right b)) => xu b;
+            Left  (Right c)         => yu c;
+            Right d                 => zu d"""
+      -> "Either (Either (Either w x) y) z -> (w -> ! u) -> (x -> ! u) -> (y -> ! u) -> (z -> ! u) -> ! u",
+      """cat4_alt2 e wu xu yu zu: Either w (Either x (Either y z)) -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+          case e of
+            Left  a                 => wu a;
+            Right (Left  b)         => xu b;
+            Right (Right (Left c))  => yu c;
+            Right (Right (Right d)) => zu d"""
+      -> "Either w (Either x (Either y z)) -> (w -> ! u) -> (x -> ! u) -> (y -> ! u) -> (z -> ! u) -> ! u")
   }
 
   def (str: String) typedAs(as: Type): given Context => Checked[Tree] = {

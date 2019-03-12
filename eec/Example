@@ -12,10 +12,23 @@ earthDiameter: Decimal = 12.742e+10
 
 movie: String = "12 Monkeys"
 
-fold e lu ru: Either x y -> (x -> !u) -> (y -> !u) -> !u =
+cat2 e lu ru: Either x y -> (x -> !u) -> (y -> !u) -> !u =
   case e of
     Left  a => lu a;
     Right b => ru b
+
+cat3 e xu yu zu: Either (Either x y) z -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+  case e of
+    Left  (Left a)  => xu a;
+    Left  (Right b) => yu b;
+    Right c         => zu c
+
+cat4 e wu xu yu zu: Either (Either (Either w x) y) z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+  case e of
+    Left  (Left  (Left a))  => wu a;
+    Left  (Left  (Right b)) => xu b;
+    Left  (Right c)         => yu c;
+    Right d                 => zu d
 
 json: String = """{
   "title": "12 Monkeys",

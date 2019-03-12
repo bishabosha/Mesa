@@ -299,16 +299,28 @@ object Typers {
         }
       }
 
-  private def typeAsFunctorArgs(functor: Name, ts: List[Tree], fTpe: Type)
-                          given Context, Mode: Checked[(List[Tree], Type)] = {
+  private def typeAsDestructor(fTpe: Type, pt: Type): Checked[(List[Type], Type)] = {
     import TypeOps._
-    val curried = toCurriedList(fTpe)
-    if ts.length + 1 != curried.length then {
-      CompilerError.UnexpectedType("arg lengths do not match")
-    } else {
-      ts.zip(curried).mapE { _.typed(_) }
-        .map(_ -> curried.last)
+    import implied TypeOps._
+    toCurriedList(fTpe).reverse match {
+      case ret0 :: args0 =>
+        val subs = getSubstitutions(ret0, pt)
+        val ret  = replace(ret0, subs)
+        val fTpeArgs = args0.reverse.map(replace(_, subs))
+        (fTpeArgs, ret)
+      case _ =>
+        CompilerError.UnexpectedType(s"Empty Functor Type ${fTpe.userString}")
     }
+  }
+
+  private def typeAsFunctorArgs
+      (functor: Name, ts: List[Tree], fTpeArgs: List[Type])
+      given Context, Mode: Checked[List[Tree]] = {
+    import TypeOps._
+    if ts.length != fTpeArgs.length then
+      CompilerError.UnexpectedType("arg lengths do not match")
+    else
+      ts.zip(fTpeArgs).mapE { _.typed(_) }
   }
 
   private def unifyConstructorToHkType
@@ -443,6 +455,12 @@ object Typers {
     } yield Alternative(patterns1)(id, tpe)
   }
 
+  inline def replace(tpe: Type, substitutions: List[(Name, Type)]): Type =
+    substitutions.foldLeft(tpe) { (acc, pair) =>
+      val (sub, by) = pair
+      unify(sub, by, acc)
+    }
+
   def typedUnapply(functor: Name, args: List[Tree])
                   (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
     import TypeOps._
@@ -458,36 +476,16 @@ object Typers {
                           s"${functor.userString} is not a constructor.")
                       }
                     }
-      pair      <-  typeAsFunctorArgs(functor, args, fTpe)
-      funProto  <-  checked {
-                      val (args1, ret) = pair
-                      toFunctionType(args1.map(_.tpe) :+ ret)
-                    }
-      tpe       <-  checkFunWithProto(fTpe, funProto)
-      tpe1      <-  checked {
-                      val substitutions = getSubstitutions(tpe, pt)
-                      val tpe1 = substitutions.foldLeft(tpe) { (acc, pair) =>
-                        val (sub, by) = pair
-                        unify(sub, by, acc)
-                      }
-                      val (args1, _) = pair
-                      for (i @ Ident(name) <- args1) {
-                        substitutions.foreach { (sub, by) =>
-                          val before = i.tpe
-                          val after = unify(sub, by, i.tpe)
-                          if before != after then {
-                            putType(name, after)
-                          }
-                        }
-                      }
-                      tpe1
+      pair      <-  typeAsDestructor(fTpe, pt)
+      args1     <-  checked {
+                      val (fTpeArgs, _) = pair
+                      typeAsFunctorArgs(functor, args, fTpeArgs)
                     }
     } yield {
       import implied NameOps._
       import implied TypeOps._
-      val (args1, _) = pair
-      println(s"""TYPE UNAPPLY `${functor.userString} ${args.mkString(" ")}` AS `${tpe1.userString}` PT: `${pt.userString}`""")
-      Unapply(functor, args1)(id, tpe1)
+      val (_, tpe) = pair
+      Unapply(functor, args1)(id, tpe)
     }
   }
 
