@@ -18,8 +18,8 @@ object Names {
   val rootString: String  = "_root_"
 
   val bootstrapped = List(
-    ComputationTag  -> FunctionType(Generic(From("$v")), AppliedType(TypeRef(ComputationTag), List(Generic(From("$v"))))),
-    EitherTag       -> FunctionType(Generic(From("$l")), FunctionType(Generic(From("$r")), AppliedType(TypeRef(EitherTag), List(Generic(From("$l")), Generic(From("$r")))))),
+    ComputationTag  -> FunctionType(Variable(From("$v")), AppliedType(TypeRef(ComputationTag), List(Variable(From("$v"))))),
+    EitherTag       -> FunctionType(Variable(From("$l")), FunctionType(Variable(From("$r")), AppliedType(TypeRef(EitherTag), List(Variable(From("$l")), Variable(From("$r")))))),
     IntegerTag      -> TypeRef(IntegerTag),
     DecimalTag      -> TypeRef(DecimalTag),
     BooleanTag      -> TypeRef(BooleanTag),

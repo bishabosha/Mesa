@@ -12,3 +12,8 @@ data Triple =
   Left A | Middle B | End C
 
 explain why match on !_ is unsound
+
+explain (,) -> (,*)
+
+explain also that at first, never had the stoup, which is required for !_
+with example that is unsound

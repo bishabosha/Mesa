@@ -20,36 +20,55 @@ class TopDefTest {
 
   @Test def typecheckTrivial(): Unit = {
     passesTypeCheck(
-      "unit: () = ()".typed   -> "()")
+      "unit: () = ()" -> "()")
   }
 
   @Test def typecheckEithers(): Unit = {
     passesTypeCheck(
-      "l: Either () r = Left ()".typed  -> "Either () r",
-      "r: Either l () = Right ()".typed -> "Either l ()")
+      "l: Either () r = Left ()"  -> "Either () r",
+      "r: Either l () = Right ()" -> "Either l ()")
   }
 
   @Test def typecheckLiftBind(): Unit = {
     passesTypeCheck(
       """lift f: (a -> !b) -> !a -> !b =
-          \c: !a => let !x = c in f x""".typed   -> "(a -> ! b) -> ! a -> ! b",
+          \c: !a => let !x = c in f x"""   -> "(a -> ! b) -> ! a -> ! b",
       """ma >>= f: !t -> (t -> !u) -> !u =
-          (lift f) ma""".typed                   -> "! t -> (t -> ! u) -> ! u")
+          (lift f) ma"""                   -> "! t -> (t -> ! u) -> ! u")
   }
 
-  def (str: String) typedAs(as: Type): () => given Context => Checked[Tree] = {
+  @Test def patternMatchEither(): Unit = {
+    passesTypeCheck(
+      """fold e lu ru: Either x y -> (x -> !u) -> (y -> !u) -> !u =
+          case e of
+            Left  a => lu a;
+            Right b => ru b"""
+      -> "Either x y -> (x -> ! u) -> (y -> ! u) -> ! u")
+  }
+
+  @Test def patternMatchEitherArbitraryDepth(): Unit = {
+    passesTypeCheck(
+      """fold_ e xu yu zu: (Either (Either x y) z) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+          case e of
+            Left  (Left a) => xu a;
+            Left  (Right b) => yu a;
+            Right c => zu c"""
+      -> "(Either (Either x y) z) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u")
+  }
+
+  def (str: String) typedAs(as: Type): given Context => Checked[Tree] = {
     import Namers._
     import CompilerErrorOps._
-    () => for {
+    for {
       exp <- parseStat(str)
       _   <- indexAsExpr(exp)
       tpd <- exp.typedAsExpr(any)
     } yield tpd
   }
 
-  def (str: String) typed: () => given Context => Checked[Tree] = str.typedAs(any)
+  def typed(str: String): given Context => Checked[Tree] = str.typedAs(any)
 
-  def passesTypeCheck(seq: (() => given Context => Checked[Tree], String)*): Unit = {
+  def passesTypeCheck(seq: (String, String)*): Unit = {
 
     import CompilerErrorOps._
     import Namers._
@@ -66,7 +85,7 @@ class TopDefTest {
                 tpd <- exp.typedAsExpr(any)
               } yield ()
             }
-      _ <-  seq.toList.mapE((f, s) => impl(f(), s))
+      _ <-  seq.toList.mapE((f, s) => impl(typed(f), s))
     } yield ()
 
     def impl(parsed: Checked[Tree], checkTpe: String): Unit = {
@@ -79,7 +98,10 @@ class TopDefTest {
     }
   }
 
-  def failsTypeCheck(seq: Checked[Tree]*): Unit = {
+  def failsTypeCheck(seq: String*): Unit = {
+    import CompilerErrorOps._
+    import Namers._
+
     def impl(parsed: Checked[Tree]): Unit = {
       import CompilerErrorOps._
       import implied TreeOps._
@@ -90,6 +112,20 @@ class TopDefTest {
           s"Typed successfully as ${tpd.tpe.userString} for expr:\n${tpd.userString}")
         }
     }
-    seq.foreach { impl }
+
+    val rootCtx = new RootContext()
+    implied for Context = rootCtx
+
+    for {
+      _ <-  Context.enterBootstrapped
+      _ <-  compiler.preludeDefs.mapE { s =>
+              for {
+                exp <- parseStat(s)
+                _   <- indexAsExpr(exp)
+                tpd <- exp.typedAsExpr(any)
+              } yield ()
+            }
+      _ <-  seq.foreach { f => impl(typed(f)) }
+    } yield ()
   }
 }

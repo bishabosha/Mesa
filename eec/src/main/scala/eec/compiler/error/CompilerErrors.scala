@@ -30,6 +30,17 @@ object CompilerErrors {
         case _                  => f(o.asInstanceOf[O])
       }
 
+    def (o: Checked[O]) filter[O](f: O => Boolean)(orElse: O => CompilerError): Checked[O] =
+      o match {
+        case err: CompilerError =>
+          err
+        case _ =>
+          if f(o.asInstanceOf[O]) then
+            o
+          else
+            orElse(o.asInstanceOf[O])
+      }
+
     def (o: Checked[O]) flatMap[O, U](f: O => Checked[U]): Checked[U] =
       o match {
         case err: CompilerError => err
