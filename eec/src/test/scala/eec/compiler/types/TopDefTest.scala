@@ -9,7 +9,7 @@ class TopDefTest {
 
   import core.Contexts._
   import ast.Trees._
-  import parsing._
+  import parsing.EntryPoint._
   import error.CompilerErrors._
   import error.CompilerErrors.CompilerError._
   import Types._
@@ -32,7 +32,7 @@ class TopDefTest {
   @Test def typecheckLiftBind(): Unit = {
     passesTypeCheck(
       """lift f: (a -> !b) -> !a -> !b =
-          \c: !a => let !x = c in f x"""   -> "(a -> ! b) -> ! a -> ! b",
+          \(c: !a) => let !x = c in f x"""   -> "(a -> ! b) -> ! a -> ! b",
       """ma >>= f: !t -> (t -> !u) -> !u =
           (lift f) ma"""                   -> "! t -> (t -> ! u) -> ! u")
   }
@@ -43,7 +43,25 @@ class TopDefTest {
           case e of
             Left  a => lu a;
             Right b => ru b"""
-      -> "Either x y -> (x -> ! u) -> (y -> ! u) -> ! u")
+      -> "Either x y -> (x -> ! u) -> (y -> ! u) -> ! u",
+      """catTup e lu ru: Either (x, y) z -> (x -> y -> !u) -> (z -> !u) -> !u =
+          case e of
+            Left  (a, b)  => lu a b;
+            Right c       => ru c"""
+      -> "Either (x, y) z -> (x -> y -> ! u) -> (z -> ! u) -> ! u")
+  }
+
+  @Test def patternMatchVariable(): Unit = {
+    passesTypeCheck(
+      """f e: a -> !a =
+          case e of
+            x => !x"""
+      -> "a -> ! a")
+    failsTypeCheck(
+      """f e: a -> !a = case e of Left x => !x""",
+      """g e: a -> !a = case e of (x, _) => !x""",
+      """h e: a -> !a = case e of (_, _) => !e""",
+      """i e: a -> !a = case e of ()     => !e""")
   }
 
   @Test def patternMatchEitherArbitraryDepth(): Unit = {

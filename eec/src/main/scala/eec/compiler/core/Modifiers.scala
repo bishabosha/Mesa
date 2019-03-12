@@ -3,9 +3,5 @@ package compiler
 package core
 
 object Modifiers {
-
-  enum Modifier derives Eql {
-    case Primitive
-  }
-
+  enum Modifier derives Eql { case Primitive }
 }

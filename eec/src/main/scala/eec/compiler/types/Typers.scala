@@ -8,47 +8,53 @@ object Typers {
   import Type._
   import core.Names._
   import core.Constants._
-  import core.Constants.Constant._
   import core.Modifiers._
   import ast._
   import ast.Trees._
   import Tree._
-  import untyped._
   import error.CompilerErrors._
   import CompilerErrorOps._
   import core.Contexts._
   import Context._
   import Mode._
-  import Name._
-  import util.Convert
 
   private val toType = {
     import implied TypeOps._
+    import util.Convert
     Convert[List[Type], Type]
   }
   
   private val typeToList = {
     import implied TypeOps._
+    import util.Convert
     Convert[Type, List[Type]]
   }
 
-  private[Typers] val any = Type.WildcardType
-
-  def (tpe: Type) isComputationType: Boolean = tpe match {
-    case AppliedType(TypeRef(ComputationTag), List(_)) => true
-    case FunctionType(_, tpe) => tpe.isComputationType
-    case Product(ts) => ts.forall(isComputationType)
-    case _ => false
+  private val getName = {
+    import implied TreeOps._
+    import util.Convert
+    Convert[Tree, Name]
   }
 
-  def (tpe: Type) =!= (other: Type): Boolean =
-    tpe == other ||
-    tpe == Type.WildcardType ||
-    other == Type.WildcardType
+  private[Typers] val any = WildcardType
+
+  def (tpe: Type) isComputationType: Boolean = {
+    import Name._
+    tpe match {
+      case AppliedType(TypeRef(ComputationTag), List(_)) =>
+        true
+      case FunctionType(_, tpe) =>
+        tpe.isComputationType
+      case Product(ts) =>
+        ts.forall(isComputationType)
+      case _ =>
+        false
+    }
+  }
 
   def (ts: List[Tree]) unifiedTpe: Checked[Type] =
     if ts.isEmpty then {
-      NoType
+      EmptyType
     } else {
       import implied TypeOps._
       val tpe = ts.head.tpe
@@ -56,52 +62,9 @@ object Typers {
       if unified then
         tpe
       else
-        CompilerError.UnexpectedType(s"Types do not unify to ${tpe.userString}")
+        CompilerError.UnexpectedType(
+          s"Types do not unify to ${tpe.userString}")
     }
-
-  private def getSubstitutions(arg: Type, app: Type): List[(Name, Type)] =
-    arg match {
-      case AppliedType(f, args1) => app match {
-        case AppliedType(g, args2) if args1.size == args2.size =>
-          getSubstitutions(f,g) ::: args1.zip(args2).flatMap(getSubstitutions)
-        case _ =>
-          Nil
-      }
-      case FunctionType(a1, b1) => app match {
-        case FunctionType(a2, b2) =>
-          getSubstitutions(a1,a2) ::: getSubstitutions(b1,b2)
-        case _ =>
-          Nil
-      }
-      case Product(tpes1) => app match {
-        case Product(tpes2) if tpes1.size == tpes2.size =>
-          tpes1.zip(tpes2).flatMap(getSubstitutions)
-        case Variable(name) =>
-          (name, arg) :: Nil
-        case _ =>
-          Nil
-      }
-      case Variable(name) =>
-        (name, app) :: Nil
-      case _ =>
-        Nil
-    }
-
-  private def unify(sub: Name, by: Type, tpe: Type): Type = tpe match {
-    case FunctionType(arg, body) =>
-      FunctionType(unify(sub, by, arg), unify(sub, by, body))
-    case AppliedType(f, args) =>
-      AppliedType(unify(sub, by, f), args.map(unify(sub, by, _)))
-    case Product(tpes) =>
-      Product(tpes.map(unify(sub, by, _)))
-    case g @ Variable(`sub`) =>
-      if by == WildcardType then
-        g
-      else
-        by
-    case _ =>
-      tpe
-  }
 
   def resolveVariables(tpe: Type) given Context: Type = tpe match {
     case FunctionType(arg, body) =>
@@ -127,7 +90,8 @@ object Typers {
       tpe
   }
 
-  def checkFunctorWithProto(functorTyp: Type, proto: Type): Checked[Type] =
+  def checkFunctorWithProto(functorTyp: Type, proto: Type): Checked[Type] = {
+    import TypeOps._
     (functorTyp, proto) match {
       case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
         val substitutions = getSubstitutions(functorTyp, proto)
@@ -154,8 +118,10 @@ object Typers {
       case _ =>
         CompilerError.IllegalState(s"Can not apply to non function type.")
     }
+  }
 
-  def checkFunWithProto(funTyp: Type, proto: Type): Checked[Type] =
+  def checkFunWithProto(funTyp: Type, proto: Type): Checked[Type] = {
+    import TypeOps._
     (funTyp, proto) match {
       case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
         val substitutions = getSubstitutions(funTyp, proto)
@@ -186,6 +152,7 @@ object Typers {
       case _ =>
         CompilerError.IllegalState(s"Can not apply to non function type.")
     }
+  }
 
   def (tree: Tree) typedAsExpr(pt: Type) given Context: Checked[Tree] = {
     implied for Mode = Term
@@ -207,12 +174,15 @@ object Typers {
     tree.typed(pt)
   }
 
-  def constantTpe: Constant => Type = {
-    case BooleanConstant(_) => Bootstraps.BooleanType
-    case BigDecConstant(_)  => Bootstraps.DecimalType
-    case BigIntConstant(_)  => Bootstraps.IntegerType
-    case CharConstant(_)    => Bootstraps.CharType
-    case StringConstant(_)  => Bootstraps.StringType
+  def constantTpe(c: Constant): Type = {
+    import Constant._
+    c match {
+      case BooleanConstant(_) => Bootstraps.BooleanType
+      case BigDecConstant(_)  => Bootstraps.DecimalType
+      case BigIntConstant(_)  => Bootstraps.IntegerType
+      case CharConstant(_)    => Bootstraps.CharType
+      case StringConstant(_)  => Bootstraps.StringType
+    }
   }
 
   private def functionTermTpe(args1: List[Tree], body1: Tree): Checked[Type] = {
@@ -239,9 +209,10 @@ object Typers {
   private def functionTypeTpe(args1: List[Tree], body1: Tree)
                           given Mode: Checked[Type] = {
     val argTpes = toType(args1.map(_.tpe))
-    val fType = FunctionType(argTpes, body1.tpe)
+    val fType   = FunctionType(argTpes, body1.tpe)
     if mode != PrimitiveType && !fType.isComputationType then
-      CompilerError.UnexpectedType("Function does not have computational co-domain")
+      CompilerError.UnexpectedType(
+        "Function does not have computational co-domain")
     else
       fType
   }
@@ -277,12 +248,13 @@ object Typers {
           CompilerError.UnexpectedType("Tuple lengths do not match")
         }
       } else {
-        ts.zip(ptAsTuple).mapE { _.typed(_) }
+        ts.zip(ptAsTuple).mapE(_.typed(_))
       }
     }
 
   def typedParens(ts: List[Tree])
-                 (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
+                 (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
+    import TypeOps._
     for (ts1 <- typeAsTuple(ts, pt))
       yield {
         val tupleTyp = toType(ts1.map(_.tpe))
@@ -293,20 +265,21 @@ object Typers {
           import implied TreeOps._
           val tupleTypeStr  = tupleTyp.userString
           val expectedStr   = pt.userString
-          val treeStr       = Parens(ts)(Id.noId, NoType).userString
+          val treeStr       = Parens(ts)(Id.noId, EmptyType).userString
           CompilerError.UnexpectedType(
             s"expected `$expectedStr` but was `$tupleTypeStr` in $mode:\n$treeStr")
         }
       }
+  }
 
   private def typeAsDestructor(fTpe: Type, pt: Type): Checked[(List[Type], Type)] = {
     import TypeOps._
     import implied TypeOps._
     toCurriedList(fTpe).reverse match {
       case ret0 :: args0 =>
-        val subs = getSubstitutions(ret0, pt)
-        val ret  = replace(ret0, subs)
-        val fTpeArgs = args0.reverse.map(replace(_, subs))
+        val subs      = getSubstitutions(ret0, pt)
+        val ret       = replace(ret0, subs)
+        val fTpeArgs  = args0.reverse.map(replace(_, subs))
         (fTpeArgs, ret)
       case _ =>
         CompilerError.UnexpectedType(s"Empty Functor Type ${fTpe.userString}")
@@ -320,7 +293,7 @@ object Typers {
     if ts.length != fTpeArgs.length then
       CompilerError.UnexpectedType("arg lengths do not match")
     else
-      ts.zip(fTpeArgs).mapE { _.typed(_) }
+      ts.zip(fTpeArgs).mapE(_.typed(_))
   }
 
   private def unifyConstructorToHkType
@@ -333,8 +306,8 @@ object Typers {
       case _ =>
         import implied TypeOps._
         val argsOrdered = args0.reverse
-        val argsExpect = argsOrdered.map(_.userString).mkString("[", ", ", "]")
-        val argsPassed = args.map(_.userString).mkString("[", ", ", "]")
+        val argsExpect  = argsOrdered.map(_.userString).mkString("[", ", ", "]")
+        val argsPassed  = args.map(_.userString).mkString("[", ", ", "]")
         val hint =
           if args0.length == 0 then
             " Perhaps functor type is unknown."
@@ -366,10 +339,11 @@ object Typers {
 
   private def unwrapCompApply(tpe: Type)
                              (name: Name, value: Tree): Checked[Type] = {
+    import Name._
     import implied TreeOps._
     import implied core.Names.NameOps._
     tpe match {
-      case AppliedType(TypeRef(Name.ComputationTag), List(t)) =>
+      case AppliedType(TypeRef(ComputationTag), List(t)) =>
         t
       case _ =>
         CompilerError.UnexpectedType(
@@ -395,27 +369,22 @@ object Typers {
                   }
     } yield Let(letId1, value1, cont1)(id, cont1.tpe)
 
-  def typedCaseExpr(selector: Tree, cases: List[Tree])
-                   (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
-    def (ts: List[Tree]) mapAsCaseClauses(selTpe: Type)(
-      pt: Type): Checked[List[Tree]] = {
-        ts.mapE({
-          case t @ CaseClause(p,g,b) =>
-            typedCaseClause(p, g, b, selTpe)(t.id, pt)
-          case unknown =>
-            CompilerError.IllegalState(
-              s"$unknown is not Tree.CaseClause(_,_,_,_)")
-        })
-      }
-
-    def selectorTpe(selector: Tree): Type = selector.tpe match {
-      case UntypedExpect(t) => t
-      case _                => any
+  def typeAsCaseClauses(ts: List[Tree], selTpe: Type)
+                       (pt: Type) given Context, Mode: Checked[List[Tree]] =
+    ts.mapE {
+      case t @ CaseClause(p,g,b) =>
+        typedCaseClause(p, g, b, selTpe)(t.id, pt)
+      case unknown =>
+        CompilerError.IllegalState(
+          s"$unknown is not Tree.CaseClause(_,_,_,_)")
     }
 
+  def typedCaseExpr(selector: Tree, cases: List[Tree])
+                   (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
+    import TypeOps._
     for {
-      selector1 <- selector.typed(selectorTpe(selector))
-      cases1    <- cases.mapAsCaseClauses(selector1.tpe)(pt)
+      selector1 <- selector.typed(untypedToChecked(selector.tpe))
+      cases1    <- typeAsCaseClauses(cases, selector1.tpe)(pt)
       tpe       <- cases1.unifiedTpe
     } yield CaseExpr(selector1, cases1)(id, tpe)
   }
@@ -433,18 +402,17 @@ object Typers {
 
   def typedBind(name: Name, body: Tree)
                (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
-    for {
-      body1 <- body.typed(pt)
-    } yield {
-      if name == Name.Wildcard then
-        body1
-      else if mode == PatAlt then
-        CompilerError.IllegalState(
-          s"Illegal variable ${name} in pattern alternative")
-      else
-        putType(name -> body1.tpe)
-        Bind(name, body1)(id, body1.tpe)
-    }
+    for (body1 <- body.typed(pt))
+      yield
+        if name == Name.Wildcard then {
+          body1
+        } else if mode == PatAlt then {
+          CompilerError.IllegalState(
+            s"Illegal variable ${name} in pattern alternative")
+        } else {
+          putType(name -> body1.tpe)
+          Bind(name, body1)(id, body1.tpe)
+        }
 
   def typedAlternative(patterns: List[Tree])
                       (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
@@ -457,66 +425,66 @@ object Typers {
 
   inline def replace(tpe: Type, substitutions: List[(Name, Type)]): Type =
     substitutions.foldLeft(tpe) { (acc, pair) =>
+      import TypeOps._
       val (sub, by) = pair
       unify(sub, by, acc)
     }
 
-  def typedUnapply(functor: Name, args: List[Tree])
-                  (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
-    import TypeOps._
-    for {
-      fst       <-  firstCtx(functor)
-      fTpe      <-  checked {
-                      implied for Context = fst
-                      if isPrimitive(functor) then {
-                        getType(functor)
-                      } else {
-                        import implied NameOps._
-                        CompilerError.UnexpectedType(
-                          s"${functor.userString} is not a constructor.")
-                      }
-                    }
-      pair      <-  typeAsDestructor(fTpe, pt)
-      args1     <-  checked {
-                      val (fTpeArgs, _) = pair
-                      typeAsFunctorArgs(functor, args, fTpeArgs)
-                    }
-    } yield {
+  def getPrimitiveType(name: Name) given Context: Checked[Type] =
+    if isPrimitive(name) then {
+      getType(name)
+    } else {
       import implied NameOps._
-      import implied TypeOps._
+      CompilerError.UnexpectedType(
+        s"${name.userString} is not a constructor.")
+    }
+
+  def typedUnapply(functor: Name, args: List[Tree])
+                  (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
+    for {
+      fst   <-  firstCtx(functor)
+      fTpe  <-  checked {
+                  implied for Context = fst
+                  getPrimitiveType(functor)
+                }
+      pair  <-  typeAsDestructor(fTpe, pt)
+      args1 <-  checked {
+                  val (fTpeArgs, _) = pair
+                  typeAsFunctorArgs(functor, args, fTpeArgs)
+                }
+    } yield {
       val (_, tpe) = pair
       Unapply(functor, args1)(id, tpe)
+    }
+
+  def typePackaging(tree: Tree) given Context: Checked[(Context, Tree)] = {
+    import TypeOps._
+    import TreeOps._
+    import Name._
+    tree.toNamePairs match {
+      case (id, name) :: tail =>
+        for {
+          next  <- lookIn(id)
+          tpe   <- declarePackage(From(rootString), name)
+        } yield (
+          tail.foldLeftE(next, Ident(name)(id, tpe)) { (acc, pair) =>
+            val (current, parent) = acc
+            val (id, name)        = pair
+            implied for Context   = current
+            for {
+              next  <- lookIn(id)
+              tpe   <- declarePackage(packageName(parent.tpe), name)
+            } yield
+              (next, Select(parent, name)(id, tpe))
+          }
+        )
+      case _ =>
+        (ctx, EmptyTree)
     }
   }
 
   def typedPackageDef(pid: Tree, stats: List[Tree])
-                     (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
-    import TypeOps._
-    import TreeOps._
-
-    def typePackaging(tree: Tree): Checked[(Context, Tree)] =
-      tree.toNamePairs match {
-        case (id, name) :: tail =>
-          for {
-            next  <- lookIn(id)
-            tpe   <- declarePackage(From(rootString), name)
-          } yield (
-            tail.foldLeftE(next, Ident(name)(id, tpe)) { (acc, pair) =>
-              val (current, parent) = acc
-              val (id, name) = pair
-              implied for Context = current
-              for {
-                next  <- lookIn(id)
-                tpe   <- declarePackage(packageName(parent.tpe), name)
-              } yield {
-                (next, Select(parent, name)(id, tpe))
-              }
-            }
-          )
-        case _ =>
-          (ctx, EmptyTree)
-      }
-
+                     (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
     for {
       pair    <-  typePackaging(pid)
       stats1  <-  checked {
@@ -528,63 +496,61 @@ object Typers {
       val (_, pid1) = pair
       PackageDef(pid1, stats1)(id, pid1.tpe)
     }
-  }
 
-  def typedDefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)
+  def typedDefDef(modifiers: Set[Modifier], sig: Tree, tpeD: Tree, body: Tree)
                  (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
-    import TypeOps._
-    import implied TreeOps._
-    val getName = Convert[Tree, Name]
     val typeTpeAs =
       if modifiers.contains(Modifier.Primitive) then
         typedAsPrimitive
       else
         typedAsTyping
     val tpd = for {
-      tpeAs1  <- typeTpeAs(tpeAs)(any)
-      tpe     <- tpeAs1.tpe
-      sig1    <- sig.typed(tpe)
-      body1   <- lookIn(sig1.id).flatMap { bodyCtx =>
+      tpeD1 <-  typeTpeAs(tpeD)(any)
+      tpe   <-  tpeD1.tpe
+      sig1  <-  sig.typed(tpe)
+      body1 <-  lookIn(sig1.id).flatMap { bodyCtx =>
+                  import TypeOps._
+                  val ret = toReturnType(sig1, tpe)
                   implied for Context = bodyCtx
-                  body.typed(toReturnType(sig1, tpe))
+                  body.typed(ret)
                 }
-      _       <- checked {
-        val name = getName(sig)
-        putType(name, resolveVariables(tpe))
-        if modifiers.contains(Modifier.Primitive) then {
-          setPrimitive(name)
-        }
-      }
-    } yield DefDef(modifiers, sig1, tpeAs1, body1)(id, tpe)
+      _     <-  checked {
+                  val name = getName(sig)
+                  putType(name, resolveVariables(tpe))
+                  if modifiers.contains(Modifier.Primitive) then {
+                    setPrimitive(name)
+                  }
+                }
+    } yield DefDef(modifiers, sig1, tpeD1, body1)(id, tpe)
     commitId(sig.id)
     tpd
   }
 
-  def typedDefSig(name: Name, args: List[Tree])
-                 (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
-    import TypeOps._
+  def mapArgs(args: List[Tree], pts: List[Type])
+             given Context: Checked[List[Tree]] = {
     import TreeOps._
-
-    def mapArgs(args: List[Tree], pts: List[Type])
-        given Context: Checked[List[Tree]] =
-      args
-        .flatMap(_.toNamePairs)
+    args.flatMap(_.toNamePairs)
         .zip(pts)
-        .mapE { (pair, tpe) =>
-          val (id, name) = pair
+        .mapE { zipped =>
+          val ((id, name), tpe) = zipped
           for (nameCtx <- lookIn(id))
             yield {
               putType(name, tpe)
               Ident(name)(id, tpe)
             }
         }
+  }
+
+  def typedDefSig(name: Name, args: List[Tree])
+                 (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
+    import TypeOps._
 
     val pts = toCurriedList(pt)
 
     if pts.length <= args.length then {
       import implied NameOps._
       CompilerError.UnexpectedType(
-        s"Function declaration arguments do not match declared type for declaration ${name.userString}. REF: $args; $pts")
+        s"Function declaration arguments do not match declared type for declaration ${name.userString}.")
     } else {
       lookIn(id).flatMap { bodyCtx =>
         implied for Context = bodyCtx
@@ -620,7 +586,8 @@ object Typers {
   }
 
   def typedIdentPat(name: Name)
-                   (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
+                   (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
+    import Name._
     if mode == PatAlt && name != Wildcard then {
       CompilerError.SyntaxError("Illegal variable in pattern alternative")
     } else {
@@ -629,16 +596,18 @@ object Typers {
       }
       Ident(name)(id, pt)
     }
+  }
 
   def typedIdentTerm(name: Name)
-                    (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
+                    (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
+    import TypeOps._
     for {
       fstCtx    <- firstCtx(name)
       idRefTpe  <- checked {
         implied for Context = fstCtx
         getType(name)
       }
-    } yield {
+    } yield
       if idRefTpe =!= pt then {
         Ident(name)(id, idRefTpe)
       } else {
@@ -650,13 +619,15 @@ object Typers {
         CompilerError.UnexpectedType(
           s"Expected type for identifier $nameStr of `$ptStr` but was `$idRefTpe`")
       }
-    }
+  }
 
   def typedLiteral(constant: Constant)
                   (id: Id) given Context, Mode: Checked[Tree] =
     Literal(constant)(id, constantTpe(constant))
 
   def check(typed: Tree)(pt: Type) given Context, Mode: Checked[Tree] = {
+    import TypeOps._
+
     lazy val typedTpe = typed.tpe
 
     def ignoreType(tree: Tree) = tree match {
@@ -664,15 +635,15 @@ object Typers {
       case _ => false
     }
 
-    val safe = pt == Types.Type.WildcardType ||
-      ignoreType(typed) ||
-      pt =!= typedTpe
+    val safe = pt =!= typedTpe ||
+      ignoreType(typed)
 
     if safe then {
       typed
     } else {
       import implied TypeOps._
       import implied TreeOps._
+      import implied ModeOps._
       val treeStr = typed.userString
       val modeStr = mode.userString
       val ptStr   = pt.userString
@@ -684,39 +655,40 @@ object Typers {
 
   def (tree: Tree) typed(pt: Type) given Context, Mode: Checked[Tree] = {
     def inner(tree: Tree, pt: Type) = tree match {
-      /* Type Trees */
-      case Select(t,n)      if mode.isType    => typedSelectType(t,n)(tree.id, pt)
-      case Ident(n)         if mode.isType    => typedIdentType(n)(tree.id, pt)
-      case Apply(t,ts)      if mode.isType    => typedApplyType(t,ts)(tree.id, pt)
-      case Function(ts,t)   if mode.isType    => typedFunctionType(ts,t)(tree.id, pt)
-      /* Pattern Trees */
-      case Ident(n)         if mode.isPattern => typedIdentPat(n)(tree.id, pt)
-      case Bind(n,t)        if mode.isPattern => typedBind(n,t)(tree.id, pt)
-      case Alternative(ts)  if mode.isPattern => typedAlternative(ts)(tree.id, pt)
-      case Unapply(f,ts)    if mode.isPattern => typedUnapply(f,ts)(tree.id, pt)
-      /* Term Trees */
-      case PackageDef(t,ts) if mode.isTerm    => typedPackageDef(t,ts)(tree.id, pt)
-      case Apply(t,ts)      if mode.isTerm    => typedApplyTerm(t,ts)(tree.id, pt)
-      case DefDef(m,s,t,b)  if mode.isTerm    => typedDefDef(m,s,t,b)(tree.id, pt)
-      case DefSig(n,ns)     if mode.isTerm    => typedDefSig(n,ns)(tree.id, pt)
-      case Let(
-        i @ Ident(n),
-        v,
-        c)                  if mode.isTerm    => typedLet(n,i.id)(v,c)(tree.id, pt)
-      case Function(ts,t)   if mode.isTerm    => typedFunctionTerm(ts,t)(tree.id, pt)
-      case Tagged(n,t)      if mode.isTerm    => typedTagged(n,t)(tree.id, pt)
-      case CaseExpr(t,ts)   if mode.isTerm    => typedCaseExpr(t,ts)(tree.id, pt)
-      case Select(t,n)      if mode.isTerm    => typedSelectTerm(t,n)(tree.id, pt)
-      case Ident(n)         if mode.isTerm    => typedIdentTerm(n)(tree.id, pt)
-      /* any mode */
-      case Literal(c)                         => typedLiteral(c)(tree.id)
-      case Parens(ts)                         => typedParens(ts)(tree.id, pt)
+      // Types
+      case Select(t,n)      if isType     => typedSelectType(t,n)(tree.id, pt)
+      case Ident(n)         if isType     => typedIdentType(n)(tree.id, pt)
+      case Apply(t,ts)      if isType     => typedApplyType(t,ts)(tree.id, pt)
+      case Function(ts,t)   if isType     => typedFunctionType(ts,t)(tree.id, pt)
+      // Patterns
+      case Ident(n)         if isPattern  => typedIdentPat(n)(tree.id, pt)
+      case Bind(n,t)        if isPattern  => typedBind(n,t)(tree.id, pt)
+      case Alternative(ts)  if isPattern  => typedAlternative(ts)(tree.id, pt)
+      case Unapply(f,ts)    if isPattern  => typedUnapply(f,ts)(tree.id, pt)
+      // Terms
+      case PackageDef(t,ts) if isTerm     => typedPackageDef(t,ts)(tree.id, pt)
+      case Apply(t,ts)      if isTerm     => typedApplyTerm(t,ts)(tree.id, pt)
+      case DefDef(m,s,t,b)  if isTerm     => typedDefDef(m,s,t,b)(tree.id, pt)
+      case DefSig(n,ns)     if isTerm     => typedDefSig(n,ns)(tree.id, pt)
+      case Let(             // Let
+        i @ Ident(n),       // Let
+        v,                  // Let
+        c)                  if isTerm     => typedLet(n,i.id)(v,c)(tree.id, pt)
+      case Function(ts,t)   if isTerm     => typedFunctionTerm(ts,t)(tree.id, pt)
+      case Tagged(n,t)      if isTerm     => typedTagged(n,t)(tree.id, pt)
+      case CaseExpr(t,ts)   if isTerm     => typedCaseExpr(t,ts)(tree.id, pt)
+      case Select(t,n)      if isTerm     => typedSelectTerm(t,n)(tree.id, pt)
+      case Ident(n)         if isTerm     => typedIdentTerm(n)(tree.id, pt)
+      // Any
+      case Literal(c)                     => typedLiteral(c)(tree.id)
+      case Parens(ts)                     => typedParens(ts)(tree.id, pt)
       case t @ ( TreeSeq(_)
                | CaseClause(_,_,_)
-               | EmptyTree)                   => t
-      /* error case */
-      case _ =>
+               | EmptyTree)               => t
+      // Error
+      case _                              =>
         import implied TreeOps._
+        import implied ModeOps._
         CompilerError.IllegalState(
           s"Typing not implemented for <${mode.userString}, ${tree.userString}>")
     }

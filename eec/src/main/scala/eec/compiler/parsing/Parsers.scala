@@ -486,7 +486,7 @@ object Parsers {
   private[this] def fromSimplePattern
       (context: EECParser.SimplePatternContext): Contextual[Tree] =
     if defined(context.Wildcard) then
-      wildcardIdent
+      any.wildcardIdent
     else if context.getText == "()" then
       fromUnitPattern
     else if defined(context.Varid) then
@@ -658,12 +658,12 @@ object Parsers {
 
   private[this] val eecErrorListener: BaseErrorListener = new {
     override def syntaxError
-          (recognizer: Recognizer[_, _],
-          offendingSymbol: AnyRef,
-          line: Int,
-          charPositionInLine: Int,
-          msg: String,
-          e: RecognitionException): Unit = {
+        (recognizer: Recognizer[_, _],
+        offendingSymbol: AnyRef,
+        line: Int,
+        charPositionInLine: Int,
+        msg: String,
+        e: RecognitionException): Unit = {
       throw new ParserSyntaxException(
         "line " + line + ":" + charPositionInLine + " " + msg)
     }

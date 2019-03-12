@@ -5,7 +5,7 @@ primitive s1 ++ s2: String -> String -> String
 primitive debug x: a -> String
 primitive putStrLn s: String -> !()
 primitive readInteger: !Integer
-primitive Left x: l -> Either l r
+primitive Left  x: l -> Either l r
 primitive Right x: r -> Either l r
 
 earthDiameter: Decimal = 12.742e+10
@@ -43,7 +43,7 @@ e: Char = 'e'
 unit: () = ()
 
 lift f: (a -> !b) -> !a -> !b =
-  \c: !a => let !x = c in f x
+  \(c: !a) => let !x = c in f x
 
 ma >>= f: !a -> (a -> !b) -> !b =
   (lift f) ma
@@ -60,7 +60,7 @@ a `or` b: Boolean -> Boolean -> !Boolean =
 not b: Boolean -> !Boolean =
   if True then !False else !True
 
-isZero x : Integer -> !Boolean =
+isZero x: Integer -> !Boolean =
   case x of
     0 => !True
     _ => !False

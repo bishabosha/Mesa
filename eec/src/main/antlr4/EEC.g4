@@ -112,7 +112,7 @@ bindings
 //   : id (',' id)*
 //   ;
 
-bindingsTagged: binding (',' binding)*;
+bindingsTagged: ('(' binding ')')+;
 
 binding: id ':' type;
 

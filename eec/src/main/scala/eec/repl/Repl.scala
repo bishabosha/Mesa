@@ -4,7 +4,7 @@ package repl
 import Commands._
 import compiler._
 import types._
-import parsing._
+import parsing.EntryPoint._
 import Namers._
 import Types._
 import Type._

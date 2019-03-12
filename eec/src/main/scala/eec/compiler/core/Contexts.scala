@@ -20,30 +20,29 @@ object Contexts {
   opaque type Id      = Long
 
   enum Mode derives Eql {
-
     case PrimitiveType, Typing, Term, Pat, PatAlt
-
-    def isPattern = this match {
-      case Pat | PatAlt => true
-      case _            => false
-    }
-
-    def isType = this match {
-      case Typing | PrimitiveType => true
-      case _                    => false
-    }
-
-    def isTerm = this match {
-      case Term => true
-      case _    => false
-    }
   }
 
   object Mode {
 
-    import util.Showable
+    inline def mode given (m: Mode) = m
 
-    def mode given (m: Mode) = m
+    def isPattern given Mode =
+      Pat     == mode ||
+      PatAlt  == mode
+
+    def isType given Mode =
+      Typing        == mode ||
+      PrimitiveType == mode
+
+    def isTerm given Mode =
+      Term == mode
+  }
+
+  object ModeOps {
+
+    import Mode._
+    import util.Showable
 
     implied for Showable[Mode] {
       def (m: Mode) userString: String = m match {
@@ -239,7 +238,7 @@ object Contexts {
       case ScopeDef(name: Scoping, tpe: Scoping, scope: Seq[Scoping])
       case ForName(name: String)
       case TypeDef(tpe: String)
-      case NoType
+      case EmptyType
       case Empty
     }
 
@@ -258,7 +257,7 @@ object Contexts {
             ForName(sym.name.userString),
             c.typeTable.get(sym.name).map { t =>
               TypeDef(t.userString)
-            }.getOrElse(NoType),
+            }.getOrElse(EmptyType),
             context.toScoping
           )
         }.toList
@@ -277,5 +276,4 @@ object Contexts {
       }
     }
   }
-
 }

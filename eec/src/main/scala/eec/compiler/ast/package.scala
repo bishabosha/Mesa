@@ -4,18 +4,16 @@ package ast
 
 import Trees.Tree._
 import types.Types._
+import Type._
 import core.Names.Name._
 import core.Contexts._
 
 object untyped {
-  type Tree = Trees.Tree
-  val uTpe = Type.Untyped
-  val uTpeBoolean = Type.UntypedExpect(Bootstraps.BooleanType)
+  type Tree       = Trees.Tree
+  val uTpe        = Untyped
+  val uTpeBoolean = UntypedExpect(Bootstraps.BooleanType)
 }
 
-object typed {
-  type Tree = Trees.Tree
+object any {
+  val wildcardIdent = Ident(Wildcard)(Id.noId, WildcardType)
 }
-
-val emptyIdent = Ident(EmptyName)(Id.noId, Type.NoType)
-val wildcardIdent = Ident(Wildcard)(Id.noId, Type.NoType)

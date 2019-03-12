@@ -25,10 +25,10 @@ object Types {
     case FunctionType(arg: Type, body: Type)
     case Product(args: List[Type])
     case AppliedType(typ: Type, args: List[Type])
-    case NoType
     case WildcardType
     case UntypedExpect(typ: Type)
     case Untyped
+    case EmptyType
   }
 
   object TypeOps {
@@ -39,9 +39,20 @@ object Types {
     import Tree._
     import util.|>
 
+    def (tpe: Type) =!= (other: Type): Boolean =
+      tpe   == other        ||
+      tpe   == WildcardType ||
+      other == WildcardType
+
     def packageName(t: Type): Name = t match {
       case PackageInfo(_, name) => name
       case _                    => EmptyName
+    }
+
+    def untypedToChecked(tpe: Type): Type = tpe match {
+      case UntypedExpect(t) => t
+      case Untyped          => WildcardType
+      case _                => EmptyType
     }
 
     def toCurriedList(t: Type): List[Type] = {
@@ -56,19 +67,60 @@ object Types {
     def toReturnType(defSig: Tree, t: Type): Type =
       defSig match {
         case DefSig(_, args) =>
-          toCurriedList(t) match {
-            case Nil    => NoType
-            case many   => toFunctionType(many.drop(args.length))
-          }
+          toFunctionType(toCurriedList(t).drop(args.length))
         case _ =>
-          NoType
+          EmptyType
       }
 
     def toFunctionType(ts: List[Type]): Type =
       ts.reverse match {
         case t :: rest  => rest.foldLeft(t)((acc, t1) => FunctionType(t1, acc))
-        case Nil        => NoType
+        case Nil        => EmptyType
       }
+
+    def getSubstitutions(arg: Type, app: Type): List[(Name, Type)] = arg match {
+      case AppliedType(f, args1) =>
+        app match {
+          case AppliedType(g, args2) if args1.size == args2.size =>
+            getSubstitutions(f,g) ::: args1.zip(args2).flatMap(getSubstitutions)
+          case _ =>
+            Nil
+        }
+      case FunctionType(a1, b1) =>
+        app match {
+          case FunctionType(a2, b2) =>
+            getSubstitutions(a1,a2) ::: getSubstitutions(b1,b2)
+          case _ =>
+            Nil
+        }
+      case Product(tpes1) =>
+        app match {
+          case Product(tpes2) if tpes1.size == tpes2.size =>
+            tpes1.zip(tpes2).flatMap(getSubstitutions)
+          case _ =>
+            Nil
+        }
+      case Variable(name) =>
+        (name, app) :: Nil
+      case _ =>
+        Nil
+    }
+
+    def unify(sub: Name, by: Type, tpe: Type): Type = tpe match {
+      case FunctionType(arg, body) =>
+        FunctionType(unify(sub, by, arg), unify(sub, by, body))
+      case AppliedType(f, args) =>
+        AppliedType(unify(sub, by, f), args.map(unify(sub, by, _)))
+      case Product(tpes) =>
+        Product(tpes.map(unify(sub, by, _)))
+      case g @ Variable(`sub`) =>
+        if by == WildcardType then
+          g
+        else
+          by
+      case _ =>
+        tpe
+    }
 
     implied for Showable[Type] {
       import implied NameOps._
@@ -127,8 +179,8 @@ object Types {
             "<anytype>"
           case Untyped | UntypedExpect(_) =>
             "<untyped>"
-          case NoType =>
-            "<notype>"
+          case EmptyType =>
+            "<emptytype>"
         }
       }
     }

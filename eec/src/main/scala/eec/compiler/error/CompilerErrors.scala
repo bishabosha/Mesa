@@ -4,8 +4,6 @@ package error
 
 object CompilerErrors {
 
-  import CompilerError._
-
   enum CompilerError derives Eql {
     case UnexpectedType(msg: String)
     case IllegalState(msg: String)
@@ -16,6 +14,10 @@ object CompilerErrors {
   type Checked[O] = O | CompilerError
 
   object CompilerErrorOps {
+
+    import eec.util.Showable
+    import scala.annotation.tailrec
+
     def checked[O](o: Checked[O]): Checked[O] = o
 
     def (o: Checked[O]) fold[O, U](e: CompilerError => U)(f: O => U): U =
@@ -50,36 +52,29 @@ object CompilerErrors {
     def (l: List[A]) mapE[A, O](f: A => Checked[O]): Checked[List[O]] = {
       import scala.collection._
       l.foldLeftE(new mutable.ListBuffer[O]) { (acc, a) =>
-        for (o <- f(a)) yield {
-          acc += o
-          acc
-        }
+        for (o <- f(a))
+          yield {
+            acc += o
+            acc
+          }
       }
       .map(_.toList)
     }
 
-    /** shortcutting fold over a list - optimised */
-    def (l: List[A]) foldLeftE[A, O](seed: O)(f: (O, A) => Checked[O]): Checked[O] = {
-      var acc = seed
-      var rest = l
-      while (true) {
-        rest match {
-          case head :: tail =>
-            f(acc, head) match {
-              case e: CompilerError =>
-                return e
-              case t =>
-                rest = tail
-                acc = t.asInstanceOf[O]
-            }
-          case Nil =>
-            return acc
-        }
+    def (l: List[A]) foldLeftE[A, O](seed: O)
+        (f: (O, A) => Checked[O]): Checked[O] = {
+      @tailrec
+      def inner(acc: O, l: List[A]): Checked[O] = l match {
+        case head :: tail =>
+          f(acc, head) match {
+            case err: CompilerError => err
+            case acc1               => inner(acc1.asInstanceOf[O], tail)
+          }
+        case _ =>
+          acc
       }
-      ???
+      inner(seed, l)
     }
-
-    import eec.util.Showable
 
     def (f: => O) recoverDefault[O]: Checked[O] = {
       import scala.util.control._
@@ -89,24 +84,27 @@ object CompilerErrors {
       }
     }
 
-    def (f: => O) recover[O](
-      opt: PartialFunction[Exception, CompilerError]): Checked[O] = {
+    def (f: => O) recover[O]
+        (opt: PartialFunction[Exception, CompilerError]): Checked[O] = {
+      import scala.util.control._
+      import CompilerError._
 
-        import scala.util.control._
-        import CompilerError._
-
-        try {
-          f
-        } catch {
-          case e: Exception if opt.isDefinedAt(e) => opt(e)
-          case e: Exception if NonFatal(e)        => Internal(e)
-        }
+      try {
+        f
+      } catch {
+        case e: Exception if opt.isDefinedAt(e) => opt(e)
+        case e: Exception if NonFatal(e)        => Internal(e)
       }
+    }
 
     implied for Showable[CompilerError] {
+      import CompilerError._
+
       def (e: CompilerError) userString = e match {
         case Internal(e) =>
-          val trace = e.getStackTraceString.split("\n")
+          val trace = e
+            .getStackTraceString
+            .split("\n")
             .toSeq
             .map("    " + _)
             .mkString("\n")

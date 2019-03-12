@@ -47,8 +47,8 @@ object Namers {
       (pid: Tree, stats: List[Tree]) given Context, Mode: Checked[Unit] = {
     import TreeOps._
     val cPkgCtx = pid.toNamePairs.foldLeftE(ctx) { (pkgCtx, pair) =>
+      val (id, pkgName)   = pair
       implied for Context = pkgCtx
-      val (id, pkgName) = pair
       enterFresh(id, pkgName)
     }
     cPkgCtx.flatMap { pkgCtx =>
@@ -138,31 +138,31 @@ object Namers {
 
   def index(tree: Tree) given Context, Mode: Checked[Unit] = tree match {
     /* Pattern Trees */
-    case Ident(n)           if mode.isPattern => namedIdentPat(n)(tree.id)
-    case Bind(n,t)          if mode.isPattern => namedBind(n,t)(tree.id)
-    case Alternative(ts)    if mode.isPattern => namedAlternative(ts)
-    case Unapply(_,ts)      if mode.isPattern => namedUnapply(ts)
+    case Ident(n)           if isPattern  => namedIdentPat(n)(tree.id)
+    case Bind(n,t)          if isPattern  => namedBind(n,t)(tree.id)
+    case Alternative(ts)    if isPattern  => namedAlternative(ts)
+    case Unapply(_,ts)      if isPattern  => namedUnapply(ts)
     /* Term Trees */
-    case PackageDef(t,ts)   if mode.isTerm    => namedPackageDef(t,ts)
-    case Apply(t,ts)        if mode.isTerm    => namedApplyTerm(t,ts)
+    case PackageDef(t,ts)   if isTerm     => namedPackageDef(t,ts)
+    case Apply(t,ts)        if isTerm     => namedApplyTerm(t,ts)
     case DefDef(
       _,
       s @ DefSig(n, ns),
       t,
-      b)                    if mode.isTerm    => namedDefDef(n,ns,s.id)(t,b)
+      b)                    if isTerm     => namedDefDef(n,ns,s.id)(t,b)
     case Let(
       i @ Ident(n),
       v,
-      c)                    if mode.isTerm    => namedLet(n,i.id)(v,c)(tree.id)
-    case Function(ts,t)     if mode.isTerm    => namedFunctionTerm(ts,t)(tree.id)
-    case CaseExpr(t,ts)     if mode.isTerm    => namedCaseExpr(t,ts)
-    case CaseClause(p,g,b)  if mode.isTerm    => namedCaseClause(p,g,b)
+      c)                    if isTerm     => namedLet(n,i.id)(v,c)(tree.id)
+    case Function(ts,t)     if isTerm     => namedFunctionTerm(ts,t)(tree.id)
+    case CaseExpr(t,ts)     if isTerm     => namedCaseExpr(t,ts)
+    case CaseClause(p,g,b)  if isTerm     => namedCaseClause(p,g,b)
     /* any mode */
-    case Parens(ts)                           => namedParens(ts)
+    case Parens(ts)                       => namedParens(ts)
     case Literal(_)
        | Ident(_)
        | Select(_,_)
-       | EmptyTree                            => // atomic
+       | EmptyTree                        => // atomic
     /* error case */
     case _ =>
       import implied TreeOps._

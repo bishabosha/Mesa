@@ -9,7 +9,7 @@ class TyperTest {
 
   import core.Contexts._
   import ast.Trees._
-  import parsing._
+  import parsing.EntryPoint._
   import error.CompilerErrors._
   import error.CompilerErrors.CompilerError._
   import Types._
@@ -47,8 +47,8 @@ class TyperTest {
 
   @Test def typecheckChar(): Unit = {
     passesTypeCheck(
-      "'a'"   -> "Char",
-      "'\\n'" -> "Char")
+      """'a'"""   -> "Char",
+      """'\n'""" -> "Char")
     failsTypeCheck(
       "''",
       "'ab'")
@@ -75,7 +75,7 @@ class TyperTest {
       "!((),())"  -> "! ((), ())",
       "(!(),!())" -> "(! (), ! ())")
     failsTypeCheck(
-      "\\c: ! a b => ()",
+      """\(c: ! a b) => ()""",
       "! () ()"
     )
   }
@@ -83,7 +83,7 @@ class TyperTest {
   @Test def typecheckIf(): Unit = {
     passesTypeCheck(
       "if True then () else ()" -> "()",
-      "\\a: Boolean, b: Boolean => if a then !b else !False" -> "Boolean -> Boolean -> ! Boolean")
+      """\(a: Boolean) (b: Boolean) => if a then !b else !False""" -> "Boolean -> Boolean -> ! Boolean")
     failsTypeCheck(
       "if 0 then () else ()", // non Boolean condition
       "if True then 0 else ()") // disjoint branches
@@ -137,32 +137,32 @@ class TyperTest {
 
   @Test def typecheckLambda(): Unit = {
     passesTypeCheck(
-      "\\t: () => ()"               -> "() -> ()",
-      "\\t: () -> () => ()"         -> "(() -> ()) -> ()",
-      "\\t: (), u: () => ()"        -> "() -> () -> ()",
-      "\\t: ((), ()) => ()"         -> "((), ()) -> ()",
-      "\\t: ((), (), (), ()) => ()" -> "((), (), (), ()) -> ()",
-      "\\t: ! () => ()"             -> "! () -> ()")
+      """\(t: ()) => ()"""                -> "() -> ()",
+      """\(t: () -> ()) => ()"""          -> "(() -> ()) -> ()",
+      """\(t: ()) (u: ()) => ()"""        -> "() -> () -> ()",
+      """\(t: ((), ())) => ()"""          -> "((), ()) -> ()",
+      """\(t: ((), (), (), ())) => ()"""  -> "((), (), (), ()) -> ()",
+      """\(t: !()) => ()"""               -> "! () -> ()")
     failsTypeCheck(
-      "\\f: () -> Char => ()", // f.tpe is not computation co-domain
-      "\\f: () => 0") // lambda tpe is not computation co-domain
+      """\(f: () -> Char) => ()""", // f.tpe is not computation co-domain
+      """\(f: ()) => 0""") // lambda tpe is not computation co-domain
   }
 
   @Test def typecheckApplication(): Unit = {
     passesTypeCheck(
-      "(\\t: (), u: (), v: () => ()) ()"       -> "() -> () -> ()",
-      "(\\t: (), u: (), v: () => ()) () ()"    -> "() -> ()",
-      "(\\t: (), u: (), v: () => ()) () () ()" -> "()",
-      "\\f: () -> () => f ()"                  -> "(() -> ()) -> ()",
-      "\\t: () -> () => \\c: () => t c"        -> "(() -> ()) -> () -> ()")
+      """(\(t: ()) (u: ()) (v: ()) => ()) ()"""       -> "() -> () -> ()",
+      """(\(t: ()) (u: ()) (v: ()) => ()) () ()"""    -> "() -> ()",
+      """(\(t: ()) (u: ()) (v: ()) => ()) () () ()""" -> "()",
+      """\(f: () -> ()) => f ()"""                    -> "(() -> ()) -> ()",
+      """\(t: () -> ()) => \(c: ()) => t c"""         -> "(() -> ()) -> () -> ()")
     failsTypeCheck(
-      "(\\f: () => ()) 0") // expects () not Integer
+      """(\(f: ()) => ()) 0""") // expects () not Integer
   }
 
   @Test def typecheckLet(): Unit = {
     passesTypeCheck(
-      "let !x = !() in ()" -> "()",
-      "let !x = !0 in !x" -> "! Integer")
+      "let !x = !() in ()"  -> "()",
+      "let !x = !0 in !x"   -> "! Integer")
     failsTypeCheck(
       "let !x = () in ()", // () is not ! type
       "let !x = 0 in ()", // 0 is not of ! type
@@ -171,9 +171,9 @@ class TyperTest {
 
   @Test def typecheckBind(): Unit = {
     passesTypeCheck(
-      "\\ma: !a, f: a -> !b => let !a = ma in f a"      -> "! a -> (a -> ! b) -> ! b",
-      "\\ma: !a => \\f: a -> !b => let !a = ma in f a"  -> "! a -> (a -> ! b) -> ! b",
-      "\\a: !a, f: a -> !b => let !a = a in f a"        -> "! a -> (a -> ! b) -> ! b") // modified to test rebinding
+      """\(ma: !a) (f: a -> !b) => let !a = ma in f a"""      -> "! a -> (a -> ! b) -> ! b",
+      """\(ma: !a) => \(f: a -> !b) => let !a = ma in f a"""  -> "! a -> (a -> ! b) -> ! b",
+      """\(a: !a) (f: a -> !b) => let !a = a in f a"""        -> "! a -> (a -> ! b) -> ! b") // modified to test rebinding
   }
 
   def (str: String) typedAs(as: Type) given Context: Checked[Tree] = {

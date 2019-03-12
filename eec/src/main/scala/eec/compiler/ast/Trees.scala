@@ -9,6 +9,7 @@ object Trees {
   import core.Contexts._
   import core.Modifiers._
   import types.Types._
+  import scala.annotation._
 
   enum Tree(val id: Id, val tpe: Type) derives Eql {
     case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(id, tpe)
@@ -27,16 +28,14 @@ object Trees {
     case Bind(name: Name, body: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
     case Unapply(name: Name, args: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
     case Tagged(arg: Name, tpeAs: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case TreeSeq(args: List[Tree]) extends Tree(Id.noId, Type.NoType)
-    case EmptyTree extends Tree(Id.noId, Type.NoType)
+    case TreeSeq(args: List[Tree]) extends Tree(Id.noId, Type.EmptyType)
+    case EmptyTree extends Tree(Id.noId, Type.EmptyType)
   }
 
   object TreeOps {
 
-    import scala.annotation._
+    import Tree._
     import util.{Showable, |>, Convert}
-    import Trees.Tree._
-    import core.Printing.untyped.Ast
     import implied core.Printing.untyped.AstOps._
 
     implied for Showable[Tree] {
