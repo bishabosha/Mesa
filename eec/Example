@@ -7,6 +7,15 @@ primitive putStrLn s: String -> !()
 primitive readInteger: !Integer
 primitive Left  x: l -> Either l r
 primitive Right x: r -> Either l r
+primitive a == b : a -> a -> Boolean
+
+fst p: (a, b) -> !a =
+  case p of (a, _) => !a
+
+snd p: (a, b) -> !b =
+  case p of (_, b) => !b
+
+foo: Boolean = (fst((0,"")), snd((0,""))) == (!0, !"")
 
 earthDiameter: Decimal = 12.742e+10
 
@@ -25,7 +34,7 @@ cat3 e xu yu zu: Either (Either x y) z -> (x -> !u) -> (y -> !u) -> (z -> !u) ->
 
 cat4 e wu xu yu zu: Either (Either (Either w x) y) z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
   case e of
-    Left  (Left  (Left a))  => wu a;
+    Left  (Left  (Left  a)) => wu a;
     Left  (Left  (Right b)) => xu b;
     Left  (Right c)         => yu c;
     Right d                 => zu d

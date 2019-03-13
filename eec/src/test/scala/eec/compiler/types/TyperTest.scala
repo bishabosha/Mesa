@@ -23,8 +23,8 @@ class TyperTest {
       "0"   -> "Integer",
       "-0"  -> "Integer")
     failsTypeCheck(
-      "0l",  // no Longs
-      "0L")  // no Longs
+      "0l",  // error: no Longs
+      "0L")  // error: no Longs
   }
 
   @Test def typecheckDecimal(): Unit = {
@@ -33,10 +33,10 @@ class TyperTest {
       "6.62607004e-34"                  -> "Decimal", // Planck's constant
       "-273.15"                         -> "Decimal") // 0 degrees Kelvin
     failsTypeCheck(
-      "3.14159f",  // no Floats
-      "3.14159F",  // no Floats
-      "3.14159d",  // no Doubles
-      "3.14159D")  // no Doubles
+      "3.14159f",  // error: no Floats
+      "3.14159F",  // error: no Floats
+      "3.14159d",  // error: no Doubles
+      "3.14159D")  // error: no Doubles
   }
 
   @Test def typecheckBoolean(): Unit = {
@@ -50,8 +50,8 @@ class TyperTest {
       """'a'"""   -> "Char",
       """'\n'""" -> "Char")
     failsTypeCheck(
-      "''",
-      "'ab'")
+      "''",   // error: empty char
+      "'ab'") // error: char more than one char
   }
 
   @Test def typecheckString(): Unit = {
@@ -75,8 +75,8 @@ class TyperTest {
       "!((),())"  -> "! ((), ())",
       "(!(),!())" -> "(! (), ! ())")
     failsTypeCheck(
-      """\(c: ! a b) => ()""",
-      "! () ()"
+      """\(c: ! a b) => ()""", // error: expected types [_] but got [a, b]
+      "! () ()"                 // error: expected args [_: _] but got [(): (), (): ()]
     )
   }
 
@@ -85,8 +85,8 @@ class TyperTest {
       "if True then () else ()" -> "()",
       """\(a: Boolean) (b: Boolean) => if a then !b else !False""" -> "Boolean -> Boolean -> ! Boolean")
     failsTypeCheck(
-      "if 0 then () else ()", // non Boolean condition
-      "if True then 0 else ()") // disjoint branches
+      "if 0 then () else ()",   // error: non Boolean condition
+      "if True then 0 else ()") // error: disjoint branches
   }
 
   @Test def typecheckCase(): Unit = {
@@ -120,19 +120,19 @@ class TyperTest {
           ((), (), (), ()) => ()"""   -> "()")
     failsTypeCheck(
       """case () of
-          (a | _) => ()""", // name in alternative
+          (a | _) => ()""", // error: name in alternative
       """case () of
           ()  => 1
-          ()  => False""", // disjoint bodies
+          ()  => False""", // error: disjoint bodies
       """case () of
-          "abc" => ()""", // pattern doesn't match selector
+          "abc" => ()""", // error: pattern doesn't match selector
       """case ((), ((), ())) of
-          (((), ()), ()) => 0""", // pattern doesn't match selector
+          (((), ()), ()) => 0""", // error: pattern doesn't match selector
       """case ((), ((), ())) of
-          ((_, _), _) => 0""", // pattern doesn't match selector
+          ((_, _), _) => 0""", // error: pattern doesn't match selector
       """case "hello" of
           ""  => 0
-          1   => 0""") // mismatching cases
+          1   => 0""") // error: mismatching cases
   }
 
   @Test def typecheckLambda(): Unit = {
@@ -144,8 +144,8 @@ class TyperTest {
       """\(t: ((), (), (), ())) => ()"""  -> "((), (), (), ()) -> ()",
       """\(t: !()) => ()"""               -> "! () -> ()")
     failsTypeCheck(
-      """\(f: () -> Char) => ()""", // f.tpe is not computation co-domain
-      """\(f: ()) => 0""") // lambda tpe is not computation co-domain
+      """\(f: () -> Char) => ()""", // error: f.tpe is not computation co-domain
+      """\(f: ()) => 0""")          // error: lambda tpe is not computation co-domain
   }
 
   @Test def typecheckApplication(): Unit = {
@@ -156,7 +156,7 @@ class TyperTest {
       """\(f: () -> ()) => f ()"""                    -> "(() -> ()) -> ()",
       """\(t: () -> ()) => \(c: ()) => t c"""         -> "(() -> ()) -> () -> ()")
     failsTypeCheck(
-      """(\(f: ()) => ()) 0""") // expects () not Integer
+      """(\(f: ()) => ()) 0""") // error: expects () not Integer
   }
 
   @Test def typecheckLet(): Unit = {
@@ -164,16 +164,16 @@ class TyperTest {
       "let !x = !() in ()"  -> "()",
       "let !x = !0 in !x"   -> "! Integer")
     failsTypeCheck(
-      "let !x = () in ()", // () is not ! type
-      "let !x = 0 in ()", // 0 is not of ! type
-      "let !x = !0 in 0") // 0 is not of computation type
+      "let !x = () in ()", // error: () is not ! type
+      "let !x = 0 in ()",  // error: 0 is not of ! type
+      "let !x = !0 in 0")  // error: 0 is not of computation type
   }
 
   @Test def typecheckBind(): Unit = {
     passesTypeCheck(
       """\(ma: !a) (f: a -> !b) => let !a = ma in f a"""      -> "! a -> (a -> ! b) -> ! b",
       """\(ma: !a) => \(f: a -> !b) => let !a = ma in f a"""  -> "! a -> (a -> ! b) -> ! b",
-      """\(a: !a) (f: a -> !b) => let !a = a in f a"""        -> "! a -> (a -> ! b) -> ! b") // modified to test rebinding
+      """\(a: !a) (f: a -> !b) => let !a = a in f a"""        -> "! a -> (a -> ! b) -> ! b") // TODO - proof that let allows to rebind names to new variable
   }
 
   def (str: String) typedAs(as: Type) given Context: Checked[Tree] = {

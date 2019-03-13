@@ -58,8 +58,8 @@ object Types {
     def toCurriedList(t: Type): List[Type] = {
       @tailrec
       def inner(acc: List[Type], t: Type): List[Type] = t match {
-        case FunctionType(arg, body) => inner(arg :: acc, body)
-        case _ => t :: acc
+        case FunctionType(arg, body)  => inner(arg :: acc, body)
+        case _                        => t :: acc
       }
       inner(Nil, t).reverse
     }

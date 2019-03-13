@@ -1,5 +1,8 @@
 dumps
 
+cp
+notes
+
 *.log
 *.bc
 *.o

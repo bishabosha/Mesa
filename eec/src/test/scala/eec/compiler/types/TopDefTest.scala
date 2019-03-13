@@ -23,6 +23,12 @@ class TopDefTest {
       "unit: () = ()" -> "()")
   }
 
+  @Test def failsRecursion(): Unit = {
+    failsTypeCheck(
+      """fix f: (t -> !t) -> !t =
+          let !x = f x in !x""") // error: x in f x is undefined
+  }
+
   @Test def typecheckEithers(): Unit = {
     passesTypeCheck(
       "l: Either () r = Left ()"  -> "Either () r",
@@ -58,10 +64,10 @@ class TopDefTest {
             x => !x"""
       -> "a -> ! a")
     failsTypeCheck(
-      """f e: a -> !a = case e of Left x => !x""",
-      """g e: a -> !a = case e of (x, _) => !x""",
-      """h e: a -> !a = case e of (_, _) => !e""",
-      """i e: a -> !a = case e of ()     => !e""")
+      """f e: a -> !a = case e of Left x => !x""", // error: Either l r is not a
+      """g e: a -> !a = case e of (x, _) => !x""", // error: Tuple is not a
+      """h e: a -> !a = case e of (_, _) => !e""", // error: Tuple is not a
+      """i e: a -> !a = case e of ()     => !e""") // error: Tuple is not a
   }
 
   @Test def patternMatchEitherArbitraryDepth(): Unit = {

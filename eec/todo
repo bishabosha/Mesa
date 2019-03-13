@@ -1,3 +1,5 @@
+# Tasks for EEC
+
 [x] desugar operators into list of calls
 [-] test how diff postfix levels interact
 [?] lazy implementation of tuple
@@ -16,3 +18,18 @@ is correct because 1 is the empty product and () can never be projected.)"
   and there is no user mechanism to define them, then it is safe to substitute
   `TypeRef(a)`, where `a` is unknown, with any concrete type - substitution must
   be propagated
+
+[!] let allows to rebind names to new variable, may need to change to allow for recursion
+
+[!] - DONT IMPLEMENT `::` unless you have implemented multi expr defs
+
+\a => a
+
+(\a -* b) :: A -* B
+
+(,,,,)
+
+!A * B
+
+data Triple =
+  Left A | Middle B | End C

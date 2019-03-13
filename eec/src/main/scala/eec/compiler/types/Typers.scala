@@ -95,16 +95,8 @@ object Typers {
     (functorTyp, proto) match {
       case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
         val substitutions = getSubstitutions(functorTyp, proto)
-        val functorTyp1 =
-          substitutions.foldLeft(functorTyp) { (acc, pair) =>
-            val (sub, by) = pair
-            unify(sub, by, acc)
-          }
-        val proto1 =
-          substitutions.foldLeft(proto) { (acc, pair) =>
-            val (sub, by) = pair
-            unify(sub, by, acc)
-          }
+        val functorTyp1   = replace(functorTyp, substitutions)
+        val proto1        = replace(proto, substitutions)
         if functorTyp1 =!= proto1 then
             TypeOps.toCurriedList(functorTyp1).last
         else {
@@ -125,11 +117,7 @@ object Typers {
     (funTyp, proto) match {
       case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
         val substitutions = getSubstitutions(funTyp, proto)
-        val FunctionType(arg2, ret2) =
-          substitutions.foldLeft(funTyp) { (acc, pair) =>
-            val (sub, by) = pair
-            unify(sub, by, acc)
-          }
+        val FunctionType(arg2, ret2) = replace(funTyp, substitutions)
         if arg1 =!= arg2 then
             if ret2 =!= ret1 then
               ret2
@@ -442,20 +430,16 @@ object Typers {
   def typedUnapply(functor: Name, args: List[Tree])
                   (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
     for {
-      fst   <-  firstCtx(functor)
+      fCtx  <-  firstCtx(functor)
       fTpe  <-  checked {
-                  implied for Context = fst
+                  implied for Context = fCtx
                   getPrimitiveType(functor)
                 }
       pair  <-  typeAsDestructor(fTpe, pt)
-      args1 <-  checked {
-                  val (fTpeArgs, _) = pair
-                  typeAsFunctorArgs(functor, args, fTpeArgs)
-                }
-    } yield {
-      val (_, tpe) = pair
+      (fTpeArgs, tpe) = pair
+      args1 <-  typeAsFunctorArgs(functor, args, fTpeArgs)
+    } yield
       Unapply(functor, args1)(id, tpe)
-    }
 
   def typePackaging(tree: Tree) given Context: Checked[(Context, Tree)] = {
     import TypeOps._
@@ -487,15 +471,13 @@ object Typers {
                      (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
     for {
       pair    <-  typePackaging(pid)
+      (pkgCtx, pid1) = pair
       stats1  <-  checked {
-                    val (pkgCtx, _) = pair
                     implied for Context = pkgCtx
                     stats.mapE(_.typed(any))
                   }
-    } yield {
-      val (_, pid1) = pair
+    } yield
       PackageDef(pid1, stats1)(id, pid1.tpe)
-    }
 
   def typedDefDef(modifiers: Set[Modifier], sig: Tree, tpeD: Tree, body: Tree)
                  (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {

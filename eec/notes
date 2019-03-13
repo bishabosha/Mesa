@@ -1,19 +1,8 @@
-\a => a
-
-\ -*
-
-A -* B
-
-(,,,,)
-
-!A * B
-
-data Triple = 
-  Left A | Middle B | End C
+# Meeting Notes With Supervisor
 
 explain why match on !_ is unsound
 
-explain (,) -> (,*)
+explain transition from binary tuples to n-ary tuples
 
 explain also that at first, never had the stoup, which is required for !_
 with example that is unsound
@@ -23,5 +12,3 @@ which caused conflicts such as `Either l r != l` and having to rebind types
   - at least for checking, the codomains should be unified for constructor and
     functor type, then the subpatterns are checked on that
   - unknown yet for wildcard check
-
-!!! - DONT USE `::` unless you have implemented multi expr defs
