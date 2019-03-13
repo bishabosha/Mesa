@@ -1,5 +1,8 @@
 dumps
 
+eec/cp
+eec/gnotes
+
 *.log
 *.bc
 *.o
@@ -34,9 +37,9 @@ local.sbt
 .vscode/
 
 # Dotty IDE
-/.dotty-ide-dev-port
-/.dotty-ide-artifact
-/.dotty-ide.json
+.dotty-ide-dev-port
+.dotty-ide-artifact
+.dotty-ide.json
 
 # idea
 .idea
