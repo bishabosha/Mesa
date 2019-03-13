@@ -15,6 +15,7 @@ class TyperTest {
   import Types._
   import types.Typers._
   import error.CompilerErrors._
+  import BootstrapTests._
 
   val any = types.Types.Type.WildcardType
 
@@ -181,53 +182,19 @@ class TyperTest {
       """\(a: !a) (f: a -> !b) => let !a = a in f a"""        -> "! a -> (a -> ! b) -> ! b") // TODO - proof that let allows to rebind names to new variable
   }
 
-  def (str: String) typedAs(as: Type) given Context: Checked[Tree] = {
-    import Namers._
-    import CompilerErrorOps._
-    for {
-      expr   <- parseExpr(str)
-      _      <- indexAsExpr(expr)
-      expr1  <- expr.typedAsExpr(as)
-    } yield expr1
-  }
-
-  def (str: String) typed given Context: Checked[Tree] = str.typedAs(any)
-
   def typecheck(seq: (String, String)*): Unit = {
     import CompilerErrorOps._
-
-    def impl(parsed: Checked[Tree], checkTpe: String): Unit = {
-      import implied CompilerErrorOps._
-      import implied TypeOps._
-
-      parsed.fold
-        { err => fail(err.userString) }
-        { tpd => assertEquals(checkTpe, tpd.tpe.userString) }
-    }
-
-    BootstrapTests.initialCtx.flatMap { ctx =>
+    initialCtx.flatMap { ctx =>
       implied for Context = ctx
-      seq.toList.mapE((f, s) => impl(typed(f), s))
+      seq.toList.mapE((f, s) => checkTpe(typeExpr(f)(any), s))
     }
   }
 
   def noType(seq: String*): Unit = {
     import CompilerErrorOps._
-
-    def impl(parsed: Checked[Tree]): Unit = {
-      import implied TreeOps._
-      import implied TypeOps._
-
-      parsed.fold
-        { err => () }
-        { tpd => fail(
-          s"Typed successfully as ${tpd.tpe.userString} for expr:\n${tpd.userString}")
-        }
-    }
-
-    BootstrapTests.initialCtx.flatMap { ctx =>
+    initialCtx.flatMap { ctx =>
       implied for Context = ctx
-      seq.toList.mapE(f => impl(typed(f)))
+      seq.toList.mapE(f => failIfTyped(typeExpr(f)(any)))
     }
   }
 }

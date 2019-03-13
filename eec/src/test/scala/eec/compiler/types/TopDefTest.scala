@@ -15,6 +15,7 @@ class TopDefTest {
   import Types._
   import types.Typers._
   import error.CompilerErrors._
+  import BootstrapTests._
 
   val any = types.Types.Type.WildcardType
 
@@ -92,53 +93,19 @@ class TopDefTest {
   ->"Either w (Either x (Either y z)) -> (w -> ! u) -> (x -> ! u) -> (y -> ! u) -> (z -> ! u) -> ! u"
   )
 
-  private def (str: String) typedAs(as: Type) given Context: Checked[Tree] = {
-    import Namers._
-    import CompilerErrorOps._
-    for {
-      exp <- parseStat(str)
-      _   <- indexAsExpr(exp)
-      tpd <- exp.typedAsExpr(any)
-    } yield tpd
-  }
-
-  private def typed(str: String) given Context: Checked[Tree] = str.typedAs(any)
-
   private def typecheck(seq: (String, String)*): Unit = {
     import CompilerErrorOps._
-
-    def impl(parsed: Checked[Tree], checkTpe: String): Unit = {
-      import CompilerErrorOps._
-      import implied CompilerErrorOps._
-      import implied TypeOps._
-      parsed.fold
-        { err => fail(err.userString) }
-        { tpd => assertEquals(checkTpe, tpd.tpe.userString) }
-    }
-
-    BootstrapTests.initialCtx.flatMap { ctx =>
+    initialCtx.flatMap { ctx =>
       implied for Context = ctx
-      seq.toList.mapE((f, s) => impl(typed(f), s))
+      seq.toList.mapE((f, s) => checkTpe(typeStat(f)(any), s))
     }
   }
 
   private def noType(seq: String*): Unit = {
     import CompilerErrorOps._
-
-    def impl(parsed: Checked[Tree]): Unit = {
-      import CompilerErrorOps._
-      import implied TreeOps._
-      import implied TypeOps._
-      parsed.fold
-        { err => () }
-        { tpd => fail(
-          s"Typed successfully as ${tpd.tpe.userString} for expr:\n${tpd.userString}")
-        }
-    }
-
-    BootstrapTests.initialCtx.flatMap { ctx =>
+    initialCtx.flatMap { ctx =>
       implied for Context = ctx
-      seq.foreach { f => impl(typed(f)) }
+      seq.foreach { f => failIfTyped(typeStat(f)(any)) }
     }
   }
 }
