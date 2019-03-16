@@ -26,20 +26,20 @@ object Repl {
 
     @tailrec
     def inner(state: LoopState): Unit = state match {
-      case s @ LoopState(prompt, false, _, _) =>
+      case s @ LoopState(prompt, false, _, _, _) =>
         println
         print(prompt.asPrompt)
         val nextState = command(s, readLine)
         inner(nextState)
-      case LoopState(_, true, _, _) =>
+      case LoopState(_, true, _, _, _) =>
         // exit
     }
 
     newContext.fold
       { err => println(s"[ERROR] ${err.userString}. Quitting...") }
-      { ctx =>
+      { (idGen, ctx) =>
         val pwd = System.getProperty("user.dir")
-        val initial = LoopState(defaultPrompt, false, pwd, ctx)
+        val initial = LoopState(defaultPrompt, false, pwd, idGen, ctx)
         println("starting eec REPL...")
         print(defaultPrompt.asPrompt)
         val state = command(initial, readLine)
@@ -47,14 +47,16 @@ object Repl {
       }
   }
 
-  private[this] def newContext: Checked[Context] = {
+  private[this] def newContext: Checked[(IdGen, Context)] = {
     import CompilerErrorOps._
     val rootCtx = new RootContext
+    val rootIdGen = new IdGen
     implied for Context = rootCtx
-    for (_ <- Context.enterBootstrapped) yield rootCtx
+    implied for IdGen = rootIdGen
+    for (_ <- Context.enterBootstrapped) yield (rootIdGen, rootCtx)
   }
 
-  private[this] case class LoopState(prompt: String, break: Boolean, pwd: String, ctx: Context)
+  private[this] case class LoopState(prompt: String, break: Boolean, pwd: String, idGen: IdGen, ctx: Context)
 
   private[this] def loadFile(pwd: String, name: String): Checked[String] = {
     import scala.util.control._
@@ -91,8 +93,9 @@ object Repl {
     import implied CompilerErrorOps._
 
     implied for Context = state.ctx
+    implied for IdGen   = state.idGen
 
-    def Typed(s: String)(f: String => Contextual[Checked[Tree]]): LoopState =
+    def Typed(s: String)(f: String => IdMaker[Checked[Tree]]): LoopState =
       guarded(state, s) {
         val yieldTyped = for {
           expr  <- f(s)
@@ -132,7 +135,7 @@ object Repl {
         state
       }
 
-    def Ast(s: String)(f: String => Contextual[Checked[Tree]]): LoopState =
+    def Ast(s: String)(f: String => IdMaker[Checked[Tree]]): LoopState =
       guarded(state, s) {
         f(s).fold
           { err => println(s"[ERROR] ${err.userString}") }
@@ -176,7 +179,7 @@ object Repl {
           { err =>
             println(s"[ERROR] ${err.userString}. Quitting...")
             state.copy(break = true) }
-          { ctx => state.copy(ctx = ctx) }
+          { (idGen, ctx) => state.copy(idGen = idGen, ctx = ctx) }
       case Ctx =>
         import ContextOps._
         pprintln(ctx.toScoping, height = Int.MaxValue)

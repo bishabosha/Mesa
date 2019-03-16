@@ -13,10 +13,11 @@ object Contexts {
   import scala.annotation._
 
   type Scope          = mutable.Buffer[(Sym, Context)]
-  type TypeTable      = mutable.AnyRefMap[Name, Type]
+  type TypeTable      = mutable.Map[Name, Type]
   type PrimTable      = mutable.Buffer[Name]
   type Modal[X]       = given Mode => X
   type Contextual[O]  = given Context => O
+  type IdMaker[O]     = given IdGen => O
   opaque type Id      = Long
 
   enum Mode derives Eql {
@@ -60,33 +61,9 @@ object Contexts {
     def (x: Id) succ : Id = x + 1l
   }
 
-  case class Sym(id: Id, name: Name)
-
-  private val rootPkg = PackageInfo(TypeRef(From(rootString)), From(rootString))
-  private val rootSym = Sym(Id.rootId, Name.From(rootString))
-
-  sealed trait Context {
-    val outer: Context
-    val scope: Scope
-    def rootCtx: RootContext
-    private[Contexts] val typeTable: TypeTable
-    private[Contexts] val primTable: PrimTable
-  }
-
-  class Fresh private[Contexts] (
-      override val outer: Context,
-      override val scope: Scope,
-      override val typeTable: TypeTable,
-      override val primTable: PrimTable) extends Context {
-    override def rootCtx = outer.rootCtx
-  }
-
-  class RootContext extends Context {
+  final class IdGen {
     import Id._
 
-    private[this] val _typeTable: TypeTable = new mutable.AnyRefMap
-    private[this] val _scope: Scope = new mutable.ArrayBuffer
-    private[this] val _primTable: PrimTable = new mutable.ArrayBuffer
     private[this] var _id: Id = Id.initId
 
     def fresh(): Id = {
@@ -96,12 +73,36 @@ object Contexts {
     }
 
     def id = _id
-    override val typeTable = _typeTable
-    override val primTable = _primTable
-    override def rootCtx = this
-    override val outer = this
-    override val scope = _scope
   }
+
+  object IdGen {
+    def idGen given (gen: IdGen) = gen
+  }
+
+  case class Sym(id: Id, name: Name)
+
+  private val rootPkg = PackageInfo(TypeRef(From(rootString)), From(rootString))
+  private val rootSym = Sym(Id.rootId, Name.From(rootString))
+
+  sealed trait Context (
+    val scope: Scope,
+    val typeTable: TypeTable,
+    val primTable: PrimTable
+  )
+
+  final class RootContext extends Context(
+    new mutable.ArrayBuffer,
+    new mutable.AnyRefMap,
+    new mutable.ArrayBuffer
+  )
+
+  final class Fresh private[Contexts](
+    val outer: Context
+  ) extends Context(
+    new mutable.ArrayBuffer,
+    new mutable.AnyRefMap,
+    new mutable.ArrayBuffer
+  )
 
   object Context {
 
@@ -109,17 +110,28 @@ object Contexts {
 
     def ctx given (c: Context) = c
 
+    def rootCtx given Context = {
+      @tailrec
+      def inner(ctx: Context): Context = ctx match {
+        case _: RootContext => ctx
+        case f: Fresh       => inner(f.outer)
+      }
+      inner(ctx)
+    }
+
     def firstCtx(name: Name) given Context: Checked[Context] = {
-      lazy val root = ctx.rootCtx
+      lazy val root = rootCtx
 
       @tailrec
       def inner(ctxIt: Context): Checked[Context] =
         if ctxIt.scope.view.map(_._1.name).contains(name) then
           ctxIt
-        else if ctxIt eq root then
-          CompilerError.IllegalState(s"name not found: ${name.userString}")
-        else
-          inner(ctxIt.outer)
+        else ctxIt match {
+          case _: RootContext =>
+            CompilerError.IllegalState(s"name not found: ${name.userString}")
+          case f: Fresh =>
+            inner(f.outer)
+        }
 
       inner(ctx)
     }
@@ -144,11 +156,7 @@ object Contexts {
         CompilerError.UnexpectedType(
           s"Illegal shadowing in scope of name: ${name.userString}")
       else {
-        val newCtx = new Fresh(
-          ctx,
-          new mutable.ArrayBuffer,
-          new mutable.AnyRefMap,
-          new mutable.ArrayBuffer)
+        val newCtx = new Fresh(ctx)
         ctx.scope += Sym(id, name) -> newCtx
         newCtx
       }
@@ -177,8 +185,9 @@ object Contexts {
       ctx.typeTable += pair
     }
 
-    def getType(name: Name) given Context: Checked[Type] =
-      if name == Name.From(rootString) && (ctx eq ctx.rootCtx) then
+    def getType(name: Name) given Context: Checked[Type] = {
+      lazy val root = rootCtx
+      if name == Name.From(rootString) && (ctx `eq` root) then
         rootPkg
       else
         ctx.typeTable.getOrElse[Checked[Type]](
@@ -186,18 +195,22 @@ object Contexts {
           CompilerError.UnexpectedType(
             s"no type found for name: ${name.userString}")
         )
+    }
 
-    def enterBootstrapped given Context: Checked[Unit] = {
+    def enterBootstrapped given Context, IdGen: Checked[Unit] = {
       import types.Types
       import Name._
       import CompilerErrorOps._
-      val root = ctx.rootCtx
-      if root.scope.nonEmpty || root.id != Id.initId then {
+      import IdGen._
+      lazy val root = rootCtx
+      if root.scope.nonEmpty then {
         CompilerError.IllegalState("Non-fresh _root_ context")
+      } else if idGen.id != Id.initId then {
+        CompilerError.IllegalState("Non-fresh IdGen context")
       } else {
         implied for Context = root
         Names.bootstrapped.foreach { (name, tpe) =>
-          for (_ <- enterFresh(root.fresh(), name))
+          for (_ <- enterFresh(idGen.fresh(), name))
             yield {
               putType(name -> tpe)
             }
@@ -209,7 +222,10 @@ object Contexts {
                       given Context: Checked[Type] = {
       import CompilerErrorOps._
       import Type._
-      val outer = ctx.outer
+      val outer = ctx match {
+        case _: RootContext => ctx
+        case f: Fresh       => f.outer
+      }
       checked {
         implied for Context = outer
         for (parentTpe <- getType(parent)) yield (

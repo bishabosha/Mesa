@@ -13,6 +13,7 @@ object Parsers {
   import core.Constants._
   import core.Modifiers._
   import Context._
+  import IdGen._
   import Modifier._
   import Constant._
   import util.{Convert, |>, PostConditions}
@@ -31,15 +32,15 @@ object Parsers {
     genParser `andThen` { _.exprAsTop }
 
   private[parsing] def fromStatAsTop
-      (context: EECParser.StatAsTopContext): Contextual[Tree] =
+      (context: EECParser.StatAsTopContext) given IdGen: Tree =
     fromStat(context.stat)
 
   private[parsing] def fromExprAsTop
-      (context: EECParser.ExprAsTopContext): Contextual[Tree] =
+      (context: EECParser.ExprAsTopContext) given IdGen: Tree =
     fromExpr(context.expr)
 
   private[parsing] def fromTranslationUnit
-      (context: EECParser.TranslationUnitContext): Contextual[Tree] = {
+      (context: EECParser.TranslationUnitContext) given IdGen: Tree = {
     val pkgId = fromPackageInfo(context.packageInfo)
     val stats =
       if defined(context.statSeq) then
@@ -63,11 +64,11 @@ object Parsers {
     Convert[Tree, List[Tree]]
   }
 
-  private[this] def freshId(): Contextual[Id] = ctx.rootCtx.fresh()
+  private[this] def freshId() given IdGen: Id = idGen.fresh()
 
   def (o: String => O) toTreeParser[O]
-      (f: O => Contextual[Tree])
-      (input: String) given Context = {
+      (f: O => IdMaker[Tree])
+      (input: String) given IdGen = {
     import error.CompilerErrors._
     import error.CompilerErrors.CompilerErrorOps._
     f(o(input)).recover {
@@ -77,7 +78,7 @@ object Parsers {
   }
 
   private[this] def fromIntegerLiteral
-      (context: EECParser.LiteralContext): Contextual[Tree] = {
+      (context: EECParser.LiteralContext) given IdGen: Tree = {
     val txt = context.IntegerLiteral.getText
     if txt.endsWith("l") || txt.endsWith("L") then {
       throw new ParserSyntaxException(s"unexpected Long literal `$txt`")
@@ -86,7 +87,7 @@ object Parsers {
   }
 
   private[this] def fromFloatingPointLiteral
-      (context: EECParser.LiteralContext): Contextual[Tree] = {
+      (context: EECParser.LiteralContext) given IdGen: Tree = {
     val txt = context.FloatingPointLiteral.getText
     if txt.endsWith("f") || txt.endsWith("F") then {
       throw new ParserSyntaxException(s"unexpected Float literal `$txt`")
@@ -98,7 +99,7 @@ object Parsers {
   }
 
   private[this] def fromBooleanLiteral
-      (context: EECParser.LiteralContext): Contextual[Tree] = {
+      (context: EECParser.LiteralContext) given IdGen: Tree = {
     val bool = context.BooleanLiteral.getText match {
       case "True" => true
       case _      => false
@@ -118,7 +119,7 @@ object Parsers {
       text stripPrefix "\"" stripSuffix "\""
 
   private[this] def fromCharacterLiteral
-      (context: EECParser.LiteralContext): Contextual[Tree] = {
+      (context: EECParser.LiteralContext) given IdGen: Tree = {
     val charStr = charText(context)
     val char =
       if charStr.length == 0 then
@@ -129,13 +130,13 @@ object Parsers {
   }
 
   private[this] def fromStringLiteral
-      (context: EECParser.LiteralContext): Contextual[Tree] = {
+      (context: EECParser.LiteralContext) given IdGen: Tree = {
     val string = formatString(context.StringLiteral.getText)
     Literal(StringConstant(string))(freshId(), uTpe)
   }
 
   private[this] def fromLiteral
-      (context: EECParser.LiteralContext): Contextual[Tree] =
+      (context: EECParser.LiteralContext) given IdGen: Tree =
     if defined(context.IntegerLiteral) then
       fromIntegerLiteral(context)
     else if defined(context.FloatingPointLiteral) then
@@ -148,7 +149,7 @@ object Parsers {
       fromStringLiteral(context)
 
   private[this] def fromId
-      (context: EECParser.IdContext): Contextual[Tree] = {
+      (context: EECParser.IdContext) given IdGen: Tree = {
     val name = {
       import implied NameOps._
       context.getText.readAs
@@ -157,7 +158,7 @@ object Parsers {
   }
 
   private[this] def fromAlphaId
-      (context: EECParser.AlphaIdContext): Contextual[Tree] = {
+      (context: EECParser.AlphaIdContext) given IdGen: Tree = {
     val name = {
       import implied NameOps._
       context.getText.readAs
@@ -165,14 +166,14 @@ object Parsers {
     Ident(name)(freshId(), uTpe)
   }
 
-  private[this] def namesToTree(lst: List[Name]): Contextual[Tree] = lst match {
+  private[this] def namesToTree(lst: List[Name]) given IdGen: Tree = lst match {
     case n :: Nil   => Ident(n)(freshId(), uTpe)
     case n :: tail  => Select(namesToTree(tail), n)(freshId(), uTpe)
     case Nil        => EmptyTree
   }
 
   private[this] def fromQualId
-      (context: EECParser.QualIdContext): Contextual[Tree] = {
+      (context: EECParser.QualIdContext) given IdGen: Tree = {
     val tokens = {
       import implied NameOps._
       import scala.language.implicitConversions
@@ -182,7 +183,7 @@ object Parsers {
   }
 
   private[this] def fromStableId
-      (context: EECParser.StableIdContext): Contextual[Tree] = {
+      (context: EECParser.StableIdContext) given IdGen: Tree = {
     val ids = {
       import scala.language.implicitConversions
       context.id.map(fromId).ensuring(result.size <= 2)
@@ -195,14 +196,14 @@ object Parsers {
     }
   }
 
-  private[this] def fromType(context: EECParser.TypeContext): Contextual[Tree] =
+  private[this] def fromType(context: EECParser.TypeContext) given IdGen: Tree =
     if defined(context.func) then
       fromFunc(context.func)
     else
       fromInfixType(context.infixType)
 
   private[this] def fromFunc
-      (context: EECParser.FuncContext): Contextual[Tree] = {
+      (context: EECParser.FuncContext) given IdGen: Tree = {
     import scala.language.implicitConversions
     val infixes = context
       .infixType
@@ -214,14 +215,14 @@ object Parsers {
   }
 
   private[this] def fromInfixType
-      (context: EECParser.InfixTypeContext): Contextual[Tree] =
+      (context: EECParser.InfixTypeContext) given IdGen: Tree =
     if defined(context.simpleType) then
       fromSimpleType(context.simpleType)
     else
       fromPrefixType(context.prefixType)
 
   private[this] def fromProductType
-        (context: EECParser.ProductTypeContext): Contextual[Tree] = {
+        (context: EECParser.ProductTypeContext) given IdGen: Tree = {
     import scala.language.implicitConversions
     val types = context.`type`.map(fromType)
     if types.size == 1 then
@@ -231,7 +232,7 @@ object Parsers {
   }
 
   private[this] def fromPrefixType
-        (context: EECParser.PrefixTypeContext): Contextual[Tree] = {
+        (context: EECParser.PrefixTypeContext) given IdGen: Tree = {
     if defined(context.Bang) then
       fromBangType(context)
     else
@@ -239,7 +240,7 @@ object Parsers {
   }
 
   private[this] def fromFunctorType
-        (context: EECParser.PrefixTypeContext): Contextual[Tree] = {
+        (context: EECParser.PrefixTypeContext) given IdGen: Tree = {
     val simpleTypes = {
       import scala.language.implicitConversions
       context.simpleType.map(fromSimpleType)
@@ -250,7 +251,7 @@ object Parsers {
   }
 
   private[this] def fromBangType
-        (context: EECParser.PrefixTypeContext): Contextual[Tree] = {
+        (context: EECParser.PrefixTypeContext) given IdGen: Tree = {
     val simpleTypes = {
       import scala.language.implicitConversions
       context.simpleType.map(fromSimpleType)
@@ -261,13 +262,13 @@ object Parsers {
   }
 
   private[this] def fromSimpleType
-      (context: EECParser.SimpleTypeContext): Contextual[Tree] =
+      (context: EECParser.SimpleTypeContext) given IdGen: Tree =
     if defined(context.qualId) then
       fromQualId(context.qualId)
     else
       fromProductType(context.productType)
 
-  private[this] def fromExpr(context: EECParser.ExprContext): Contextual[Tree] =
+  private[this] def fromExpr(context: EECParser.ExprContext) given IdGen: Tree =
     if defined(context.lambda) then
       fromLambda(context.lambda)
     else if defined(context.letExpr) then
@@ -280,7 +281,7 @@ object Parsers {
       fromExprSeqAsApply(context.expr)
 
   private[this] def fromExprSeqAsApply
-        (exprs: java.util.List[EECParser.ExprContext]): Contextual[Tree] = {
+        (exprs: java.util.List[EECParser.ExprContext]) given IdGen: Tree = {
     import scala.language.implicitConversions
     val Seq(expr, arg)  = exprs.map(fromExpr).ensuring(result.size == 2)
     val args            = toList(arg)
@@ -288,14 +289,14 @@ object Parsers {
   }
 
   private[this] def fromLambda
-      (context: EECParser.LambdaContext): Contextual[Tree] = {
+      (context: EECParser.LambdaContext) given IdGen: Tree = {
     val bindings  = toList(fromBindings(context.bindings))
     val body      = fromExpr(context.expr)
     Function(bindings, body)(freshId(), uTpe)
   }
 
   private[this] def fromLetExpr
-      (context: EECParser.LetExprContext): Contextual[Tree] = {
+      (context: EECParser.LetExprContext) given IdGen: Tree = {
     import implied NameOps._
     var name =
       if defined(context.Varid) then
@@ -310,14 +311,14 @@ object Parsers {
   }
 
   private[this] def fromCaseExpr
-      (context: EECParser.CaseExprContext): Contextual[Tree] = {
+      (context: EECParser.CaseExprContext) given IdGen: Tree = {
     val selector = fromExpr(context.expr)
     val cases = toList(fromCases(context.cases))
     CaseExpr(selector, cases)(freshId(), uTpe)
   }
 
   private[this] def fromIfElse
-      (context: EECParser.Expr1Context) : Contextual[Tree] = {
+      (context: EECParser.Expr1Context)  given IdGen: Tree = {
     import scala.language.implicitConversions
     import types.Types.TypeOps._
     val exprs = context.expr
@@ -332,14 +333,14 @@ object Parsers {
   }
 
   private[this] def fromExpr1
-      (context: EECParser.Expr1Context): Contextual[Tree] =
+      (context: EECParser.Expr1Context) given IdGen: Tree =
     if defined(context.infixExpr) then
       fromInfixExpr(context.infixExpr)
     else
       fromIfElse(context)
 
   private[this] def fromInfixApplication
-        (context: EECParser.InfixExprContext): Contextual[Tree] = {
+        (context: EECParser.InfixExprContext) given IdGen: Tree = {
     val id =
       if defined(context.OpId) then {
         import implied NameOps._
@@ -356,20 +357,20 @@ object Parsers {
   }
 
   private[this] def fromInfixExpr
-      (context: EECParser.InfixExprContext): Contextual[Tree] =
+      (context: EECParser.InfixExprContext) given IdGen: Tree =
     if defined(context.prefixExpr) then
       fromPrefixExpr(context.prefixExpr)
     else
       fromInfixApplication(context)
 
-  private[this] def wrapComputation(tree: Tree): Contextual[Tree] = {
+  private[this] def wrapComputation(tree: Tree) given IdGen: Tree = {
     import Name._
     val tag = Ident(ComputationTag)(freshId(), uTpe)
     Apply(tag, List(tree))(freshId(), uTpe)
   }
 
   private[this] def fromPrefixExpr
-      (context: EECParser.PrefixExprContext): Contextual[Tree] = {
+      (context: EECParser.PrefixExprContext) given IdGen: Tree = {
     val simpleExpr = fromSimpleExpr(context.simpleExpr)
     if defined(context.Bang) then
       wrapComputation(simpleExpr)
@@ -378,7 +379,7 @@ object Parsers {
   }
 
   private[this] def fromSimpleExpr
-      (context: EECParser.SimpleExprContext): Contextual[Tree] =
+      (context: EECParser.SimpleExprContext) given IdGen: Tree =
     if defined(context.literal) then
       fromLiteral(context.literal)
     else if defined(context.stableId) then
@@ -387,7 +388,7 @@ object Parsers {
       fromExprsInParens(context.exprsInParens)
 
   private[this] def fromCases
-      (context: EECParser.CasesContext): Contextual[Tree] = {
+      (context: EECParser.CasesContext) given IdGen: Tree = {
     val caseClauses = {
       import scala.language.implicitConversions
       context.caseClause.map(fromCaseClause).toList
@@ -396,7 +397,7 @@ object Parsers {
   }
 
   private[this] def fromCaseClause
-      (context: EECParser.CaseClauseContext): Contextual[Tree] = {
+      (context: EECParser.CaseClauseContext) given IdGen: Tree = {
     val pat = fromPattern(context.pattern)
     val guard =
       if defined(context.guard) then
@@ -408,7 +409,7 @@ object Parsers {
   }
 
   private[this] def fromExprsInParens
-      (context: EECParser.ExprsInParensContext): Contextual[Tree] = {
+      (context: EECParser.ExprsInParensContext) given IdGen: Tree = {
     val expr = {
       import scala.language.implicitConversions
       context.expr.map(fromExpr)
@@ -420,7 +421,7 @@ object Parsers {
   }
 
   private[this] def fromPattern
-      (context: EECParser.PatternContext): Contextual[Tree] = {
+      (context: EECParser.PatternContext) given IdGen: Tree = {
     val patterns = {
       import scala.language.implicitConversions
       context.pattern1.map(fromPattern1)
@@ -432,11 +433,11 @@ object Parsers {
   }
 
   private[this] def fromPattern1
-      (context: EECParser.Pattern1Context): Contextual[Tree] =
+      (context: EECParser.Pattern1Context) given IdGen: Tree =
     fromPattern2(context.pattern2)
 
   private[this] def fromBind
-      (context: EECParser.Pattern2Context): Contextual[Tree] = {
+      (context: EECParser.Pattern2Context) given IdGen: Tree = {
     val name = {
       import implied NameOps._
       context.Varid.getText.readAs
@@ -448,18 +449,18 @@ object Parsers {
   }
 
   private[this] def fromPattern2
-      (context: EECParser.Pattern2Context): Contextual[Tree] =
+      (context: EECParser.Pattern2Context) given IdGen: Tree =
     if defined(context.Varid) then
       fromBind(context)
     else
       fromPattern3(context.pattern3)
 
   private[this] def fromPattern3
-      (context: EECParser.Pattern3Context): Contextual[Tree] =
+      (context: EECParser.Pattern3Context) given IdGen: Tree =
     fromSimplePattern(context.simplePattern)
 
   private[this] def fromVaridPattern
-      (context: EECParser.SimplePatternContext): Contextual[Tree] = {
+      (context: EECParser.SimplePatternContext) given IdGen: Tree = {
     val name = {
       import implied NameOps._
       context.Varid.getText.readAs
@@ -468,7 +469,7 @@ object Parsers {
   }
 
   private[this] def fromFunctorPattern
-      (context: EECParser.SimplePatternContext): Contextual[Tree] = {
+      (context: EECParser.SimplePatternContext) given IdGen: Tree = {
     val functor = {
       import implied NameOps._
       context.Patid.getText.readAs
@@ -480,11 +481,11 @@ object Parsers {
     Unapply(functor, args)(freshId(), uTpe)
   }
 
-  private[this] def fromUnitPattern: Contextual[Tree] =
+  private[this] def fromUnitPattern given IdGen: Tree =
     Parens(Nil)(freshId(), uTpe)
 
   private[this] def fromSimplePattern
-      (context: EECParser.SimplePatternContext): Contextual[Tree] =
+      (context: EECParser.SimplePatternContext) given IdGen: Tree =
     if defined(context.Wildcard) then
       any.wildcardIdent
     else if context.getText == "()" then
@@ -499,7 +500,7 @@ object Parsers {
       fromPatterns(context.patterns)
 
   private[this] def fromPatterns
-      (context: EECParser.PatternsContext): Contextual[Tree] = {
+      (context: EECParser.PatternsContext) given IdGen: Tree = {
     val patterns = {
       import scala.language.implicitConversions
       context.pattern.map(fromPattern)
@@ -511,15 +512,15 @@ object Parsers {
   }
 
   private[this] def fromGuard
-      (context: EECParser.GuardContext): Contextual[Tree] =
+      (context: EECParser.GuardContext) given IdGen: Tree =
     fromInfixExpr(context.infixExpr)
 
   private[this] def fromBindings
-      (context: EECParser.BindingsContext): Contextual[Tree] =
+      (context: EECParser.BindingsContext) given IdGen: Tree =
     fromBindingsTagged(context.bindingsTagged)
 
   private[this] def fromBindingsTagged
-      (context: EECParser.BindingsTaggedContext): Contextual[Tree] = {
+      (context: EECParser.BindingsTaggedContext) given IdGen: Tree = {
     val bindings = {
       import scala.language.implicitConversions
       context.binding.map(fromBinding).toList
@@ -528,36 +529,36 @@ object Parsers {
   }
 
   private[this] def fromBinding
-      (context: EECParser.BindingContext): Contextual[Tree] = {
+      (context: EECParser.BindingContext) given IdGen: Tree = {
     import TreeOps._
     val List(name) = fromId(context.id).toNames
     val typ = fromType(context.`type`)
     Tagged(name, typ)(freshId(), uTpe)
   }
 
-  private[this] def fromDcl(context: EECParser.DclContext): Contextual[Tree] =
+  private[this] def fromDcl(context: EECParser.DclContext) given IdGen: Tree =
     fromPrimitiveDcl(context.primitiveDcl)
 
   private[this] def fromPrimitiveDcl
-      (context: EECParser.PrimitiveDclContext): Contextual[Tree] = {
+      (context: EECParser.PrimitiveDclContext) given IdGen: Tree = {
     import TreeOps._
     val modifiers = Set(Primitive)
     fromDefDecl(context.defDecl).addModifiers(modifiers)
   }
 
   private[this] def fromDefDecl
-      (context: EECParser.DefDeclContext): Contextual[Tree] = {
+      (context: EECParser.DefDeclContext) given IdGen: Tree = {
     val sig = fromDefSig(context.defSig)
     val typ = fromType(context.`type`)
     DefDef(Set(), sig, typ, EmptyTree)(freshId(), uTpe)
   }
 
   private[this] def fromDef
-      (context: EECParser.DefContext): Contextual[Tree] =
+      (context: EECParser.DefContext) given IdGen: Tree =
     fromDefDef(context.defDef)
 
   private[this] def fromDefDef
-      (context: EECParser.DefDefContext): Contextual[Tree] = {
+      (context: EECParser.DefDefContext) given IdGen: Tree = {
     val defSig  = fromDefSig(context.defSig)
     val typ     = fromType(context.`type`)
     val expr    = fromExpr(context.expr)
@@ -565,14 +566,14 @@ object Parsers {
   }
 
   private[this] def fromDefSig
-      (context: EECParser.DefSigContext): Contextual[Tree] =
+      (context: EECParser.DefSigContext) given IdGen: Tree =
     if defined(context.infixDefSig) then
       fromInfixDefSig(context.infixDefSig)
     else
       fromPrefixDefSig(context)
 
   private[this] def fromPrefixDefSig
-      (context: EECParser.DefSigContext): Contextual[Tree] = {
+      (context: EECParser.DefSigContext) given IdGen: Tree = {
     var name = {
       import implied TreeOps._
       Convert[Tree, Name](fromAlphaId(context.alphaId))
@@ -587,7 +588,7 @@ object Parsers {
   }
 
   private[this] def fromInfixDefSig
-      (context: EECParser.InfixDefSigContext): Contextual[Tree] =
+      (context: EECParser.InfixDefSigContext) given IdGen: Tree =
     if defined(context.prefixOpSig) then
       fromPrefixOpSig(context.prefixOpSig)
     else if defined(context.OpId) then
@@ -596,7 +597,7 @@ object Parsers {
       fromInfixAlphaSig(context)
 
   private[this] def infixArgs
-      (context: EECParser.InfixDefSigContext): Contextual[List[Tree]] = {
+      (context: EECParser.InfixDefSigContext) given IdGen: List[Tree] = {
     import scala.language.implicitConversions
     import implied NameOps._
     context.Varid
@@ -607,7 +608,7 @@ object Parsers {
   }
 
   private[this] def fromInfixOpSig
-      (context: EECParser.InfixDefSigContext): Contextual[Tree] = {
+      (context: EECParser.InfixDefSigContext) given IdGen: Tree = {
     var args = infixArgs(context)
     var name = {
       import implied NameOps._
@@ -617,7 +618,7 @@ object Parsers {
   }
 
   private[this] def fromInfixAlphaSig
-      (context: EECParser.InfixDefSigContext): Contextual[Tree] = {
+      (context: EECParser.InfixDefSigContext) given IdGen: Tree = {
     var args = infixArgs(context)
     val name = {
       import implied TreeOps._
@@ -627,7 +628,7 @@ object Parsers {
   }
 
   private[this] def fromPrefixOpSig
-      (context: EECParser.PrefixOpSigContext): Contextual[Tree] = {
+      (context: EECParser.PrefixOpSigContext) given IdGen: Tree = {
     import scala.language.implicitConversions
     import implied NameOps._
     var args = context.Varid
@@ -639,18 +640,18 @@ object Parsers {
   }
 
   private[this] def fromPackageInfo
-      (context: EECParser.PackageInfoContext): Contextual[Tree] =
+      (context: EECParser.PackageInfoContext) given IdGen: Tree =
     fromQualId(context.qualId)
 
   private[this] def fromStatSeq
-      (context: EECParser.StatSeqContext): Contextual[Tree] = {
+      (context: EECParser.StatSeqContext) given IdGen: Tree = {
     import scala.language.implicitConversions
     import implied TreeOps._
     val stats = context.stat.map(fromStat).toList
     fromList(stats)
   }
 
-  private[this] def fromStat(context: EECParser.StatContext): Contextual[Tree] =
+  private[this] def fromStat(context: EECParser.StatContext) given IdGen: Tree =
     if defined(context.`def`) then
       fromDef(context.`def`)
     else

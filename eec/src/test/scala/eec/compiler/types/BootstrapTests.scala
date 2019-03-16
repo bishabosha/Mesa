@@ -19,15 +19,15 @@ object BootstrapTests {
 
   private val any = Type.WildcardType
 
-  def typeExpr: String => Type => Contextual[Checked[Tree]] =
+  def typeExpr: String => Type => Contextual[IdMaker[Checked[Tree]]] =
     typeCore(parseExpr)
 
-  def typeStat: String => Type => Contextual[Checked[Tree]] =
+  def typeStat: String => Type => Contextual[IdMaker[Checked[Tree]]] =
     typeCore(parseStat)
 
-  private def typeCore(f: String => Contextual[Checked[Tree]])
+  private def typeCore(f: String => IdMaker[Checked[Tree]])
                       (str: String)
-                      (pt: Type) given Context =
+                      (pt: Type) given IdGen, Context =
     for {
       exp <- f(str)
       _   <- indexAsExpr(exp)
@@ -52,14 +52,16 @@ object BootstrapTests {
         { tpd => assertEquals(checkTpe, tpd.tpe.userString) }
     }
 
-  def initialCtx: Checked[Context] = {
+  def initialCtx: Checked[(IdGen, Context)] = {
 
-    val rootCtx = new RootContext()
-    implied for Context = rootCtx
+    val idGen = new IdGen
+    val ctx   = new RootContext()
+    implied for Context = ctx
+    implied for IdGen   = idGen
 
     for {
       _ <- Context.enterBootstrapped
       _ <- compiler.preludeDefs.mapE(typeStat(_)(any))
-    } yield rootCtx
+    } yield (idGen, ctx)
   }
 }

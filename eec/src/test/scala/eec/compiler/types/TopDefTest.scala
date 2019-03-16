@@ -95,7 +95,8 @@ class TopDefTest {
 
   private def typecheck(seq: (String, String)*): Unit = {
     import CompilerErrorOps._
-    initialCtx.flatMap { ctx =>
+    initialCtx.flatMap { (idGen, ctx) =>
+      implied for IdGen = idGen
       implied for Context = ctx
       seq.toList.mapE((f, s) => checkTpe(typeStat(f)(any), s))
     }
@@ -103,7 +104,8 @@ class TopDefTest {
 
   private def noType(seq: String*): Unit = {
     import CompilerErrorOps._
-    initialCtx.flatMap { ctx =>
+    initialCtx.flatMap { (idGen, ctx) =>
+      implied for IdGen = idGen
       implied for Context = ctx
       seq.foreach { f => failIfTyped(typeStat(f)(any)) }
     }

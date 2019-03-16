@@ -184,7 +184,8 @@ class TyperTest {
 
   def typecheck(seq: (String, String)*): Unit = {
     import CompilerErrorOps._
-    initialCtx.flatMap { ctx =>
+    initialCtx.flatMap { (idGen, ctx) =>
+      implied for IdGen = idGen
       implied for Context = ctx
       seq.toList.mapE((f, s) => checkTpe(typeExpr(f)(any), s))
     }
@@ -192,7 +193,8 @@ class TyperTest {
 
   def noType(seq: String*): Unit = {
     import CompilerErrorOps._
-    initialCtx.flatMap { ctx =>
+    initialCtx.flatMap { (idGen, ctx) =>
+      implied for IdGen = idGen
       implied for Context = ctx
       seq.toList.mapE(f => failIfTyped(typeExpr(f)(any)))
     }

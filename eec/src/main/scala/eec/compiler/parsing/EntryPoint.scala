@@ -9,13 +9,13 @@ import core.Contexts._
 
 object EntryPoint {
 
-  val parseEEC: String => Contextual[Checked[Tree]] =
+  val parseEEC: String => IdMaker[Checked[Tree]] =
     eecParser `toTreeParser` fromTranslationUnit
 
-  val parseStat: String => Contextual[Checked[Tree]] =
+  val parseStat: String => IdMaker[Checked[Tree]] =
     statParser `toTreeParser` fromStatAsTop
 
-  val parseExpr: String => Contextual[Checked[Tree]] =
+  val parseExpr: String => IdMaker[Checked[Tree]] =
     exprParser `toTreeParser` fromExprAsTop
 
 }
