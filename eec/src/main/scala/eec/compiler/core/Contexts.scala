@@ -9,8 +9,8 @@ object Contexts {
   import core.Names._
   import Name._
   import error.CompilerErrors._
-  import scala.collection._
-  import scala.annotation._
+  import collection._
+  import annotation._
 
   type Scope          = mutable.Buffer[(Sym, Context)]
   type TypeTable      = mutable.Map[Name, Type]

@@ -9,7 +9,7 @@ object Trees {
   import core.Contexts._
   import core.Modifiers._
   import types.Types._
-  import scala.annotation._
+  import annotation._
 
   enum Tree(val id: Id, val tpe: Type) derives Eql {
     case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(id, tpe)

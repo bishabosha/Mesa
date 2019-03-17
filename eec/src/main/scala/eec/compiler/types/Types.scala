@@ -33,7 +33,7 @@ object Types {
 
   object TypeOps {
 
-    import scala.annotation._
+    import annotation._
     import util.Showable
     import Type._
     import Tree._

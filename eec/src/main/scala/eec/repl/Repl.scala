@@ -10,7 +10,7 @@ import Types._
 import Type._
 import core.Contexts._
 import error.CompilerErrors._
-import scala.annotation._
+import annotation._
 import util.Convert
 import pprint._
 

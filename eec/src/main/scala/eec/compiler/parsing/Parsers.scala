@@ -20,7 +20,7 @@ object Parsers {
   import PostConditions._
   import error.CompilerErrors._
   import org.antlr.v4.runtime._
-  import scala.collection.JavaConversions._
+  import collection.JavaConversions._
 
   private[parsing] val eecParser =
     genParser `andThen` { _.translationUnit }
@@ -176,7 +176,7 @@ object Parsers {
       (context: EECParser.QualIdContext) given IdGen: Tree = {
     val tokens = {
       import implied NameOps._
-      import scala.language.implicitConversions
+      import language.implicitConversions
       context.id.map(_.getText.readAs).toList.reverse
     }
     namesToTree(tokens)
@@ -185,7 +185,7 @@ object Parsers {
   private[this] def fromStableId
       (context: EECParser.StableIdContext) given IdGen: Tree = {
     val ids = {
-      import scala.language.implicitConversions
+      import language.implicitConversions
       context.id.map(fromId).ensuring(result.size <= 2)
     }
     if ids.size == 1 then {
@@ -204,7 +204,7 @@ object Parsers {
 
   private[this] def fromFunc
       (context: EECParser.FuncContext) given IdGen: Tree = {
-    import scala.language.implicitConversions
+    import language.implicitConversions
     val infixes = context
       .infixType
       .map(fromInfixType)
@@ -223,7 +223,7 @@ object Parsers {
 
   private[this] def fromProductType
         (context: EECParser.ProductTypeContext) given IdGen: Tree = {
-    import scala.language.implicitConversions
+    import language.implicitConversions
     val types = context.`type`.map(fromType)
     if types.size == 1 then
       types(0)
@@ -242,7 +242,7 @@ object Parsers {
   private[this] def fromFunctorType
         (context: EECParser.PrefixTypeContext) given IdGen: Tree = {
     val simpleTypes = {
-      import scala.language.implicitConversions
+      import language.implicitConversions
       context.simpleType.map(fromSimpleType)
     }
     val tag   = fromQualId(context.qualId)
@@ -253,7 +253,7 @@ object Parsers {
   private[this] def fromBangType
         (context: EECParser.PrefixTypeContext) given IdGen: Tree = {
     val simpleTypes = {
-      import scala.language.implicitConversions
+      import language.implicitConversions
       context.simpleType.map(fromSimpleType)
     }
     val tag   = Ident(Name.ComputationTag)(freshId(), uTpe)
@@ -282,7 +282,7 @@ object Parsers {
 
   private[this] def fromExprSeqAsApply
         (exprs: java.util.List[EECParser.ExprContext]) given IdGen: Tree = {
-    import scala.language.implicitConversions
+    import language.implicitConversions
     val Seq(expr, arg)  = exprs.map(fromExpr).ensuring(result.size == 2)
     val args            = toList(arg)
     Apply(expr, args)(freshId(), uTpe)
@@ -319,7 +319,7 @@ object Parsers {
 
   private[this] def fromIfElse
       (context: EECParser.Expr1Context)  given IdGen: Tree = {
-    import scala.language.implicitConversions
+    import language.implicitConversions
     import types.Types.TypeOps._
     val exprs = context.expr
       .ensuring(result.size == 3)
@@ -348,7 +348,7 @@ object Parsers {
       } else {
         fromAlphaId(context.alphaId)
       }
-    import scala.language.implicitConversions
+    import language.implicitConversions
     val infixes = context.infixExpr
       .ensuring(result.size == 2)
       .map(fromInfixExpr)
@@ -390,7 +390,7 @@ object Parsers {
   private[this] def fromCases
       (context: EECParser.CasesContext) given IdGen: Tree = {
     val caseClauses = {
-      import scala.language.implicitConversions
+      import language.implicitConversions
       context.caseClause.map(fromCaseClause).toList
     }
     fromList(caseClauses)
@@ -411,7 +411,7 @@ object Parsers {
   private[this] def fromExprsInParens
       (context: EECParser.ExprsInParensContext) given IdGen: Tree = {
     val expr = {
-      import scala.language.implicitConversions
+      import language.implicitConversions
       context.expr.map(fromExpr)
     }
     if expr.size == 1 then
@@ -423,7 +423,7 @@ object Parsers {
   private[this] def fromPattern
       (context: EECParser.PatternContext) given IdGen: Tree = {
     val patterns = {
-      import scala.language.implicitConversions
+      import language.implicitConversions
       context.pattern1.map(fromPattern1)
     }
     if patterns.size == 1 then
@@ -475,7 +475,7 @@ object Parsers {
       context.Patid.getText.readAs
     }
     val args = {
-      import scala.language.implicitConversions
+      import language.implicitConversions
       context.pattern.map(fromPattern).toList
     }
     Unapply(functor, args)(freshId(), uTpe)
@@ -502,7 +502,7 @@ object Parsers {
   private[this] def fromPatterns
       (context: EECParser.PatternsContext) given IdGen: Tree = {
     val patterns = {
-      import scala.language.implicitConversions
+      import language.implicitConversions
       context.pattern.map(fromPattern)
     }
     if patterns.size == 1 then
@@ -522,7 +522,7 @@ object Parsers {
   private[this] def fromBindingsTagged
       (context: EECParser.BindingsTaggedContext) given IdGen: Tree = {
     val bindings = {
-      import scala.language.implicitConversions
+      import language.implicitConversions
       context.binding.map(fromBinding).toList
     }
     fromList(bindings)
@@ -579,7 +579,7 @@ object Parsers {
       Convert[Tree, Name](fromAlphaId(context.alphaId))
     }
     var varids = {
-      import scala.language.implicitConversions
+      import language.implicitConversions
       import implied NameOps._
       context.Varid.map(_.getText.readAs).toList
     }
@@ -598,7 +598,7 @@ object Parsers {
 
   private[this] def infixArgs
       (context: EECParser.InfixDefSigContext) given IdGen: List[Tree] = {
-    import scala.language.implicitConversions
+    import language.implicitConversions
     import implied NameOps._
     context.Varid
       .ensuring(result.size == 2)
@@ -629,7 +629,7 @@ object Parsers {
 
   private[this] def fromPrefixOpSig
       (context: EECParser.PrefixOpSigContext) given IdGen: Tree = {
-    import scala.language.implicitConversions
+    import language.implicitConversions
     import implied NameOps._
     var args = context.Varid
       .map { _.getText.readAs }
@@ -645,7 +645,7 @@ object Parsers {
 
   private[this] def fromStatSeq
       (context: EECParser.StatSeqContext) given IdGen: Tree = {
-    import scala.language.implicitConversions
+    import language.implicitConversions
     import implied TreeOps._
     val stats = context.stat.map(fromStat).toList
     fromList(stats)

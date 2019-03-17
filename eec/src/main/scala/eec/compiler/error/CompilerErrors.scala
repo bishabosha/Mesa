@@ -16,7 +16,9 @@ object CompilerErrors {
   object CompilerErrorOps {
 
     import eec.util.Showable
-    import scala.annotation.tailrec
+    import collection.generic.CanBuildFrom
+    import collection.mutable.Builder
+    import annotation.tailrec
 
     def checked[O](o: Checked[O]): Checked[O] = o
 
@@ -49,31 +51,41 @@ object CompilerErrors {
         case _                  => f(o.asInstanceOf[O])
       }
 
-    def (l: List[A]) mapE[A, O](f: A => Checked[O]): Checked[List[O]] = {
-      import scala.collection._
-      l.foldLeftE(new mutable.ListBuffer[O]) { (acc, a) =>
-        for (o <- f(a))
-          yield {
-            acc += o
-            acc
+    def (c: CC[A]) mapE[CC[A] <: Iterable[A], A, O, That](f: A => Checked[O])
+        given (bf: CanBuildFrom[CC[A], O, That]): Checked[That] = {
+
+      val b = bf(c)
+
+      @tailrec
+      def inner(it: Iterator[A]): Checked[That] =
+        if it.hasNext then
+          f(it.next) match {
+            case err: CompilerError =>
+              err
+            case o =>
+              b += o.asInstanceOf[O]
+              inner(it)
           }
-      }
-      .map(_.toList)
+        else
+          b.result
+
+      inner(c.iterator)
     }
 
-    def (l: List[A]) foldLeftE[A, O](seed: O)
+    def (l: Iterable[A]) foldLeftE[A, O](seed: O)
         (f: (O, A) => Checked[O]): Checked[O] = {
+
       @tailrec
-      def inner(acc: O, l: List[A]): Checked[O] = l match {
-        case head :: tail =>
-          f(acc, head) match {
+      def inner(acc: O, it: Iterator[A]): Checked[O] =
+        if it.hasNext then
+          f(acc, it.next) match {
             case err: CompilerError => err
-            case acc1               => inner(acc1.asInstanceOf[O], tail)
+            case acc1               => inner(acc1.asInstanceOf[O], it)
           }
-        case _ =>
+        else
           acc
-      }
-      inner(seed, l)
+
+      inner(seed, l.iterator)
     }
 
     def (f: => O) recoverDefault[O]: Checked[O] = {
