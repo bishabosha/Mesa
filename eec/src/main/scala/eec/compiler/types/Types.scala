@@ -26,7 +26,6 @@ object Types {
     case Product(args: List[Type])
     case AppliedType(typ: Type, args: List[Type])
     case WildcardType
-    case UntypedExpect(typ: Type)
     case Untyped
     case EmptyType
   }
@@ -47,12 +46,6 @@ object Types {
     def packageName(t: Type): Name = t match {
       case PackageInfo(_, name) => name
       case _                    => EmptyName
-    }
-
-    def untypedToChecked(tpe: Type): Type = tpe match {
-      case UntypedExpect(t) => t
-      case Untyped          => WildcardType
-      case _                => EmptyType
     }
 
     def toCurriedList(t: Type): List[Type] = {
@@ -100,6 +93,11 @@ object Types {
           case _ =>
             Nil
         }
+      case Variable(comp @ Comp(_)) =>
+        if app.isComputationType then
+          (comp, app) :: Nil
+        else
+          Nil
       case Variable(name) =>
         (name, app) :: Nil
       case _ =>
@@ -122,10 +120,23 @@ object Types {
         tpe
     }
 
+    def (tpe: Type) isComputationType: Boolean = tpe match {
+      case AppliedType(TypeRef(ComputationTag), List(_)) =>
+        true
+      case TypeRef(Comp(_)) =>
+        true
+      case FunctionType(_, tpe) =>
+        tpe.isComputationType
+      case Product(ts) =>
+        ts.forall(isComputationType)
+      case _ =>
+        false
+    }
+
     implied for Showable[Type] {
       import implied NameOps._
 
-      def (tpe: Type) userString: String = {
+      def (tpe: Type) show: String = {
         inline def packaged(t: Type): String = {
           @tailrec
           def packageNamed(acc: List[Name], tpe: Type): List[Name] =
@@ -136,30 +147,30 @@ object Types {
                 acc
             }
           packageNamed(Nil, t)
-            .map(_.userString)
+            .map(_.show)
             .mkString("package ", ".", "")
         }
         
         inline def applied(t: Type, ts: List[Type]): String = {
           if ts.isEmpty then
-            t.userString
+            t.show
           else {
             val args = ts.map {
               case f @ (FunctionType(_,_) | AppliedType(_,_)) =>
-                val str = f.userString
+                val str = f.show
                 s"($str)"
               case f =>
-                f.userString
+                f.show
             }
-            val functorStr = t.userString
+            val functorStr = t.show
             val argsStr = args.mkString(" ")
             s"$functorStr $argsStr"
           }
         }
 
         inline def fromFunction(arg: Type, body: Type): String = arg match {
-          case FunctionType(_,_) => s"(${arg.userString}) -> ${body.userString}"
-          case _                 => s"${arg.userString} -> ${body.userString}"
+          case FunctionType(_,_) => s"(${arg.show}) -> ${body.show}"
+          case _                 => s"${arg.show} -> ${body.show}"
         }
 
         tpe match {
@@ -168,16 +179,16 @@ object Types {
           case FunctionType(arg, body) =>
             fromFunction(arg, body)
           case Product(ts) =>
-            ts.map(_.userString).mkString("(", ", ", ")")
+            ts.map(_.show).mkString("(", ", ", ")")
           case AppliedType(t, ts) =>
             applied(t, ts)
           case TypeRef(t) =>
-            t.userString
+            t.show
           case Variable(t) =>
-            t.userString
+            t.show
           case WildcardType =>
             "<anytype>"
-          case Untyped | UntypedExpect(_) =>
+          case Untyped =>
             "<untyped>"
           case EmptyType =>
             "<emptytype>"

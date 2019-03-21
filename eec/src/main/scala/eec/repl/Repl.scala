@@ -36,7 +36,7 @@ object Repl {
     }
 
     newContext.fold
-      { err => println(s"[ERROR] ${err.userString}. Quitting...") }
+      { err => println(s"[ERROR] ${err.show}. Quitting...") }
       { (idGen, ctx) =>
         val pwd = System.getProperty("user.dir")
         val initial = LoopState(defaultPrompt, false, pwd, idGen, ctx)
@@ -104,11 +104,11 @@ object Repl {
         } yield typed
 
         yieldTyped.fold
-          { error => println(s"[ERROR] ${error.userString}") }
+          { error => println(s"[ERROR] ${error.show}") }
           { typed =>
             import ContextOps._
             import implied TypeOps._
-            println(typed.tpe.userString)
+            println(typed.tpe.show)
           }
 
         state
@@ -123,13 +123,13 @@ object Repl {
         } yield tpd
 
         typed.fold
-          { err => println(s"[ERROR] ${err.userString}") }
+          { err => println(s"[ERROR] ${err.show}") }
           { tpd =>
             import Tree._
             import implied TypeOps._
             import implied core.Names.NameOps._
             val DefDef(_, DefSig(name, _), _, _) = tpd
-            println(s"defined ${name.userString} : ${tpd.tpe.userString}")
+            println(s"defined ${name.show} : ${tpd.tpe.show}")
           }
 
         state
@@ -138,7 +138,7 @@ object Repl {
     def Ast(s: String)(f: String => IdMaker[Checked[Tree]]): LoopState =
       guarded(state, s) {
         f(s).fold
-          { err => println(s"[ERROR] ${err.userString}") }
+          { err => println(s"[ERROR] ${err.show}") }
           { ast =>
             import core.Printing.untyped.Ast
             import implied core.Printing.untyped.AstOps._
@@ -177,7 +177,7 @@ object Repl {
         println("Loading a new context")
         newContext.fold
           { err =>
-            println(s"[ERROR] ${err.userString}. Quitting...")
+            println(s"[ERROR] ${err.show}. Quitting...")
             state.copy(break = true) }
           { (idGen, ctx) => state.copy(idGen = idGen, ctx = ctx) }
       case Ctx =>

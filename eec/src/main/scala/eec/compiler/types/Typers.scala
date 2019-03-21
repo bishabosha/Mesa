@@ -38,20 +38,6 @@ object Typers {
 
   private[Typers] val any = WildcardType
 
-  def (tpe: Type) isComputationType: Boolean = {
-    import Name._
-    tpe match {
-      case AppliedType(TypeRef(ComputationTag), List(_)) =>
-        true
-      case FunctionType(_, tpe) =>
-        tpe.isComputationType
-      case Product(ts) =>
-        ts.forall(isComputationType)
-      case _ =>
-        false
-    }
-  }
-
   def (ts: List[Tree]) unifiedTpe: Checked[Type] =
     if ts.isEmpty then {
       EmptyType
@@ -63,7 +49,7 @@ object Typers {
         tpe
       else
         CompilerError.UnexpectedType(
-          s"Types do not unify to ${tpe.userString}")
+          s"Types do not unify to ${tpe.show}")
     }
 
   def resolveVariables(tpe: Type) given Context: Type = tpe match {
@@ -102,10 +88,10 @@ object Typers {
         else {
           import implied TreeOps._
           import implied TypeOps._
-          val functorTyp1Str  = functorTyp1.userString
-          val proto1Str       = proto1.userString
+          val functorTyp1Str  = functorTyp1.show
+          val proto1Str       = proto1.show
           CompilerError.UnexpectedType(
-            s"Functor definition `${functorTyp.userString}` does not match args. Expected `$functorTyp1Str` but was `$proto1Str` in application expr.")
+            s"Functor definition `${functorTyp.show}` does not match args. Expected `$functorTyp1Str` but was `$proto1Str` in application expr.")
         }
       case _ =>
         CompilerError.IllegalState(s"Can not apply to non function type.")
@@ -124,18 +110,18 @@ object Typers {
             else {
               import implied TreeOps._
               import implied TypeOps._
-              val ret2Str = ret2.userString
-              val ret1Str = ret1.userString
+              val ret2Str = ret2.show
+              val ret1Str = ret1.show
               CompilerError.UnexpectedType(
                 s"Function Definition type `$ret2Str` does not match return type `$ret1Str`.")
             }
         else {
           import implied TreeOps._
           import implied TypeOps._
-          val arg2Str  = arg2.userString
-          val arg1Str = arg1.userString
+          val arg2Str  = arg2.show
+          val arg1Str = arg1.show
           CompilerError.UnexpectedType(
-            s"Function definition `${funTyp.userString}` does not match args. Expected `$arg2Str` but was `$arg1Str` in application expr.")
+            s"Function definition `${funTyp.show}` does not match args. Expected `$arg2Str` but was `$arg1Str` in application expr.")
         }
       case _ =>
         CompilerError.IllegalState(s"Can not apply to non function type.")
@@ -174,6 +160,7 @@ object Typers {
   }
 
   private def functionTermTpe(args1: List[Tree], body1: Tree): Checked[Type] = {
+    import TypeOps._
     val tpes  = args1.map(_.tpe)
     val fType = tpes.foldRight(body1.tpe) { FunctionType(_,_) }
     if !fType.isComputationType then
@@ -196,6 +183,7 @@ object Typers {
 
   private def functionTypeTpe(args1: List[Tree], body1: Tree)
                           given Mode: Checked[Type] = {
+    import TypeOps._
     val argTpes = toType(args1.map(_.tpe))
     val fType   = FunctionType(argTpes, body1.tpe)
     if mode != PrimitiveType && !fType.isComputationType then
@@ -231,7 +219,7 @@ object Typers {
         if ptAsTuple.length == 1 then {
           import implied TypeOps._
           CompilerError.UnexpectedType(
-            s"expected `${pt.userString}` but was a Tuple.")
+            s"expected `${pt.show}` but was a Tuple.")
         } else {
           CompilerError.UnexpectedType("Tuple lengths do not match")
         }
@@ -251,9 +239,9 @@ object Typers {
         } else {
           import implied TypeOps._
           import implied TreeOps._
-          val tupleTypeStr  = tupleTyp.userString
-          val expectedStr   = pt.userString
-          val treeStr       = Parens(ts)(Id.noId, EmptyType).userString
+          val tupleTypeStr  = tupleTyp.show
+          val expectedStr   = pt.show
+          val treeStr       = Parens(ts)(Id.noId, EmptyType).show
           CompilerError.UnexpectedType(
             s"expected `$expectedStr` but was `$tupleTypeStr` in $mode:\n$treeStr")
         }
@@ -270,7 +258,7 @@ object Typers {
         val fTpeArgs  = args0.reverse.map(replace(_, subs))
         (fTpeArgs, ret)
       case _ =>
-        CompilerError.UnexpectedType(s"Empty Functor Type ${fTpe.userString}")
+        CompilerError.UnexpectedType(s"Empty Functor Type ${fTpe.show}")
     }
   }
 
@@ -285,22 +273,25 @@ object Typers {
   }
 
   private def unifyConstructorToHkType
-      (constructor: Type, args: List[Type]): Checked[Type] = {
+      (functor: Tree, args: List[Type]): Checked[Type] = {
     import TypeOps._
-    val res :: args0 = toCurriedList(constructor).reverse
+    val res :: args0 = toCurriedList(functor.tpe).reverse
     res match {
       case _ if args0.length == args.length =>
         res
       case _ =>
         import implied TypeOps._
         val argsOrdered = args0.reverse
-        val argsExpect  = argsOrdered.map(_.userString).mkString("[", ", ", "]")
-        val argsPassed  = args.map(_.userString).mkString("[", ", ", "]")
+        val argsExpect  = argsOrdered.map(_.show).mkString("[", ", ", "]")
+        val argsPassed  = args.map(_.show).mkString("[", ", ", "]")
         val hint =
-          if args0.length == 0 then
-            " Perhaps functor type is unknown."
-          else
+          if args0.length == 0 then {
+            import implied NameOps._
+            val name = getName(functor).show
+            s" Perhaps functor type `$name` is unknown."
+          } else {
             ""
+          }
         CompilerError.UnexpectedType(
           s"HK args do not match. Expected $argsExpect but got $argsPassed.$hint")
     }
@@ -311,7 +302,7 @@ object Typers {
     for {
       functor1  <-  functor.typed(any)
       args1     <-  args.mapE(_.typed(any))
-      applied   <-  unifyConstructorToHkType(functor1.tpe, args1.map(_.tpe))
+      applied   <-  unifyConstructorToHkType(functor1, args1.map(_.tpe))
       funProto  <-  TypeOps.toFunctionType(args1.map(_.tpe) :+ applied)
       tpe       <-  checkFunctorWithProto(functor1.tpe, funProto)
     } yield Apply(functor1, args1)(id, tpe)
@@ -335,7 +326,7 @@ object Typers {
         t
       case _ =>
         CompilerError.UnexpectedType(
-          s"Can not infer type of `!${name.userString} = ${value.userString}` as of ! type.")
+          s"Can not infer type of `!${name.show} = ${value.show}` as of ! type.")
     }
   }
 
@@ -347,6 +338,7 @@ object Typers {
       value1U <-  unwrapCompApply(value1.tpe)(name, value)
       letId1  <-  Ident(name)(nId, value1U)
       cont1   <-  checked {
+                    import TypeOps._
                     implied for Context = lCtx
                     putType(name -> value1U)
                     cont.typed(pt)
@@ -371,7 +363,7 @@ object Typers {
                    (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
     import TypeOps._
     for {
-      selector1 <- selector.typed(untypedToChecked(selector.tpe))
+      selector1 <- selector.typed(any)
       cases1    <- typeAsCaseClauses(cases, selector1.tpe)(pt)
       tpe       <- cases1.unifiedTpe
     } yield CaseExpr(selector1, cases1)(id, tpe)
@@ -424,7 +416,7 @@ object Typers {
     } else {
       import implied NameOps._
       CompilerError.UnexpectedType(
-        s"${name.userString} is not a constructor.")
+        s"${name.show} is not a constructor.")
     }
 
   def typedUnapply(functor: Name, args: List[Tree])
@@ -532,7 +524,7 @@ object Typers {
     if pts.length <= args.length then {
       import implied NameOps._
       CompilerError.UnexpectedType(
-        s"Function declaration arguments do not match declared type for declaration ${name.userString}.")
+        s"Function declaration arguments do not match declared type for declaration ${name.show}.")
     } else {
       lookIn(id).flatMap { bodyCtx =>
         implied for Context = bodyCtx
@@ -595,9 +587,9 @@ object Typers {
       } else {
         import implied NameOps._
         import implied TypeOps._
-        val nameStr     = name.userString
-        val idRefTpeStr = idRefTpe.userString
-        val ptStr       = pt.userString
+        val nameStr     = name.show
+        val idRefTpeStr = idRefTpe.show
+        val ptStr       = pt.show
         CompilerError.UnexpectedType(
           s"Expected type for identifier $nameStr of `$ptStr` but was `$idRefTpe`")
       }
@@ -626,10 +618,10 @@ object Typers {
       import implied TypeOps._
       import implied TreeOps._
       import implied ModeOps._
-      val treeStr = typed.userString
-      val modeStr = mode.userString
-      val ptStr   = pt.userString
-      val tpeStr  = typedTpe.userString
+      val treeStr = typed.show
+      val modeStr = mode.show
+      val ptStr   = pt.show
+      val tpeStr  = typedTpe.show
       CompilerError.UnexpectedType(
         s"Check failed. Type $tpeStr != $ptStr in $modeStr:\n$treeStr")
     }
@@ -672,7 +664,7 @@ object Typers {
         import implied TreeOps._
         import implied ModeOps._
         CompilerError.IllegalState(
-          s"Typing not implemented for <${mode.userString}, ${tree.userString}>")
+          s"Typing not implemented for <${mode.show}, ${tree.show}>")
     }
     inner(tree, pt).map(check(_)(pt))
   }

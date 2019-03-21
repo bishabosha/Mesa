@@ -29,7 +29,7 @@ productType: '(' type (',' type)* ')' | '()';
 
 prefixType: (Bang | qualId) simpleType+;
 
-simpleType: qualId | productType;
+simpleType: CompId | qualId | productType;
 
 //
 // -- Expressions
@@ -168,6 +168,7 @@ Wildcard: '_';
 
 BooleanLiteral: 'True' | 'False';
 
+CompId: Varid '#';
 Patid: Upper Idrest;
 Varid: Lower Idrest;
 OpId: Op;

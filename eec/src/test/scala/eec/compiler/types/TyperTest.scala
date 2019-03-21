@@ -144,7 +144,7 @@ class TyperTest {
     """\(t: ()) (u: ()) => ()"""        -> "() -> () -> ()",
     """\(t: ((), ())) => ()"""          -> "((), ()) -> ()",
     """\(t: ((), (), (), ())) => ()"""  -> "((), (), (), ()) -> ()",
-    """\(t: !()) => ()"""               -> "! () -> ()"
+    """\(t: b#) => t"""                 -> "b# -> b#"
   )
 
   @Test def failLambda() = noType(
@@ -179,7 +179,7 @@ class TyperTest {
     typecheck(
       """\(ma: !a) (f: a -> !b) => let !a = ma in f a"""      -> "! a -> (a -> ! b) -> ! b",
       """\(ma: !a) => \(f: a -> !b) => let !a = ma in f a"""  -> "! a -> (a -> ! b) -> ! b",
-      """\(a: !a) (f: a -> !b) => let !a = a in f a"""        -> "! a -> (a -> ! b) -> ! b") // TODO - proof that let allows to rebind names to new variable
+      """\(a: !a) (f: a -> !b) => let !a = a in f a"""        -> "! a -> (a -> ! b) -> ! b")
   }
 
   def typecheck(seq: (String, String)*): Unit = {

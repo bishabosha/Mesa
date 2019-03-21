@@ -112,7 +112,7 @@ object CompilerErrors {
     implied for Showable[CompilerError] {
       import CompilerError._
 
-      def (e: CompilerError) userString = e match {
+      def (e: CompilerError) show = e match {
         case Internal(e) =>
           val trace = e
             .getStackTraceString

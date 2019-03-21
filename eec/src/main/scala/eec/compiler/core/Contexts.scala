@@ -46,7 +46,7 @@ object Contexts {
     import util.Showable
 
     implied for Showable[Mode] {
-      def (m: Mode) userString: String = m match {
+      def (m: Mode) show: String = m match {
         case Pat | PatAlt => "pattern"
         case Term => "term"
         case PrimitiveType | Typing => "typing"
@@ -128,7 +128,7 @@ object Contexts {
           ctxIt
         else ctxIt match {
           case _: RootContext =>
-            CompilerError.IllegalState(s"name not found: ${name.userString}")
+            CompilerError.IllegalState(s"name not found: ${name.show}")
           case f: Fresh =>
             inner(f.outer)
         }
@@ -154,7 +154,7 @@ object Contexts {
       import implied NameOps._
       if contains(name) then
         CompilerError.UnexpectedType(
-          s"Illegal shadowing in scope of name: ${name.userString}")
+          s"Illegal shadowing in scope of name: ${name.show}")
       else {
         val newCtx = new Fresh(ctx)
         ctx.scope += Sym(id, name) -> newCtx
@@ -193,7 +193,7 @@ object Contexts {
         ctx.typeTable.getOrElse[Checked[Type]](
           name,
           CompilerError.UnexpectedType(
-            s"no type found for name: ${name.userString}")
+            s"no type found for name: ${name.show}")
         )
     }
 
@@ -236,7 +236,7 @@ object Contexts {
               tpe
             case _ =>
               CompilerError.UnexpectedType(
-                s"name `${parent.userString}` does not refer to a package")
+                s"name `${parent.show}` does not refer to a package")
           }
         )
       }
@@ -270,9 +270,9 @@ object Contexts {
         }.map { pair =>
           val (sym, context) = pair
           ScopeDef(
-            ForName(sym.name.userString),
+            ForName(sym.name.show),
             c.typeTable.get(sym.name).map { t =>
-              TypeDef(t.userString)
+              TypeDef(t.show)
             }.getOrElse(EmptyType),
             context.toScoping
           )
@@ -283,8 +283,8 @@ object Contexts {
       ctx match {
         case c: RootContext =>
           List(
-            ScopeDef(ForName(rootSym.name.userString),
-            TypeDef(rootPkg.userString), branch(c)))
+            ScopeDef(ForName(rootSym.name.show),
+            TypeDef(rootPkg.show), branch(c)))
         case f: Fresh if f.scope.nonEmpty || f.typeTable.nonEmpty =>
           branch(f)
         case _ =>

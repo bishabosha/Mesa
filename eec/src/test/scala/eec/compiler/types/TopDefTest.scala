@@ -28,15 +28,28 @@ class TopDefTest {
         let !x = f x in !x"""  // error: x in f x is undefined
   )
 
+  @Test def typecheckCompUnification() = typecheck(
+    """eval c : a# -> () = ()"""        -> "a# -> ()",
+    """foo : () = eval ()"""            -> "()",
+    """bar : () = eval ((), ())"""      -> "()",
+    """baz : () = eval \(c: z#) => c""" -> "()"
+  )
+
+  @Test def failNonCompUnification() = someNoType(
+    "eval c : a# -> () = ()",
+    "foo: () = eval 0" // error: Integer is not a computation type
+  )
+
   @Test def typecheckEithers() = typecheck(
     "l: Either () r = Left ()"  -> "Either () r",
-    "r: Either l () = Right ()" -> "Either l ()"
+    "r: Either l () = Right ()" -> "Either l ()",
+    "u: Either l (Either () r) = Right (Left ())" -> "Either l (Either () r)" // TODO: generate fresh variables
   )
 
   @Test def typecheckLiftBind() = typecheck(
-    """lift f: (a -> !b) -> !a -> !b =
+    """lift f: (a -> b#) -> !a -> b# =
         \(c: !a) => let !x = c in f x"""
-  ->"(a -> ! b) -> ! a -> ! b",
+  ->"(a -> b#) -> ! a -> b#",
     """ma >>= f: !t -> (t -> !u) -> !u =
         (lift f) ma"""
   ->"! t -> (t -> ! u) -> ! u"
@@ -108,6 +121,15 @@ class TopDefTest {
       implied for IdGen = idGen
       implied for Context = ctx
       seq.foreach { f => failIfTyped(typeStat(f)(any)) }
+    }
+  }
+
+  private def someNoType(seq: String*): Unit = {
+    import CompilerErrorOps._
+    initialCtx.flatMap { (idGen, ctx) =>
+      implied for IdGen = idGen
+      implied for Context = ctx
+      failIfAllTyped(seq.mapE { f => typeStat(f)(any) })
     }
   }
 }

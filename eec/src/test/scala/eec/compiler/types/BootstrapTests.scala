@@ -3,8 +3,8 @@ package compiler
 package types
 
 object BootstrapTests {
-
   import core.Contexts._
+  import core.Names._
   import error.CompilerErrors._
   import parsing.EntryPoint._
   import Typers._
@@ -39,8 +39,28 @@ object BootstrapTests {
     import implied TypeOps._
     tpd.fold
       { err => () }
-      { tpd => fail(
-        s"Typed successfully as ${tpd.tpe.userString} for expr:\n${tpd.userString}")
+      { tpd =>
+        val tpeStr = tpd.tpe.show
+        val tpdStr = tpd.show
+        fail(s"Typed successfully as $tpeStr for expr:\n$tpdStr")
+      }
+  }
+
+  def failIfAllTyped(tpd: Checked[Iterable[Tree]]): Unit = {
+    import implied TypeOps._
+    import implied TreeOps._
+    import implied NameOps._
+    import util.Convert
+    tpd.fold
+      { err => () }
+      { tpds =>
+        val tpes = tpds.map { t =>
+          val nameStr = Convert[Tree, Name](t).show
+          val tpeStr  = t.tpe.show
+          s"$nameStr: $tpeStr"
+        }
+        val tpeStr = tpes.mkString("[", ", ", "]")
+        fail(s"Typed successfully together as $tpeStr")
       }
   }
 
@@ -48,8 +68,8 @@ object BootstrapTests {
       import implied CompilerErrorOps._
       import implied TypeOps._
       parsed.fold
-        { err => fail(err.userString) }
-        { tpd => assertEquals(checkTpe, tpd.tpe.userString) }
+        { err => fail(err.show) }
+        { tpd => assertEquals(checkTpe, tpd.tpe.show) }
     }
 
   def initialCtx: Checked[(IdGen, Context)] = {

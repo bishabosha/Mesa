@@ -265,8 +265,17 @@ object Parsers {
       (context: EECParser.SimpleTypeContext) given IdGen: Tree =
     if defined(context.qualId) then
       fromQualId(context.qualId)
+    else if defined(context.CompId) then
+      fromCompId(context)
     else
       fromProductType(context.productType)
+
+  private[this] def fromCompId
+      (context: EECParser.SimpleTypeContext) given IdGen: Tree = {
+    import NameOps._
+    import implied NameOps._
+    Ident(context.CompId.getText.readAs.promoteComp)(freshId(), uTpe)
+  }
 
   private[this] def fromExpr(context: EECParser.ExprContext) given IdGen: Tree =
     if defined(context.lambda) then
@@ -328,7 +337,7 @@ object Parsers {
     val patFalse  = Literal(BooleanConstant(false))(freshId(), uTpe)
     val caseTrue  = CaseClause(patTrue, EmptyTree, exprs(1))(freshId(), uTpe)
     val caseFalse = CaseClause(patFalse, EmptyTree, exprs(2))(freshId(), uTpe)
-    val selector  = exprs(0).withType(uTpeBoolean)
+    val selector  = exprs(0).withType(uTpe)
     CaseExpr(selector, List(caseTrue, caseFalse))(freshId(), uTpe)
   }
 

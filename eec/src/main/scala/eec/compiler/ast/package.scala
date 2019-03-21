@@ -11,7 +11,6 @@ import core.Contexts._
 object untyped {
   type Tree       = Trees.Tree
   val uTpe        = Untyped
-  val uTpeBoolean = UntypedExpect(Bootstraps.BooleanType)
 }
 
 object any {

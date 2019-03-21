@@ -167,6 +167,6 @@ object Namers {
     case _ =>
       import implied TreeOps._
       CompilerError.IllegalState(
-        s"Namer implementation missing for `${tree.userString}`")
+        s"Namer implementation missing for `${tree.show}`")
   }
 }

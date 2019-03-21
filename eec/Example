@@ -1,80 +1,80 @@
 package com.example
 
-primitive x + y: Integer -> Integer -> Integer
-primitive s1 ++ s2: String -> String -> String
-primitive debug x: a -> String
-primitive putStrLn s: String -> !()
-primitive readInteger: !Integer
-primitive Left  x: l -> Either l r
-primitive Right x: r -> Either l r
+primitive x + y : Integer -> Integer -> Integer
+primitive s1 ++ s2 : String -> String -> String
+primitive debug x : a -> String
+primitive putStrLn s : String -> !()
+primitive readInteger : !Integer
+primitive Left  x : l -> Either l r
+primitive Right x : r -> Either l r
 primitive a == b : a -> a -> Boolean
 
-fst p: (a, b) -> !a =
+fst p : (a, b) -> !a =
   case p of (a, _) => !a
 
-snd p: (a, b) -> !b =
+snd p : (a, b) -> !b =
   case p of (_, b) => !b
 
-foo: Boolean = (fst((0,"")), snd((0,""))) == (!0, !"")
+foo : Boolean = (fst((0,"")), snd((0,""))) == (!0, !"")
 
-earthDiameter: Decimal = 12.742e+10
+earthDiameter : Decimal = 12.742e+10
 
-movie: String = "12 Monkeys"
+movie : String = "12 Monkeys"
 
-cat2 e lu ru: Either x y -> (x -> !u) -> (y -> !u) -> !u =
+cat2 e lu ru : Either x y -> (x -> !u) -> (y -> !u) -> !u =
   case e of
     Left  a => lu a;
     Right b => ru b
 
-cat3 e xu yu zu: Either (Either x y) z -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+cat3 e xu yu zu : Either (Either x y) z -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
   case e of
     Left  (Left a)  => xu a;
     Left  (Right b) => yu b;
     Right c         => zu c
 
-cat4 e wu xu yu zu: Either (Either (Either w x) y) z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+cat4 e wu xu yu zu : Either (Either (Either w x) y) z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
   case e of
     Left  (Left  (Left  a)) => wu a;
     Left  (Left  (Right b)) => xu b;
     Left  (Right c)         => yu c;
     Right d                 => zu d
 
-json: String = """{
+json : String = """{
   "title": "12 Monkeys",
   "director": "Terry Gilliam",
   "length": 129
 }"""
 
-nl: Char = '\n'
+nl : Char = '\n'
 
-e: Char = 'e'
+e : Char = 'e'
 
-unit: () = ()
+unit : () = ()
 
-lift f: (a -> !b) -> !a -> !b =
+lift f : (a -> b#) -> !a -> b# =
   \(c: !a) => let !x = c in f x
 
-ma >>= f: !a -> (a -> !b) -> !b =
+ma >>= f : !a -> (a -> !b) -> !b =
   (lift f) ma
 
-succ x: Integer -> !Integer =
+succ x : Integer -> !Integer =
   !(x + 1)
 
-a `and` b: Boolean -> Boolean -> !Boolean =
+a `and` b : Boolean -> Boolean -> !Boolean =
   if a then !b else !False
 
-a `or` b: Boolean -> Boolean -> !Boolean =
+a `or` b : Boolean -> Boolean -> !Boolean =
   if a then !True else !b
 
-not b: Boolean -> !Boolean =
+not b : Boolean -> !Boolean =
   if True then !False else !True
 
-isZero x: Integer -> !Boolean =
+isZero x : Integer -> !Boolean =
   case x of
     0 => !True
     _ => !False
 
-main: !() =
+main : !() =
   let !x    = readInteger in
   let !zero = isZero x    in
   if zero then

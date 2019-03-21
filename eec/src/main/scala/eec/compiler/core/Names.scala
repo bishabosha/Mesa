@@ -6,10 +6,12 @@ object Names {
 
   import Name._
   import types.Types._
+  import implied NameOps._
   import Type._
 
   enum Name derives Eql {
     case From(name: String)
+    case Comp(name: String)
     case ComputationTag, IntegerTag, DecimalTag, EitherTag,
       BooleanTag, StringTag, CharTag, Wildcard, EmptyName
   }
@@ -18,8 +20,8 @@ object Names {
   val rootString: String  = "_root_"
 
   val bootstrapped = List(
-    ComputationTag  -> FunctionType(Variable(From("$v")), AppliedType(TypeRef(ComputationTag), List(Variable(From("$v"))))),
-    EitherTag       -> FunctionType(Variable(From("$l")), FunctionType(Variable(From("$r")), AppliedType(TypeRef(EitherTag), List(Variable(From("$l")), Variable(From("$r")))))),
+    ComputationTag  -> FunctionType(Variable("$v".readAs), AppliedType(TypeRef("!".readAs), List(Variable("$v".readAs)))),
+    EitherTag       -> FunctionType(Variable("$l".readAs), FunctionType(Variable("$r".readAs), AppliedType(TypeRef(EitherTag), List(Variable("$l".readAs), Variable("$r".readAs))))),
     IntegerTag      -> TypeRef(IntegerTag),
     DecimalTag      -> TypeRef(DecimalTag),
     BooleanTag      -> TypeRef(BooleanTag),
@@ -32,8 +34,13 @@ object Names {
     import Name._
     import eec.util.{Showable, Readable}
 
+    def (name: Name) promoteComp: Name = name match {
+      case From(str)  => Comp(str)
+      case _          => name
+    }
+
     implied for Showable[Name] {
-      def (n: Name) userString = n match {
+      def (n: Name) show = n match {
         case Wildcard       => "_"
         case ComputationTag => "!"
         case IntegerTag     => "Integer"
@@ -43,6 +50,7 @@ object Names {
         case CharTag        => "Char"
         case EitherTag      => "Either"
         case EmptyName      => emptyString
+        case Comp(n)        => n
         case From(n)        => n
       }
     }

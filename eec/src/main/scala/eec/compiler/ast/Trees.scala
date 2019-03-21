@@ -39,7 +39,7 @@ object Trees {
     import implied core.Printing.untyped.AstOps._
 
     implied for Showable[Tree] {
-      def (t: Tree) userString = toAst(t).toString
+      def (t: Tree) show = toAst(t).toString
     }
 
     implied for (Tree |> List[Tree]) {
