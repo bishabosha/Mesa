@@ -6,7 +6,6 @@ object Names {
 
   import Name._
   import types.Types._
-  import implied NameOps._
   import Type._
   import Contexts.Id
 
@@ -25,15 +24,18 @@ object Names {
   val emptyString: String = "<empty>"
   val rootString: String  = "_root_"
 
-  val bootstrapped = List(
-    ComputationTag  -> FunctionType(Variable("$v".readAs), AppliedType(TypeRef("!".readAs), List(Variable("$v".readAs)))),
-    EitherTag       -> FunctionType(Variable("$l".readAs), FunctionType(Variable("$r".readAs), AppliedType(TypeRef(EitherTag), List(Variable("$l".readAs), Variable("$r".readAs))))),
-    IntegerTag      -> TypeRef(IntegerTag),
-    DecimalTag      -> TypeRef(DecimalTag),
-    BooleanTag      -> TypeRef(BooleanTag),
-    StringTag       -> TypeRef(StringTag),
-    CharTag         -> TypeRef(CharTag)
-  )
+  val bootstrapped = {
+    import implied NameOps._
+    List(
+      ComputationTag  -> FunctionType(Variable("$v".readAs), AppliedType(TypeRef("!".readAs), List(Variable("$v".readAs)))),
+      EitherTag       -> FunctionType(Variable("$l".readAs), FunctionType(Variable("$r".readAs), AppliedType(TypeRef(EitherTag), List(Variable("$l".readAs), Variable("$r".readAs))))),
+      IntegerTag      -> TypeRef(IntegerTag),
+      DecimalTag      -> TypeRef(DecimalTag),
+      BooleanTag      -> TypeRef(BooleanTag),
+      StringTag       -> TypeRef(StringTag),
+      CharTag         -> TypeRef(CharTag)
+    )
+  }
 
   object DerivedOps {
     import Derived._
@@ -54,7 +56,6 @@ object Names {
   object NameOps {
     import Name._
     import Derived._
-    import implied DerivedOps._
     import eec.util.{Showable, Readable}
 
     def (name: Name) promoteComp: Name = name match {
@@ -80,8 +81,12 @@ object Names {
         case CharTag        => "Char"
         case EitherTag      => "Either"
         case EmptyName      => emptyString
-        case Comp(n)        => n.show
-        case From(n)        => n.show
+        case Comp(n)        =>
+          import implied DerivedOps._
+          n.show
+        case From(n)        =>
+          import implied DerivedOps._
+          n.show
       }
     }
 
@@ -95,7 +100,9 @@ object Names {
         case "String"   => StringTag
         case "Char"     => CharTag
         case "Either"   => EitherTag
-        case str        => From(infer[Readable[Derived]].readAs(str))
+        case str        =>
+          import implied DerivedOps._
+          From(infer[Readable[Derived]].readAs(str))
       }
     }
   }

@@ -3,12 +3,12 @@ package compiler
 package core
 
 object Contexts {
-
   import types.Types._
   import Type._
   import core.Names._
   import Name._
-  import error.CompilerErrors._
+  import error._
+  import CompilerErrors._
   import collection._
   import annotation._
 
@@ -41,7 +41,6 @@ object Contexts {
   }
 
   object ModeOps {
-
     import Mode._
     import util.Showable
 
@@ -115,8 +114,11 @@ object Contexts {
   )
 
   object Context {
-
-    import implied NameOps._
+    import TypeOps._
+    import NameOps._
+    import Derived._
+    import CompilerErrorOps._
+    import IdGen._
 
     def ctx given (c: Context) = c
 
@@ -136,6 +138,7 @@ object Contexts {
           ctxIt
         else ctxIt match {
           case _: RootContext =>
+            import implied NameOps._
             CompilerError.IllegalState(s"name not found: ${name.show}")
           case f: Fresh =>
             inner(f.outer)
@@ -151,46 +154,43 @@ object Contexts {
       }
 
     def contains(name: Name) given Context: Boolean = {
+      import implied NameOps._
       name != emptyString.readAs && (
         ctx.scope.collectFirst { case (Sym(_, `name`), _) => () }
            .isDefined
       )
     }
 
-    def enterFresh(id: Id, name: Name) given Context: Checked[Context] = {
-      import implied NameOps._
-      if contains(name) then
+    def enterFresh(id: Id, name: Name) given Context: Checked[Context] =
+      if contains(name) then {
+        import implied NameOps._
         CompilerError.UnexpectedType(
           s"Illegal shadowing in scope of name: ${name.show}")
-      else {
+      } else {
         val newCtx = new Fresh(ctx)
         ctx.scope += Sym(id, name) -> newCtx
         newCtx
       }
-    }
 
     def commitId(id: Id) given Context: Unit = {
-      val found = ctx.scope.collectFirst {
+      val first = ctx.scope.collectFirst {
         case sym @ (Sym(`id`, name), _) => (sym, name)
       }
-      found.foreach { (sym, name) =>
+      for ((sym, name) <- first) {
         if !ctx.typeTable.contains(name) then {
           ctx.scope -= sym
         }
       }
     }
 
-    def isPrimitive(name: Name) given Context: Boolean = {
+    def isPrimitive(name: Name) given Context: Boolean =
       ctx.primTable.contains(name)
-    }
 
-    def setPrimitive(name: Name) given Context: Unit = {
+    def setPrimitive(name: Name) given Context: Unit =
       ctx.primTable += name
-    }
 
-    def putType(pair: (Name, Type)) given Context: Unit = {
+    def putType(pair: (Name, Type)) given Context: Unit =
       ctx.typeTable += pair
-    }
 
     def getType(name: Name) given Context: Checked[Type] = {
       import implied NameOps._
@@ -205,20 +205,12 @@ object Contexts {
         )
     }
 
-    def (tpe: Type) freshVariables given Context: Type = {
-      import TypeOps._
-      import NameOps._
-      import Derived._
+    def (tpe: Type) freshVariables given Context: Type =
       tpe.replaceVariables {
         _.updateDerivedStr(Synthetic(ctx.localIdGen.fresh(), _))
       }
-    }
 
     def enterBootstrapped given Context, IdGen: Checked[Unit] = {
-      import types.Types
-      import Name._
-      import CompilerErrorOps._
-      import IdGen._
       lazy val root = rootCtx
       if root.scope.nonEmpty then {
         CompilerError.IllegalState("Non-fresh _root_ context")
@@ -237,8 +229,6 @@ object Contexts {
 
     def declarePackage(parent: Name, name: Name)
                       given Context: Checked[Type] = {
-      import CompilerErrorOps._
-      import Type._
       val outer = ctx match {
         case _: RootContext => ctx
         case f: Fresh       => f.outer
@@ -252,6 +242,7 @@ object Contexts {
               putType(name, tpe)
               tpe
             case _ =>
+              import implied NameOps._
               CompilerError.UnexpectedType(
                 s"name `${parent.show}` does not refer to a package")
           }
@@ -276,25 +267,20 @@ object Contexts {
     }
 
     def (ctx: Context) toScoping: Seq[Scoping] = {
-      import Name._
       import implied NameOps._
       import implied TypeOps._
 
       def branch(c: Context): Seq[Scoping] = {
-        val scopes = c.scope.filter { pair =>
-          val (Sym(_, name), context) = pair
-          context.scope.nonEmpty || name != emptyString.readAs
-        }.map { pair =>
-          val (sym, context) = pair
-          ScopeDef(
-            ForName(sym.name.show),
-            c.typeTable.get(sym.name).map { t =>
-              TypeDef(t.show)
-            }.getOrElse(EmptyType),
-            context.toScoping
-          )
-        }.toList
-        scopes
+        for {
+          pair <- c.scope.filter { pair =>
+                    val (Sym(_, name), context) = pair
+                    context.scope.nonEmpty || name != emptyString.readAs
+                  }
+          (sym, context)  = pair
+          tpeOpt          = c.typeTable.get(sym.name).map(t => TypeDef(t.show))
+          tpe             = tpeOpt.getOrElse(EmptyType)
+          name            = sym.name.show
+        } yield ScopeDef(ForName(name), tpe, context.toScoping)
       }
 
       ctx match {

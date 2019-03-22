@@ -7,11 +7,15 @@ object Parsers {
   import ast._
   import Trees._
   import Tree._
+  import TreeOps._
   import untyped._
   import core.Names._
+  import Name._
+  import NameOps._
   import core.Contexts._
   import core.Constants._
   import core.Modifiers._
+  import types.Types.TypeOps._
   import Context._
   import IdGen._
   import Modifier._
@@ -69,7 +73,6 @@ object Parsers {
   def (o: String => O) toTreeParser[O]
       (f: O => IdMaker[Tree])
       (input: String) given IdGen = {
-    import error.CompilerErrors._
     import error.CompilerErrors.CompilerErrorOps._
     f(o(input)).recover {
       case e: ParserSyntaxException =>
@@ -272,7 +275,6 @@ object Parsers {
 
   private[this] def fromCompId
       (context: EECParser.SimpleTypeContext) given IdGen: Tree = {
-    import NameOps._
     import implied NameOps._
     Ident(context.CompId.getText.readAs.promoteComp)(freshId(), uTpe)
   }
@@ -329,7 +331,6 @@ object Parsers {
   private[this] def fromIfElse
       (context: EECParser.Expr1Context)  given IdGen: Tree = {
     import language.implicitConversions
-    import types.Types.TypeOps._
     val exprs = context.expr
       .ensuring(result.size == 3)
       .map(fromExpr)
@@ -373,7 +374,6 @@ object Parsers {
       fromInfixApplication(context)
 
   private[this] def wrapComputation(tree: Tree) given IdGen: Tree = {
-    import Name._
     val tag = Ident(ComputationTag)(freshId(), uTpe)
     Apply(tag, List(tree))(freshId(), uTpe)
   }
@@ -539,7 +539,6 @@ object Parsers {
 
   private[this] def fromBinding
       (context: EECParser.BindingContext) given IdGen: Tree = {
-    import TreeOps._
     val List(name) = fromId(context.id).toNames
     val typ = fromType(context.`type`)
     Tagged(name, typ)(freshId(), uTpe)
@@ -550,7 +549,6 @@ object Parsers {
 
   private[this] def fromPrimitiveDcl
       (context: EECParser.PrimitiveDclContext) given IdGen: Tree = {
-    import TreeOps._
     val modifiers = Set(Primitive)
     fromDefDecl(context.defDecl).addModifiers(modifiers)
   }

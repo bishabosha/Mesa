@@ -6,6 +6,7 @@ object Namers {
 
   import ast.Trees._
   import Tree._
+  import TreeOps._
   import error.CompilerErrors._
   import CompilerErrorOps._
   import core.Contexts._
@@ -28,7 +29,6 @@ object Namers {
   def namedDefDef(name: Name, args: List[Tree], sigId: Id)
                  (tpeAs: Tree, body: Tree) given Context, Mode: Checked[Unit] =
     enterFresh(sigId, name).flatMap { ctx1 =>
-      import TreeOps._
       implied for Context = ctx1
       for {
         _ <-  args.flatMap(toNamePairs).mapE(enterFresh)
@@ -48,7 +48,6 @@ object Namers {
 
   def namedPackageDef
       (pid: Tree, stats: List[Tree]) given Context, Mode: Checked[Unit] = {
-    import TreeOps._
     val cPkgCtx = pid.toNamePairs.foldLeftE(ctx) { (pkgCtx, pair) =>
       val (id, pkgName)   = pair
       implied for Context = pkgCtx
@@ -167,9 +166,6 @@ object Namers {
        | Select(_,_)
        | EmptyTree                        => // atomic
     /* error case */
-    case _ =>
-      import implied TreeOps._
-      CompilerError.IllegalState(
-        s"Namer implementation missing for `${tree.show}`")
+    case _                                => NamerErrors.namingMissing(tree)
   }
 }

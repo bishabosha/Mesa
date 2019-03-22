@@ -4,12 +4,12 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     import eec.repl._
-    if args.length == 1 && args(0) == "-help" then {
-      println("Usage: eec [options]")
+    if args `sameElements` Array("-help") then {
+      println("Usage: eec <option>")
       println
       println("  -e    => run EEC REPL")
       println("  -help => view these options")
-    } else if args.contains("-e") then {
+    } else if args `sameElements` Array("-e") then {
       Repl.loop()
     } else {
       println("No valid option specified. See options with -help")

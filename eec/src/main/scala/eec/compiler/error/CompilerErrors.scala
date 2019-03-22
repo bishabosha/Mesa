@@ -15,6 +15,7 @@ object CompilerErrors {
 
   object CompilerErrorOps {
 
+    import CompilerError._
     import eec.util.Showable
     import collection.generic.CanBuildFrom
     import collection.mutable.Builder
@@ -90,7 +91,6 @@ object CompilerErrors {
 
     def (f: => O) recoverDefault[O]: Checked[O] = {
       import scala.util.control._
-      import CompilerError._
       f.recover {
         case e: Exception if NonFatal(e) => Internal(e)
       }
@@ -99,7 +99,6 @@ object CompilerErrors {
     def (f: => O) recover[O]
         (opt: PartialFunction[Exception, CompilerError]): Checked[O] = {
       import scala.util.control._
-      import CompilerError._
 
       try {
         f
@@ -110,8 +109,6 @@ object CompilerErrors {
     }
 
     implied for Showable[CompilerError] {
-      import CompilerError._
-
       def (e: CompilerError) show = e match {
         case Internal(e) =>
           val trace = e
