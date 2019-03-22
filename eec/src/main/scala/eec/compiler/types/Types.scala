@@ -65,11 +65,7 @@ object Types {
             case AppliedType(f, args1) =>
               app match {
                 case AppliedType(g, args2) if args1.size == args2.size =>
-                  inner(
-                    acc,
-                    (f :: args1) ::: argRest,
-                    (g :: args2) ::: appsRest
-                  )
+                  inner(acc, f :: args1 ::: argRest, g :: args2 ::: appsRest)
                 case _ =>
                   inner(acc, argRest, appsRest)
               }
@@ -109,41 +105,81 @@ object Types {
         inner(bf(), ops :: Nil, tpe :: Nil).result
     }
 
-    def (tpe: TypeVariableOps) foldLeft[O](seed: O)(f: (O, Name) => O): O = {
+    def unifyImpl(tpe: Type, sub: Name, by: Type): Type = tpe.mapVariables {
+      case `sub` =>
+        if by == WildcardType then
+          Variable(sub)
+        else
+          by
+      case other =>
+        Variable(other)
+    }
+
+    def (tpe: TypeVariableOps) mapVariables(f: Name => Type): Type = {
+
+      type Program = List[Type] => List[Type]
+
+      inline def program(f: Program) = f
+
+      def compile(tpe: Type): List[Program] =
+        tpe.foldLeft[List[Program]](Nil) { (programs, tpe) =>
+          tpe match {
+            case FunctionType(arg, body) =>
+              val prog = program { stack =>
+                val a1 :: a2 :: rest = stack
+                FunctionType(a1, a2) :: rest
+              }
+              prog :: programs
+            case AppliedType(f, args) =>
+              val prog = program { stack =>
+                val (removed, rest) = stack.splitAt(args.length + 1)
+                AppliedType(removed.head, removed.tail) :: rest
+              }
+              prog :: programs
+            case Product(tpes1) =>
+              val prog = program { stack =>
+                val (removed, rest) = stack.splitAt(tpes1.length)
+                Product(removed) :: rest
+              }
+              prog :: programs
+            case Variable(name) =>
+              program(f(name) :: _) :: programs
+            case _ =>
+              program(tpe :: _) :: programs
+          }
+        }
+
+      @tailrec
+      def unsafeInterpret(stack: List[Type], programs: List[Program]): Type =
+        programs match {
+          case p :: ps  => unsafeInterpret(p(stack), ps)
+          case Nil      => stack.head
+        }
+
+      unsafeInterpret(Nil, compile(tpe))
+    }
+
+    def (tpe: TypeVariableOps) foldLeft[O]
+        (seed: O)
+        (f: (O, Type) => O): O = {
+
       @tailrec
       def inner(acc: O, tpes: List[Type]): O = tpes match {
         case Nil => acc
         case tpe :: rest =>
           tpe match {
             case AppliedType(t, tpes) =>
-              inner(acc, (t :: tpes) ::: rest)
+              inner(f(acc, tpe), t :: tpes ::: rest)
             case FunctionType(a1, b1) =>
-              inner(acc, a1 :: b1 :: rest)
+              inner(f(acc, tpe), a1 :: b1 :: rest)
             case Product(tpes) =>
-              inner(acc, tpes ::: rest)
-            case Variable(name) =>
-              inner(f(acc, name), rest)
+              inner(f(acc, tpe), tpes ::: rest)
             case _ =>
-              inner(acc, rest)
+              inner(f(acc, tpe), rest)
           }
       }
-      inner(seed, tpe :: Nil)
-    }
 
-    def unifyImpl(tpe: Type, sub: Name, by: Type): Type = tpe match {
-      case FunctionType(arg, body) =>
-        FunctionType(unifyImpl(arg, sub, by), unifyImpl(body, sub, by))
-      case AppliedType(f, args) =>
-        AppliedType(unifyImpl(f, sub, by), args.map(unifyImpl(_, sub, by)))
-      case Product(tpes) =>
-        Product(tpes.map(unifyImpl(_, sub, by)))
-      case g @ Variable(`sub`) =>
-        if by == WildcardType then
-          g
-        else
-          by
-      case _ =>
-        tpe
+      inner(seed, tpe :: Nil)
     }
   }
 
@@ -218,13 +254,14 @@ object Types {
     def (tpe: Type) replaceVariables(f: Name => Option[Name]): Type = {
       import TypeVariableOps._
       var seen = Set[Name]()
-      TypeVariableOps(tpe).foldLeft(tpe) { (acc, n) =>
-        if !seen.contains(n) then {
-          seen += n
-          f(n).map(acc.replaceVariable(n)(_))
-              .getOrElse(acc)
-        } else {
-          acc
+      TypeVariableOps(tpe).foldLeft(tpe) { (acc, tpe) =>
+        tpe match {
+          case Variable(n) if !seen.contains(n) =>
+            seen += n
+            f(n).map(acc.replaceVariable(n)(_))
+                .getOrElse(acc)
+          case _ =>
+            acc
         }
       }
     }
