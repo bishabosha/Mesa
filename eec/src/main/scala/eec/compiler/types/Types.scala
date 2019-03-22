@@ -39,47 +39,50 @@ object Types {
 
     def apply(tpe: Type): TypeVariableOps = tpe
 
-    def (ops: TypeVariableOps) zipFold[O]
-        (tpe: Type)
-        (seed: O)
-        (f: (O, Name, Type) => O): O = {
-      import implied util.Builders._
-      var acc = seed
-      ops.zipWith(tpe) { (name, tpe) => acc = f(acc, name, tpe) }
-      acc
-    }
-
     def (ops: TypeVariableOps) zipWith[O, That](tpe: Type)
         (f: (Name, Type) => O)
         given (bf: CanBuild[O, That]): That = {
 
+      val b = ops.zipFold(tpe)(bf()) { (acc, arg, app) =>
+        arg match {
+          case Variable(name) => acc += f(name, app)
+          case _              => acc
+        }
+      }
+
+      b.result
+    }
+
+    def (ops: TypeVariableOps) zipFold[O, That](tpe: Type)(seed: O)
+        (f: (O, Type, Type) => O): O = {
+
       @tailrec
       def inner(
-          acc: Builder[O, That],
+          acc: O,
           args: List[Type],
-          apps: List[Type]): Builder[O, That] = args match {
+          apps: List[Type]): O = args match {
         case Nil => acc
         case arg :: argRest => apps match {
           case Nil => acc
           case app :: appsRest => arg match {
-            case AppliedType(f, args1) =>
+            case AppliedType(functor, args1) =>
               app match {
                 case AppliedType(g, args2) if args1.size == args2.size =>
-                  inner(acc, f :: args1 ::: argRest, g :: args2 ::: appsRest)
+                  inner(f(acc, arg, app), functor :: args1 ::: argRest, g :: args2 ::: appsRest)
                 case _ =>
                   inner(acc, argRest, appsRest)
               }
             case FunctionType(a1, b1) =>
               app match {
                 case FunctionType(a2, b2) =>
-                  inner(acc, a1 :: b1 :: argRest, a2 :: b2 :: appsRest)
+                  inner(f(acc, arg, app), a1 :: b1 :: argRest, a2 :: b2 :: appsRest)
                 case _ =>
                   inner(acc, argRest, appsRest)
               }
             case Product(tpes1) =>
               app match {
                 case Product(tpes2) if tpes1.size == tpes2.size =>
-                  inner(acc, tpes1 ::: argRest, tpes2 ::: appsRest)
+                  inner(f(acc, arg, app), tpes1 ::: argRest, tpes2 ::: appsRest)
                 case _ =>
                   inner(acc, argRest, appsRest)
               }
@@ -87,11 +90,11 @@ object Types {
               name match {
                 case Comp(_) =>
                   if app.isComputationType then
-                    inner(acc += f(name, app), argRest, appsRest)
+                    inner(f(acc, arg, app), argRest, appsRest)
                   else
                     inner(acc, argRest, appsRest)
                 case _ =>
-                  inner(acc += f(name, app), argRest, appsRest)
+                  inner(f(acc, arg, app), argRest, appsRest)
               }
             case _ =>
               inner(acc, argRest, appsRest)
@@ -100,9 +103,9 @@ object Types {
       }
 
       if WildcardType == tpe || WildcardType == ops then
-        bf().result
+        seed
       else
-        inner(bf(), ops :: Nil, tpe :: Nil).result
+        inner(seed, ops :: Nil, tpe :: Nil)
     }
 
     def unifyImpl(tpe: Type, sub: Name, by: Type): Type = tpe.mapVariables {
@@ -231,8 +234,11 @@ object Types {
 
     def (tpe: Type) unifyFrom(subFrom: Type)(subWith: Type): Type = {
       import TypeVariableOps._
-      TypeVariableOps(subFrom).zipFold(subWith)(tpe) { (acc, name, sub) =>
-        unifyImpl(acc, name, sub)
+      TypeVariableOps(subFrom).zipFold(subWith)(tpe) { (acc, arg, sub) =>
+        arg match {
+          case Variable(name) => unifyImpl(acc, name, sub)
+          case _              => acc
+        }
       }
     }
 
