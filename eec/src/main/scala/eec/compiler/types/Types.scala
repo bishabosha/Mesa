@@ -3,7 +3,9 @@ package compiler
 package types
 
 object Types {
-
+  import collection.generic._
+  import collection.mutable._
+  import annotation._
   import core.Names
   import Names._
   import Name._
@@ -30,9 +32,124 @@ object Types {
     case EmptyType
   }
 
+  opaque type TypeVariableOps = Type
+
+  private object TypeVariableOps {
+    import TypeOps._
+
+    def apply(tpe: Type): TypeVariableOps = tpe
+
+    def (ops: TypeVariableOps) zipFold[O]
+        (tpe: Type)
+        (seed: O)
+        (f: (O, Name, Type) => O): O = {
+      import implied util.Builders._
+      var acc = seed
+      ops.zipWith(tpe) { (name, tpe) => acc = f(acc, name, tpe) }
+      acc
+    }
+
+    def (ops: TypeVariableOps) zipWith[O, That](tpe: Type)
+        (f: (Name, Type) => O)
+        given (bf: CanBuild[O, That]): That = {
+
+      @tailrec
+      def inner(
+          acc: Builder[O, That],
+          args: List[Type],
+          apps: List[Type]): Builder[O, That] = args match {
+        case Nil => acc
+        case arg :: argRest => apps match {
+          case Nil => acc
+          case app :: appsRest => arg match {
+            case AppliedType(f, args1) =>
+              app match {
+                case AppliedType(g, args2) if args1.size == args2.size =>
+                  inner(
+                    acc,
+                    (f :: args1) ::: argRest,
+                    (g :: args2) ::: appsRest
+                  )
+                case _ =>
+                  inner(acc, argRest, appsRest)
+              }
+            case FunctionType(a1, b1) =>
+              app match {
+                case FunctionType(a2, b2) =>
+                  inner(acc, a1 :: b1 :: argRest, a2 :: b2 :: appsRest)
+                case _ =>
+                  inner(acc, argRest, appsRest)
+              }
+            case Product(tpes1) =>
+              app match {
+                case Product(tpes2) if tpes1.size == tpes2.size =>
+                  inner(acc, tpes1 ::: argRest, tpes2 ::: appsRest)
+                case _ =>
+                  inner(acc, argRest, appsRest)
+              }
+            case Variable(name) =>
+              name match {
+                case Comp(_) =>
+                  if app.isComputationType then
+                    inner(acc += f(name, app), argRest, appsRest)
+                  else
+                    inner(acc, argRest, appsRest)
+                case _ =>
+                  inner(acc += f(name, app), argRest, appsRest)
+              }
+            case _ =>
+              inner(acc, argRest, appsRest)
+          }
+        }
+      }
+
+      if WildcardType == tpe || WildcardType == ops then
+        bf().result
+      else
+        inner(bf(), ops :: Nil, tpe :: Nil).result
+    }
+
+    def (tpe: TypeVariableOps) foldLeft[O](seed: O)(f: (O, Name) => O): O = {
+      @tailrec
+      def inner(acc: O, tpes: List[Type]): O = tpes match {
+        case Nil => acc
+        case tpe :: rest =>
+          tpe match {
+            case AppliedType(t, tpes) =>
+              inner(acc, (t :: tpes) ::: rest)
+            case FunctionType(a1, b1) =>
+              inner(acc, a1 :: b1 :: rest)
+            case Product(tpes) =>
+              inner(acc, tpes ::: rest)
+            case Variable(name) =>
+              inner(f(acc, name), rest)
+            case _ =>
+              inner(acc, rest)
+          }
+      }
+      inner(seed, tpe :: Nil)
+    }
+
+    def unifyImpl(tpe: Type, sub: Name, by: Type): Type = tpe match {
+      case FunctionType(arg, body) =>
+        FunctionType(unifyImpl(arg, sub, by), unifyImpl(body, sub, by))
+      case AppliedType(f, args) =>
+        AppliedType(unifyImpl(f, sub, by), args.map(unifyImpl(_, sub, by)))
+      case Product(tpes) =>
+        Product(tpes.map(unifyImpl(_, sub, by)))
+      case g @ Variable(`sub`) =>
+        if by == WildcardType then
+          g
+        else
+          by
+      case _ =>
+        tpe
+    }
+  }
+
   object TypeOps {
 
-    import annotation._
+    import collection._
     import util.Showable
     import Type._
     import Tree._
@@ -71,59 +188,50 @@ object Types {
         case Nil        => EmptyType
       }
 
-    def getSubstitutions(arg: Type, app: Type): List[(Name, Type)] = arg match {
-      case AppliedType(f, args1) =>
-        app match {
-          case AppliedType(g, args2) if args1.size == args2.size =>
-            getSubstitutions(f,g) ::: args1.zip(args2).flatMap(getSubstitutions)
-          case _ =>
-            Nil
-        }
-      case FunctionType(a1, b1) =>
-        app match {
-          case FunctionType(a2, b2) =>
-            getSubstitutions(a1,a2) ::: getSubstitutions(b1,b2)
-          case _ =>
-            Nil
-        }
-      case Product(tpes1) =>
-        app match {
-          case Product(tpes2) if tpes1.size == tpes2.size =>
-            tpes1.zip(tpes2).flatMap(getSubstitutions)
-          case _ =>
-            Nil
-        }
-      case Variable(comp @ Comp(_)) =>
-        if app.isComputationType then
-          (comp, app) :: Nil
-        else
-          Nil
-      case Variable(name) =>
-        (name, app) :: Nil
-      case _ =>
-        Nil
+    def (tpe: Type) unifications(subWith: Type): List[(Name, Type)] = {
+      import TypeVariableOps._
+      TypeVariableOps(tpe).zipWith(subWith)((_, _))
     }
 
-    def unify(sub: Name, by: Type, tpe: Type): Type = tpe match {
-      case FunctionType(arg, body) =>
-        FunctionType(unify(sub, by, arg), unify(sub, by, body))
-      case AppliedType(f, args) =>
-        AppliedType(unify(sub, by, f), args.map(unify(sub, by, _)))
-      case Product(tpes) =>
-        Product(tpes.map(unify(sub, by, _)))
-      case g @ Variable(`sub`) =>
-        if by == WildcardType then
-          g
-        else
-          by
-      case _ =>
-        tpe
+    def (tpe: Type) unifyFrom(subFrom: Type)(subWith: Type): Type = {
+      import TypeVariableOps._
+      TypeVariableOps(subFrom).zipFold(subWith)(tpe) { (acc, name, sub) =>
+        unifyImpl(acc, name, sub)
+      }
+    }
+
+    inline def (tpe: Type) unify(subWith: Type) =
+      tpe.unifyFrom(tpe)(subWith)
+
+    def (tpe: Type) unifyFromAll(unifications: Iterable[(Name, Type)]): Type =
+      unifications.foldLeft(tpe) { (acc, pair) =>
+        import TypeVariableOps._
+        val (sub, by) = pair
+        unifyImpl(acc, sub, by)
+      }
+
+    def (tpe: Type) replaceVariable(from: Name)(by: Name): Type = {
+      import TypeVariableOps._
+      unifyImpl(tpe, from, Variable(by))
+    }
+
+    def (tpe: Type) replaceVariables(f: Name => Option[Name]): Type = {
+      import TypeVariableOps._
+      var seen = Set[Name]()
+      TypeVariableOps(tpe).foldLeft(tpe) { (acc, n) =>
+        if !seen.contains(n) then {
+          seen += n
+          f(n).map(acc.replaceVariable(n)(_))
+              .getOrElse(acc)
+        } else {
+          acc
+        }
+      }
     }
 
     def (tpe: Type) isComputationType: Boolean = tpe match {
-      case AppliedType(TypeRef(ComputationTag), List(_)) =>
-        true
-      case TypeRef(Comp(_)) =>
+      case AppliedType(TypeRef(ComputationTag), List(_))
+         | TypeRef(Comp(_)) =>
         true
       case FunctionType(_, tpe) =>
         tpe.isComputationType

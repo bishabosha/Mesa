@@ -40,10 +40,11 @@ class TopDefTest {
     "foo: () = eval 0" // error: Integer is not a computation type
   )
 
-  @Test def typecheckEithers() = typecheck(
-    "l: Either () r = Left ()"  -> "Either () r",
-    "r: Either l () = Right ()" -> "Either l ()",
-    "u: Either l (Either () r) = Right (Left ())" -> "Either l (Either () r)" // TODO: generate fresh variables
+  @Test def typecheckEither() = typecheck(
+    "l: Either () q = Left ()"                    -> "Either () q",
+    "r: Either m () = Right ()"                   -> "Either m ()",
+    "u: Either y (Either () z) = Right (Left ())" -> "Either y (Either () z)",
+    "v: Either (Either y ()) z = Left (Right ())" -> "Either (Either y ()) z"
   )
 
   @Test def typecheckLiftBind() = typecheck(

@@ -76,52 +76,49 @@ object Typers {
       tpe
   }
 
-  def checkFunctorWithProto(functorTyp: Type, proto: Type): Checked[Type] = {
+  def checkFunctorWithProto(functor: Tree, proto: Type): Checked[Type] = {
     import TypeOps._
+    val functorTyp = functor.tpe
     (functorTyp, proto) match {
       case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
-        val substitutions = getSubstitutions(functorTyp, proto)
-        val functorTyp1   = replace(functorTyp, substitutions)
-        val proto1        = replace(proto, substitutions)
+        import TypeOps._
+        val unifications  = functorTyp.unifications(proto)
+        val functorTyp1   = functorTyp.unifyFromAll(unifications)
+        val proto1        = proto.unifyFromAll(unifications)
         if functorTyp1 =!= proto1 then
             TypeOps.toCurriedList(functorTyp1).last
         else {
           import implied TreeOps._
           import implied TypeOps._
+          import implied NameOps._
           val functorTyp1Str  = functorTyp1.show
           val proto1Str       = proto1.show
+          val functorNameStr  = uniqName(functor).show
           CompilerError.UnexpectedType(
-            s"Functor definition `${functorTyp.show}` does not match args. Expected `$functorTyp1Str` but was `$proto1Str` in application expr.")
+            s"Functor definition `$functorNameStr: ${functorTyp.show}` does not match args. Expected `$functorTyp1Str` but was `$proto1Str` in application expr.")
         }
       case _ =>
         CompilerError.IllegalState(s"Can not apply to non function type.")
     }
   }
 
-  def checkFunWithProto(funTyp: Type, proto: Type): Checked[Type] = {
+  def checkFunWithProto(fun: Tree, argProto: Type)(pt: Type): Checked[Type] = {
     import TypeOps._
-    (funTyp, proto) match {
-      case (FunctionType(arg, ret), FunctionType(arg1, ret1)) =>
-        val substitutions = getSubstitutions(funTyp, proto)
-        val FunctionType(arg2, ret2) = replace(funTyp, substitutions)
-        if arg1 =!= arg2 then
-            if ret2 =!= ret1 then
-              ret2
-            else {
-              import implied TreeOps._
-              import implied TypeOps._
-              val ret2Str = ret2.show
-              val ret1Str = ret1.show
-              CompilerError.UnexpectedType(
-                s"Function Definition type `$ret2Str` does not match return type `$ret1Str`.")
-            }
-        else {
+    val funTyp = fun.tpe
+    funTyp match {
+      case FunctionType(arg, ret) =>
+        val FunctionType(arg1, ret1) = funTyp.unifyFrom(arg)(argProto)
+        if arg1 =!= argProto then {
+          ret1.unify(pt)
+        } else {
           import implied TreeOps._
           import implied TypeOps._
-          val arg2Str  = arg2.show
-          val arg1Str = arg1.show
+          import implied NameOps._
+          val argProtoStr = argProto.show
+          val arg1Str     = arg1.show
+          val funNameStr  = uniqName(fun).show
           CompilerError.UnexpectedType(
-            s"Function definition `${funTyp.show}` does not match args. Expected `$arg2Str` but was `$arg1Str` in application expr.")
+            s"Function definition `$funNameStr: ${funTyp.show}` does not match args. Expected `$arg1Str` but was `$argProtoStr` in application expr.")
         }
       case _ =>
         CompilerError.IllegalState(s"Can not apply to non function type.")
@@ -232,20 +229,7 @@ object Typers {
                  (id: Id, pt: Type) given Context, Mode: Checked[Tree] = {
     import TypeOps._
     for (ts1 <- typeAsTuple(ts, pt))
-      yield {
-        val tupleTyp = toType(ts1.map(_.tpe))
-        if tupleTyp =!= pt then {
-          Parens(ts1)(id, tupleTyp)
-        } else {
-          import implied TypeOps._
-          import implied TreeOps._
-          val tupleTypeStr  = tupleTyp.show
-          val expectedStr   = pt.show
-          val treeStr       = Parens(ts)(Id.noId, EmptyType).show
-          CompilerError.UnexpectedType(
-            s"expected `$expectedStr` but was `$tupleTypeStr` in $mode:\n$treeStr")
-        }
-      }
+      yield Parens(ts1)(id, toType(ts1.map(_.tpe)))
   }
 
   private def typeAsDestructor(fTpe: Type, pt: Type): Checked[(List[Type], Type)] = {
@@ -253,9 +237,9 @@ object Typers {
     import implied TypeOps._
     toCurriedList(fTpe).reverse match {
       case ret0 :: args0 =>
-        val subs      = getSubstitutions(ret0, pt)
-        val ret       = replace(ret0, subs)
-        val fTpeArgs  = args0.reverse.map(replace(_, subs))
+        val unifications  = ret0.unifications(pt)
+        val ret           = ret0.unifyFromAll(unifications)
+        val fTpeArgs      = args0.reverse.map(_.unifyFromAll(unifications))
         (fTpeArgs, ret)
       case _ =>
         CompilerError.UnexpectedType(s"Empty Functor Type ${fTpe.show}")
@@ -298,13 +282,13 @@ object Typers {
   }
 
   def typedApplyType(functor: Tree, args: List[Tree])
-                    (id: Id, pt: Type) given Context, Mode: Checked[Tree] =
+                    (id: Id) given Context, Mode: Checked[Tree] =
     for {
       functor1  <-  functor.typed(any)
       args1     <-  args.mapE(_.typed(any))
       applied   <-  unifyConstructorToHkType(functor1, args1.map(_.tpe))
       funProto  <-  TypeOps.toFunctionType(args1.map(_.tpe) :+ applied)
-      tpe       <-  checkFunctorWithProto(functor1.tpe, funProto)
+      tpe       <-  checkFunctorWithProto(functor1, funProto)
     } yield Apply(functor1, args1)(id, tpe)
 
   def typedApplyTerm(fun: Tree, args: List[Tree])
@@ -312,8 +296,8 @@ object Typers {
     for {
       fun1      <-  fun.typed(any)
       args1     <-  args.mapE(_.typed(any))
-      funProto  <-  FunctionType(toType(args1.map(_.tpe)), pt)
-      tpe       <-  checkFunWithProto(fun1.tpe, funProto)
+      argsProto <-  toType(args1.map(_.tpe))
+      tpe       <-  checkFunWithProto(fun1, argsProto)(pt)
     } yield Apply(fun1, args1)(id, tpe)
 
   private def unwrapCompApply(tpe: Type)
@@ -403,20 +387,13 @@ object Typers {
     } yield Alternative(patterns1)(id, tpe)
   }
 
-  inline def replace(tpe: Type, substitutions: List[(Name, Type)]): Type =
-    substitutions.foldLeft(tpe) { (acc, pair) =>
-      import TypeOps._
-      val (sub, by) = pair
-      unify(sub, by, acc)
-    }
-
   def getPrimitiveType(name: Name) given Context: Checked[Type] =
     if isPrimitive(name) then {
       getType(name)
     } else {
       import implied NameOps._
       CompilerError.UnexpectedType(
-        s"${name.show} is not a constructor.")
+        s"${name.show} does not qualify to be a constructor.")
     }
 
   def typedUnapply(functor: Name, args: List[Tree])
@@ -437,11 +414,12 @@ object Typers {
     import TypeOps._
     import TreeOps._
     import Name._
+    import implied NameOps._
     tree.toNamePairs match {
       case (id, name) :: tail =>
         for {
           next  <- lookIn(id)
-          tpe   <- declarePackage(From(rootString), name)
+          tpe   <- declarePackage(rootString.readAs, name)
         } yield (
           tail.foldLeftE(next, Ident(name)(id, tpe)) { (acc, pair) =>
             val (current, parent) = acc
@@ -581,18 +559,7 @@ object Typers {
         implied for Context = fstCtx
         getType(name)
       }
-    } yield
-      if idRefTpe =!= pt then {
-        Ident(name)(id, idRefTpe)
-      } else {
-        import implied NameOps._
-        import implied TypeOps._
-        val nameStr     = name.show
-        val idRefTpeStr = idRefTpe.show
-        val ptStr       = pt.show
-        CompilerError.UnexpectedType(
-          s"Expected type for identifier $nameStr of `$ptStr` but was `$idRefTpe`")
-      }
+    } yield Ident(name)(id, idRefTpe.freshVariables)
   }
 
   def typedLiteral(constant: Constant)
@@ -632,7 +599,7 @@ object Typers {
       // Types
       case Select(t,n)      if isType     => typedSelectType(t,n)(tree.id, pt)
       case Ident(n)         if isType     => typedIdentType(n)(tree.id, pt)
-      case Apply(t,ts)      if isType     => typedApplyType(t,ts)(tree.id, pt)
+      case Apply(t,ts)      if isType     => typedApplyType(t,ts)(tree.id)
       case Function(ts,t)   if isType     => typedFunctionType(ts,t)(tree.id, pt)
       // Patterns
       case Ident(n)         if isPattern  => typedIdentPat(n)(tree.id, pt)

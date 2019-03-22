@@ -15,7 +15,10 @@ object Namers {
   import Mode._
   import util.Convert
 
-  private[this] val anon = From(emptyString)
+  private[this] val anon = {
+    import implied NameOps._
+    emptyString.readAs
+  }
 
   private[this] val toName = {
     import implied TreeOps._

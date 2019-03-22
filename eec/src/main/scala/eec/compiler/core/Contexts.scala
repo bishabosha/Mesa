@@ -81,19 +81,28 @@ object Contexts {
 
   case class Sym(id: Id, name: Name)
 
-  private val rootPkg = PackageInfo(TypeRef(From(rootString)), From(rootString))
-  private val rootSym = Sym(Id.rootId, Name.From(rootString))
+  private val rootPkg = {
+    import implied NameOps._
+    PackageInfo(TypeRef(rootString.readAs), rootString.readAs)
+  }
+
+  private val rootSym = {
+    import implied NameOps._
+    Sym(Id.rootId, rootString.readAs)
+  }
 
   sealed trait Context (
     val scope: Scope,
     val typeTable: TypeTable,
-    val primTable: PrimTable
+    val primTable: PrimTable,
+    val localIdGen: IdGen
   )
 
   final class RootContext extends Context(
     new mutable.ArrayBuffer,
     new mutable.AnyRefMap,
-    new mutable.ArrayBuffer
+    new mutable.ArrayBuffer,
+    new IdGen
   )
 
   final class Fresh private[Contexts](
@@ -101,7 +110,8 @@ object Contexts {
   ) extends Context(
     new mutable.ArrayBuffer,
     new mutable.AnyRefMap,
-    new mutable.ArrayBuffer
+    new mutable.ArrayBuffer,
+    new IdGen
   )
 
   object Context {
@@ -144,7 +154,7 @@ object Contexts {
       }
 
     def contains(name: Name) given Context: Boolean = {
-      name != Name.From(emptyString) && (
+      name != emptyString.readAs && (
         ctx.scope.collectFirst { case (Sym(_, `name`), _) => () }
            .isDefined
       )
@@ -186,8 +196,9 @@ object Contexts {
     }
 
     def getType(name: Name) given Context: Checked[Type] = {
+      import implied NameOps._
       lazy val root = rootCtx
-      if name == Name.From(rootString) && (ctx `eq` root) then
+      if name == rootString.readAs && (ctx `eq` root) then
         rootPkg
       else
         ctx.typeTable.getOrElse[Checked[Type]](
@@ -195,6 +206,15 @@ object Contexts {
           CompilerError.UnexpectedType(
             s"no type found for name: ${name.show}")
         )
+    }
+
+    def (tpe: Type) freshVariables given Context: Type = {
+      import TypeOps._
+      import NameOps._
+      import Derived._
+      tpe.replaceVariables {
+        _.updateDerivedStr(Synthetic(ctx.localIdGen.fresh(), _))
+      }
     }
 
     def enterBootstrapped given Context, IdGen: Checked[Unit] = {
@@ -266,7 +286,7 @@ object Contexts {
       def branch(c: Context): Seq[Scoping] = {
         val scopes = c.scope.filter { pair =>
           val (Sym(_, name), context) = pair
-          context.scope.nonEmpty || name != Name.From(emptyString)
+          context.scope.nonEmpty || name != emptyString.readAs
         }.map { pair =>
           val (sym, context) = pair
           ScopeDef(

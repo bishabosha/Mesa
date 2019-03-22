@@ -19,6 +19,8 @@ foo : Boolean = (fst((0,"")), snd((0,""))) == (!0, !"")
 
 earthDiameter : Decimal = 12.742e+10
 
+u: Either y (Either () z) = Right (Left ())
+
 movie : String = "12 Monkeys"
 
 cat2 e lu ru : Either x y -> (x -> !u) -> (y -> !u) -> !u =
