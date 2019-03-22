@@ -130,8 +130,6 @@ object Contexts {
     }
 
     def firstCtx(name: Name) given Context: Checked[Context] = {
-      lazy val root = rootCtx
-
       @tailrec
       def inner(ctxIt: Context): Checked[Context] =
         if ctxIt.scope.view.map(_._1.name).contains(name) then
@@ -142,7 +140,6 @@ object Contexts {
           case f: Fresh =>
             inner(f.outer)
         }
-
       inner(ctx)
     }
 

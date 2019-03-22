@@ -165,7 +165,6 @@ object Types {
     def (tpe: TypeVariableOps) foldLeft[O]
         (seed: O)
         (f: (O, Type) => O): O = {
-
       @tailrec
       def inner(acc: O, tpes: List[Type]): O = tpes match {
         case Nil => acc
@@ -181,7 +180,6 @@ object Types {
               inner(f(acc, tpe), rest)
           }
       }
-
       inner(seed, tpe :: Nil)
     }
   }
@@ -272,16 +270,19 @@ object Types {
       }
     }
 
-    def (tpe: Type) isComputationType: Boolean = tpe match {
-      case AppliedType(TypeRef(ComputationTag), List(_))
-         | TypeRef(Comp(_)) =>
-        true
-      case FunctionType(_, tpe) =>
-        tpe.isComputationType
-      case Product(ts) =>
-        ts.forall(isComputationType)
-      case _ =>
-        false
+    def (tpe: Type) isComputationType: Boolean = {
+      @tailrec
+      def inner(acc: Boolean, tpes: List[Type]): Boolean = tpes match {
+        case Nil => acc
+        case tpe :: tpes => tpe match {
+          case AppliedType(TypeRef(ComputationTag), List(_))
+          |    TypeRef(Comp(_))       => true
+          case FunctionType(_, body)  => inner(acc, body :: tpes)
+          case Product(ts)            => inner(acc, ts ::: tpes)
+          case _                      => false
+        }
+      }
+      inner(true, tpe :: Nil)
     }
 
     implied for Showable[Type] {

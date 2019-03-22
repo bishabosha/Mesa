@@ -148,8 +148,9 @@ class TyperTest {
   )
 
   @Test def failLambda() = noType(
-    """\(f: () -> Char) => ()""", // error: f.tpe is not computation co-domain
-    """\(f: ()) => 0""" // error: lambda tpe is not computation co-domain
+    """\(f: () -> Char) => ()""", // error: (() -> Char) is not computation co-domain
+    """\(f: ()) => 0""", // error: (() -> Integer) is not computation co-domain
+    """\(f: (a -> b) -> c#) => ()""" // error: (a -> b) isnt computational codomain
   )
 
   @Test def typecheckApplication() = typecheck(
