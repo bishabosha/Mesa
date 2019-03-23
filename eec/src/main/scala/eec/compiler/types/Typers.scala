@@ -133,11 +133,11 @@ object Typers {
   }
 
   def constantTpe(c: Constant): Type = c match {
-    case BooleanConstant(_) => Bootstraps.BooleanType
-    case BigDecConstant(_)  => Bootstraps.DecimalType
-    case BigIntConstant(_)  => Bootstraps.IntegerType
-    case CharConstant(_)    => Bootstraps.CharType
-    case StringConstant(_)  => Bootstraps.StringType
+    case _: BooleanConstant => Bootstraps.BooleanType
+    case _: BigDecConstant  => Bootstraps.DecimalType
+    case _: BigIntConstant  => Bootstraps.IntegerType
+    case _: CharConstant    => Bootstraps.CharType
+    case _: StringConstant  => Bootstraps.StringType
   }
 
   private def functionTermTpe(args1: List[Tree], body1: Tree): Checked[Type] = {
@@ -490,8 +490,8 @@ object Typers {
 
   def check(typed: Tree)(pt: Type) given Context, Mode: Checked[Tree] = {
     inline def ignoreType(tree: Tree) = tree match {
-      case EmptyTree | TreeSeq(_) => true
-      case _ => false
+      case EmptyTree | _: TreeSeq => true
+      case _                      => false
     }
     if pt =!= typed.tpe || ignoreType(typed) then
       typed
@@ -528,9 +528,9 @@ object Typers {
       // Any
       case Literal(c)                     => typedLiteral(c)(tree.id)
       case Parens(ts)                     => typedParens(ts)(tree.id, pt)
-      case t @ ( TreeSeq(_)
-               | CaseClause(_,_,_)
-               | EmptyTree)               => t
+      case t @ ( _: TreeSeq
+               | _: CaseClause
+               |    EmptyTree)            => t
       // Error
       case _                              => TyperErrors.typingMissing(tree)
     }

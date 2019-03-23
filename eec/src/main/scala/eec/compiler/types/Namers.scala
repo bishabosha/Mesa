@@ -161,9 +161,9 @@ object Namers {
     case CaseClause(p,g,b)  if isTerm     => namedCaseClause(p,g,b)
     /* any mode */
     case Parens(ts)                       => namedParens(ts)
-    case Literal(_)
-       | Ident(_)
-       | Select(_,_)
+    case _: Literal
+       | _: Ident
+       | _: Select
        | EmptyTree                        => // atomic
     /* error case */
     case _                                => NamerErrors.namingMissing(tree)

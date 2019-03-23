@@ -1,0 +1,25 @@
+import util.Programs._
+  import Program._
+
+  val compiler = Compiler[Type, Type] {
+    case FunctionType(arg, body) =>
+      stack =>
+        val a1 :: a2 :: rest = stack
+        FunctionType(a1, a2) :: rest
+    case AppliedType(f, args) =>
+      stack =>
+        val functor :: stack1 = stack
+        val (args1, rest)     = stack1.splitAt(args.length)
+        AppliedType(functor, args1) :: rest
+    case Product(tpes) =>
+      stack =>
+        val (tpes1, rest) = stack.splitAt(tpes.length)
+        Product(tpes1) :: rest
+    case Variable(name) =>
+      f(name) :: _
+    case _ =>
+      tpe :: _
+  }
+
+  tpe.foldLeft(of[Type])(compiler).unsafeInterpret
+}
