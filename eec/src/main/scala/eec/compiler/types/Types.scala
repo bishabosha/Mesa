@@ -39,11 +39,11 @@ object Types {
 
     def apply(tpe: Type): TypeVariableOps = tpe
 
-    def (ops: TypeVariableOps) zipWith[O, That](tpe: Type)
+    def (ops: TypeVariableOps) zipWith[O, That](subWith: Type)
         (f: (Name, Type) => O)
         given (bf: CanBuild[O, That]): That = {
 
-      val b = ops.zipFold(tpe)(bf()) { (acc, arg, app) =>
+      val b = ops.zipFold(subWith)(bf()) { (acc, arg, app) =>
         arg match {
           case Variable(name) => acc += f(name, app)
           case _              => acc
@@ -64,47 +64,30 @@ object Types {
     }
 
     def (tpe: TypeVariableOps) mapVariables(f: Name => Type): Type = {
+      import util.StackMachine._
+      import Program._
 
-      type Program = List[Type] => List[Type]
+      val compiler = Compiler[Type, Type] {
+        case FunctionType(arg, body) =>
+          stack =>
+            val a1 :: a2 :: rest = stack
+            FunctionType(a1, a2) :: rest
+        case AppliedType(f, args) =>
+          stack =>
+            val functor :: stack1 = stack
+            val (removed, rest) = stack1.splitAt(args.length)
+            AppliedType(functor, removed) :: rest
+        case Product(tpes1) =>
+          stack =>
+            val (removed, rest) = stack.splitAt(tpes1.length)
+            Product(removed) :: rest
+        case Variable(name) =>
+          f(name) :: _
+        case tpe1 =>
+          tpe1 :: _
+      }
 
-      inline def program(f: Program) = f
-
-       def compile(tpe: Type): List[Program] =
-        tpe.foldLeft[List[Program]](Nil) { (programs, tpe) =>
-          tpe match {
-            case FunctionType(arg, body) =>
-              val prog = program { stack =>
-                val a1 :: a2 :: rest = stack
-                FunctionType(a1, a2) :: rest
-              }
-              prog :: programs
-            case AppliedType(f, args) =>
-              val prog = program { stack =>
-                val (removed, rest) = stack.splitAt(args.length + 1)
-                AppliedType(removed.head, removed.tail) :: rest
-              }
-              prog :: programs
-            case Product(tpes1) =>
-              val prog = program { stack =>
-                val (removed, rest) = stack.splitAt(tpes1.length)
-                Product(removed) :: rest
-              }
-              prog :: programs
-            case Variable(name) =>
-              program(f(name) :: _) :: programs
-            case _ =>
-              program(tpe :: _) :: programs
-          }
-        }
-
-      @tailrec
-      def unsafeInterpret(stack: List[Type], programs: List[Program]): Type =
-        programs match {
-          case p :: ps  => unsafeInterpret(p(stack), ps)
-          case Nil      => stack.head
-        }
-
-      unsafeInterpret(Nil, compile(tpe))
+      tpe.foldLeft(of[Type])(compiler).run.head
     }
   }
 
@@ -137,7 +120,7 @@ object Types {
       inner(seed, tpe :: Nil)
     }
 
-    def (tpe: Type) zipFold[O, That](app: Type)(seed: O)
+    def (subFrom: Type) zipFold[O, That](subWith: Type)(seed: O)
         (f: (O, Type, Type) => O): O = {
 
       @tailrec
@@ -151,8 +134,8 @@ object Types {
           case app :: appsRest =>
             if canUnify(arg, app) then
               (arg, app) match {
-                case (AppliedType(functor, args1), AppliedType(g, args2)) =>
-                  inner(f(acc, arg, app), functor :: args1 ::: argRest, g :: args2 ::: appsRest)
+                case (AppliedType(functor1, args1), AppliedType(functor2, args2)) =>
+                  inner(f(acc, arg, app), functor1 :: args1 ::: argRest, functor2 :: args2 ::: appsRest)
                 case (FunctionType(a1, b1), FunctionType(a2, b2)) =>
                   inner(f(acc, arg, app), a1 :: b1 :: argRest, a2 :: b2 :: appsRest)
                 case (Product(tpes1), Product(tpes2)) =>
@@ -165,10 +148,11 @@ object Types {
         }
       }
 
-      if WildcardType == app || WildcardType == tpe then
+      if WildcardType == subWith || WildcardType == subFrom then
         seed
-      else
-        inner(seed, tpe :: Nil, app :: Nil)
+      else {
+        inner(seed, subFrom :: Nil, subWith :: Nil)
+      }
     }
 
     def canUnify(arg: Type, app: Type): Boolean = (arg, app) match {
@@ -223,9 +207,9 @@ object Types {
         case Nil        => EmptyType
       }
 
-    def (tpe: Type) unifications(subWith: Type): List[(Name, Type)] = {
+    def (subFrom: Type) unifications(subWith: Type): List[(Name, Type)] = {
       import TypeVariableOps._
-      TypeVariableOps(tpe).zipWith(subWith)((_, _))
+      TypeVariableOps(subFrom).zipWith(subWith)((_, _))
     }
 
     def (tpe: Type) unifyFrom(subFrom: Type)(subWith: Type): Type = {

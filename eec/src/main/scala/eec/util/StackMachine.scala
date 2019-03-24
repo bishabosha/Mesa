@@ -1,11 +1,18 @@
 package eec
 package util
 
-object Programs {
+object StackMachine {
   import annotation.tailrec
+  import Program._
 
   type Stack[T]     = List[T]
   type Statement[T] = Stack[T] => Stack[T]
+
+  object Compiler {
+    def apply[I, T](compiler: I => Statement[T])
+                   (program: Program[T], i: I): Program[T] =
+      compiler(i) +: program
+  }
 
   opaque type Program[T] = List[Statement[T]]
 
@@ -13,11 +20,8 @@ object Programs {
     
     inline def of[T]: Program[T] = Nil
 
-    object Compiler {
-      def apply[I, T](compiler: I => Statement[T])
-                     (program: Program[T], i: I): Program[T] =
-        compiler(i) :: program
-    }
+    def (stat: Statement[T]) +: [T](program: Program[T]): Program[T] =
+      stat :: program
 
     def (program: Program[T]) run[T]: Stack[T] = {
       @tailrec
@@ -28,8 +32,5 @@ object Programs {
         }
       inner(Nil, program)
     }
-
-    def (program: Program[T]) unsafeInterpret[T]: T =
-      program.run.head
   }
 }
