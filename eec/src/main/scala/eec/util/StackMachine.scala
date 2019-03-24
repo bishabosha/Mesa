@@ -5,8 +5,8 @@ object StackMachine {
   import annotation.tailrec
   import Program._
 
-  type Stack[T]     = List[T]
-  type Statement[T] = Stack[T] => Stack[T]
+  type Stack     [T] = List[T]
+  type Statement [T] = Stack[T] => Stack[T]
 
   object Compiler {
     def apply[I, T](compiler: I => Statement[T])
@@ -23,7 +23,7 @@ object StackMachine {
     def (stat: Statement[T]) +: [T](program: Program[T]): Program[T] =
       stat :: program
 
-    def (program: Program[T]) run[T]: Stack[T] = {
+    private def (program: Program[T]) run[T]: Stack[T] = {
       @tailrec
       def inner[T](stack: Stack[T], program: Program[T]): Stack[T] =
         program match {
@@ -32,5 +32,8 @@ object StackMachine {
         }
       inner(Nil, program)
     }
+
+    def (program: Program[T]) unsafeInterpret [T] = program.run.head
+    def (program: Program[T]) interpret       [T] = program.run.headOption
   }
 }

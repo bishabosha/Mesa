@@ -87,7 +87,7 @@ object Types {
           tpe1 :: _
       }
 
-      tpe.foldLeft(of[Type])(compiler).run.head
+      tpe.foldLeft(of[Type])(compiler).unsafeInterpret
     }
   }
 
@@ -163,7 +163,7 @@ object Types {
       case (AppliedType(_, args1), AppliedType(_, args2)) =>
         args1.size == args2.size
       case ( _: FunctionType,   _: FunctionType )
-      |    ( _: TypeRef,        _: TypeRef )
+      |    ( _: TypeRef,        _: TypeRef      )
       |    ( _: Variable
            |    WildcardType,   _               )
       |    ( _: PackageInfo,    _: PackageInfo  )
@@ -179,9 +179,21 @@ object Types {
       tpe   == WildcardType ||
       other == WildcardType
 
-    def packageName(t: Type): Name = t match {
+    def packageName(tpe: Type): Name = tpe match {
       case PackageInfo(_, name) => name
       case _                    => EmptyName
+    }
+
+    def packageNames(tpe: Type): List[Name] = {
+      @tailrec
+      def packageNamed(acc: List[Name], tpe: Type): List[Name] =
+        tpe match {
+          case PackageInfo(parent, name) =>
+            packageNamed(name :: acc, parent)
+          case _ =>
+            acc
+        }
+      packageNamed(Nil, tpe)
     }
 
     def toCurriedList(t: Type): List[Type] = {
@@ -270,64 +282,76 @@ object Types {
 
     implied for Showable[Type] {
       import implied NameOps._
+      import util.StackMachine._
+      import Program._
 
-      def (tpe: Type) show: String = {
-        inline def packaged(t: Type): String = {
-          @tailrec
-          def packageNamed(acc: List[Name], tpe: Type): List[Name] =
-            tpe match {
-              case PackageInfo(parent, name) =>
-                packageNamed(name :: acc, parent)
-              case _ =>
-                acc
-            }
-          packageNamed(Nil, t)
-            .map(_.show)
-            .mkString("package ", ".", "")
+      def (tpe: Type) show: String =
+        tpe.foldLeft(of[String])(compiler).unsafeInterpret
+
+      private val compiler = Compiler[Type, String] {
+        case FunctionType(arg, body) =>
+          fromFunctionType(arg, body)
+        case AppliedType(f, args) =>
+          fromAppliedType(f, args)
+        case Product(tpes1) =>
+          fromProduct(tpes1)
+        case TypeRef(t) =>
+          t.show :: _
+        case Variable(t) =>
+          t.show :: _
+        case PackageInfo(parent, name) =>
+          showPackage(parent, name) :: _
+        case WildcardType =>
+          "<anytype>" :: _
+        case Untyped =>
+          "<untyped>" :: _
+        case EmptyType =>
+          "<emptytype>" :: _
+      }
+
+      private def fromFunctionType(arg: Type, body: Type)
+                                  (stack: Stack[String]) = {
+        val a1 :: a2 :: rest = stack
+        val a1Final = arg match {
+          case _: FunctionType  => s"($a1)"
+          case _                => a1
         }
-        
-        inline def applied(t: Type, ts: List[Type]): String = {
-          if ts.isEmpty then
-            t.show
-          else {
-            val args = ts.map {
-              case f: (FunctionType | AppliedType) =>
-                val str = f.show
-                s"($str)"
-              case f =>
-                f.show
-            }
-            val functorStr = t.show
-            val argsStr = args.mkString(" ")
-            s"$functorStr $argsStr"
-          }
+        s"$a1Final -> $a2" :: rest
+      }
+
+      private def fromAppliedType(f: Type, args: List[Type])
+                                 (stack: Stack[String]) = {
+
+        def checkAll(tpes: List[Type], strs: List[String]) =
+          tpes.zip(strs).map(check)
+
+        def check(tpe: Type, str: String) = tpe match {
+          case _: (FunctionType | AppliedType) =>
+            s"($str)"
+          case _ =>
+            str
         }
 
-        inline def fromFunction(arg: Type, body: Type): String = arg match {
-          case _: FunctionType  => s"(${arg.show}) -> ${body.show}"
-          case _                => s"${arg.show} -> ${body.show}"
-        }
+        val functor :: stack1 = stack
+        val (removed, rest) = stack1.splitAt(args.length)
+        val str =
+          if removed.isEmpty then
+            functor
+          else
+            checkAll(args, removed).mkString(s"$functor ", " ", "")
+        str :: rest
+      }
 
-        tpe match {
-          case _: PackageInfo =>
-            packaged(tpe)
-          case FunctionType(arg, body) =>
-            fromFunction(arg, body)
-          case Product(ts) =>
-            ts.map(_.show).mkString("(", ", ", ")")
-          case AppliedType(t, ts) =>
-            applied(t, ts)
-          case TypeRef(t) =>
-            t.show
-          case Variable(t) =>
-            t.show
-          case WildcardType =>
-            "<anytype>"
-          case Untyped =>
-            "<untyped>"
-          case EmptyType =>
-            "<emptytype>"
-        }
+      private def fromProduct(tpes: List[Type])
+                             (stack: Stack[String]) = {
+        val (removed, rest) = stack.splitAt(tpes.length)
+        removed.mkString("(", ", ", ")") :: rest
+      }
+
+      private inline def showPackage(parent: Type, name: Name): String = {
+        (packageNames(parent) ::: name :: Nil)
+          .map(_.show)
+          .mkString("package ", ".", "")
       }
     }
 
