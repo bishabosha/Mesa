@@ -7,6 +7,7 @@ primitive putStrLn s : String -> !()
 primitive readInteger : !Integer
 primitive Left  x : l -> Either l r
 primitive Right x : r -> Either l r
+primitive absurd v : Void -> a
 primitive a == b : a -> a -> Boolean
 
 fst p : (a, b) -> !a =

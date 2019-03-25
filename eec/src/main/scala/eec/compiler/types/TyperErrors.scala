@@ -6,6 +6,7 @@ object TyperErrors {
   import error.CompilerErrors._
   import ast.Trees._
   import types.Types._
+  import types.Typers._
   import core.Names._
   import core.Contexts._
 
@@ -141,6 +142,14 @@ object TyperErrors {
     import implied NameOps._
     CompilerError.UnexpectedType(
       s"${name.show} does not qualify to be a constructor.")
+  }
+
+  def stoupNotEmptyBang(tree: Tree) given Stoup = {
+    import Stoup._
+    import implied TreeOps._
+    import implied StoupOps._
+    CompilerError.UnexpectedType(
+      s"Can not construct ! for argument `${tree.show}` as stoup is `${stoup.show}`")
   }
 
   def memberSelection given Mode = {

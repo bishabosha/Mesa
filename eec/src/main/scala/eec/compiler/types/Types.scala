@@ -87,7 +87,7 @@ object Types {
           tpe1 :: _
       }
 
-      tpe.foldLeft(of[Type])(compiler).unsafeInterpret
+      tpe.foldLeft(of[Type])(evalLeft(compiler)).unsafeInterpret
     }
   }
 
@@ -186,14 +186,14 @@ object Types {
 
     def packageNames(tpe: Type): List[Name] = {
       @tailrec
-      def packageNamed(acc: List[Name], tpe: Type): List[Name] =
+      def inner(acc: List[Name], tpe: Type): List[Name] =
         tpe match {
           case PackageInfo(parent, name) =>
-            packageNamed(name :: acc, parent)
+            inner(name :: acc, parent)
           case _ =>
             acc
         }
-      packageNamed(Nil, tpe)
+      inner(Nil, tpe)
     }
 
     def toCurriedList(t: Type): List[Type] = {
@@ -286,7 +286,7 @@ object Types {
       import Program._
 
       def (tpe: Type) show: String =
-        tpe.foldLeft(of[String])(compiler).unsafeInterpret
+        tpe.foldLeft(of[String])(evalLeft(compiler)).unsafeInterpret
 
       private val compiler = Compiler[Type, String] {
         case FunctionType(arg, body) =>

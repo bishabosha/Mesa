@@ -17,18 +17,47 @@ object Names {
   enum Name derives Eql {
     case From(derived: Derived)
     case Comp(derived: Derived)
-    case ComputationTag, IntegerTag, DecimalTag, EitherTag,
+    case ComputationTag, IntegerTag, DecimalTag, EitherTag, VoidTag,
       BooleanTag, StringTag, CharTag, Wildcard, EmptyName
   }
 
   val emptyString: String = "<empty>"
   val rootString: String  = "_root_"
 
+  val bangConstructor = {
+    import implied NameOps._
+    FunctionType(
+      Variable("$v".readAs),
+      AppliedType(
+        TypeRef("!".readAs),
+        List(Variable("$v".readAs))
+      )
+    )
+  }
+
+  val eitherConstructor = {
+    import implied NameOps._
+    FunctionType(
+      Variable("$l".readAs),
+      FunctionType(
+        Variable("$r".readAs),
+        AppliedType(
+          TypeRef(EitherTag),
+          List(
+            Variable("$l".readAs),
+            Variable("$r".readAs)
+          )
+        )
+      )
+    )
+  }
+
   val bootstrapped = {
     import implied NameOps._
     List(
-      ComputationTag  -> FunctionType(Variable("$v".readAs), AppliedType(TypeRef("!".readAs), List(Variable("$v".readAs)))),
-      EitherTag       -> FunctionType(Variable("$l".readAs), FunctionType(Variable("$r".readAs), AppliedType(TypeRef(EitherTag), List(Variable("$l".readAs), Variable("$r".readAs))))),
+      ComputationTag  -> bangConstructor,
+      EitherTag       -> eitherConstructor,
+      VoidTag         -> TypeRef(VoidTag),
       IntegerTag      -> TypeRef(IntegerTag),
       DecimalTag      -> TypeRef(DecimalTag),
       BooleanTag      -> TypeRef(BooleanTag),
@@ -80,6 +109,7 @@ object Names {
         case StringTag      => "String"
         case CharTag        => "Char"
         case EitherTag      => "Either"
+        case VoidTag        => "Void"
         case EmptyName      => emptyString
         case Comp(n)        =>
           import implied DerivedOps._
@@ -100,6 +130,7 @@ object Names {
         case "String"   => StringTag
         case "Char"     => CharTag
         case "Either"   => EitherTag
+        case "Void"     => VoidTag
         case str        =>
           import implied DerivedOps._
           From(infer[Readable[Derived]].readAs(str))

@@ -1,0 +1,31 @@
+"Γ is a context of value-type assignments to variables"
+ => do variables depend on the stoup?
+  - I think answer is if variable refers to computation type then can't be empty stoup
+
+two kinds of match?
+
+`Γ | − ⊢ t: A`
+  * `t` has no sub-computation
+
+`!x` binds a value `x` that has no sub-computation in its evaluation
+  * `Γ | − ⊢ t: A` -> `Γ | − ⊢ !t: !A`
+
+Is it possible to pass `t: A#` as a value that is not computed yet? or does the act
+of passing it require evaluation?
+  * Asking because rule for functions:
+    - `Γ | ∆ ⊢ s: A -> B#` ∧ `Γ | − ⊢ t: A` -> `Γ | ∆ ⊢ s t: B#`
+    - i.e. function arguments have no linear dependencies
+  * same for EC+, `Left x: A + B` and `Right y: A + B` have no linear dependence
+
+`Γ | z: A# ⊢ t: B#` -> `Γ | − ⊢ (\(z: A#) -* t): A# -* B#`
+  if `t` is a computation that to evaluate as type `B#`, has the first sub-computation `z: A#`,
+  then `\(z: A#) -* t` has no linear dependence to evaluate as type `A# -* B#`
+
+is `!(!a)` ok?
+  * maybe not since `Γ | z:A# ⊢ z:A#` -> `Γ | z:!A ⊢ z:!A`
+  * however if it just trivially returns its argument, then !a is returned without evaluation
+  * assume ok in first prototype
+
+let !x be t in u
+  =>  t is a computation of arbitrary linearity
+      u is a computation but has no linear dependence on anything before its execution

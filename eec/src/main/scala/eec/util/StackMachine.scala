@@ -8,20 +8,27 @@ object StackMachine {
   type Stack     [T] = List[T]
   type Statement [T] = Stack[T] => Stack[T]
 
+  opaque type Compiler[I,T] = I => Statement[T]
+
   object Compiler {
-    def apply[I, T](compiler: I => Statement[T])
-                   (program: Program[T], i: I): Program[T] =
-      compiler(i) +: program
+    def apply[I, T](compiler: I => Statement[T]): Compiler[I, T]   = compiler
+    def (compiler: Compiler[I, T]) unseal[I, T]: I => Statement[T] = compiler
   }
 
   opaque type Program[T] = List[Statement[T]]
 
   object Program {
-    
+    import Compiler._
+
     inline def of[T]: Program[T] = Nil
 
-    def (stat: Statement[T]) +: [T](program: Program[T]): Program[T] =
-      stat :: program
+    def evalLeft[I,T](compiler: Compiler[I, T])
+                     (program: Program[T], i: I): Program[T] =
+      compiler.unseal(i) :: program
+
+    def evalRight[I,T](compiler: Compiler[I, T])
+                      (i: I, program: Program[T]): Program[T] =
+      compiler.unseal(i) :: program
 
     private def (program: Program[T]) run[T]: Stack[T] = {
       @tailrec

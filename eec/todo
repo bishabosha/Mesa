@@ -9,6 +9,19 @@
 evaluated once projected out. (So, e.g., the linearity in the rule for 1
 is correct because 1 is the empty product and () can never be projected.)"
 
+(i)  Γ | −     ⊢ t: A
+(ii) Γ | z: A# ⊢ t: B#
+
+"On the right of Γ is a stoup (following the terminology of [13]),
+which may either be empty, as in the case of judgement (i),
+or may consist of a unique type assignment z:A,
+in which case the type on the right of the turnstyle is also required to be a
+computation type, as in (ii)."
+  - "The purpose of judgement (i) is merely to assert that the term t has value
+    type A in (value) context Γ."
+  - "Judgement (ii) asserts that t is a computation of type B (in context Γ)
+    which depends linearly on the computation z of type A."
+
 * In branch `unification1`- realised i need to make scope have separate types for
   names that refer to terms and names that refer to pure types
     - e.g. when ! is used as a type `! Integer`, and also to refer to the
