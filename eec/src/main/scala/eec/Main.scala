@@ -1,9 +1,10 @@
 package eec
 
+import repl._
+
 object Main {
 
   def main(args: Array[String]): Unit = {
-    import eec.repl._
     if args `sameElements` Array("-help") then {
       println("Usage: eec <option>")
       println

@@ -1,9 +1,6 @@
-package eec
-package compiler
-package core
+package eec.compiler.core
 
 object Constants {
-
   enum Constant derives Eql {
     case StringConstant(str: String)
     case CharConstant(chr: Char)
@@ -15,5 +12,4 @@ object Constants {
     case BigDecConstant(bd: BigDecimal)
     case BooleanConstant(z: Boolean)
   }
-
 }

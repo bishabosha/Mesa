@@ -42,7 +42,7 @@ object Commands {
   private val ctx = """:ctx(?:\s*)""".r
   private val showHelp = """:help(?:\s*)""".r
 
-  def (s: String) trimOrEmpty: String = Option(s).map(_.trim).getOrElse("")
+  def (s: String) trimOrEmpty: String = Option(s).fold("")(_.trim)
 
   def parseCommand(line: String): Command = line.trim match {
     case quitCommand()        => Quit

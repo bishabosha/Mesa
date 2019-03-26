@@ -4,5 +4,5 @@ package util
 trait |>[A,B] extends (A => B)
 
 object Convert {
-  inline def apply[A, B] given (c: A |> B) = c
+  def (a: A) convert[A, B] given (c: A |> B) = c(a)
 }

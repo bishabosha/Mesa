@@ -2,29 +2,24 @@ package eec
 package compiler
 package types
 
+import ast.Trees._
+import Tree._
+import TreeOps._
+import error.CompilerErrors._
+import CompilerErrorOps._
+import core.Contexts._
+import core.Names._
+import Name._
+import Context._
+import Mode._
+import util.Convert
+import Convert._
+
+import implied NameOps._
+import implied TreeOps._
+
 object Namers {
-
-  import ast.Trees._
-  import Tree._
-  import TreeOps._
-  import error.CompilerErrors._
-  import CompilerErrorOps._
-  import core.Contexts._
-  import core.Names._
-  import Name._
-  import Context._
-  import Mode._
-  import util.Convert
-
-  private[this] val anon = {
-    import implied NameOps._
-    emptyString.readAs
-  }
-
-  private[this] val toName = {
-    import implied TreeOps._
-    Convert[Tree, Name]
-  }
+  private[this] val anon: Name  = emptyString.readAs
 
   def namedDefDef(name: Name, args: List[Tree], sigId: Id)
                  (tpeAs: Tree, body: Tree) given Context, Mode: Checked[Unit] =
@@ -41,7 +36,7 @@ object Namers {
     enterFresh(id, anon).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
-        _ <-  args.map(t => t.id -> toName(t)).mapE(enterFresh)
+        _ <-  args.map(t => t.id -> (t.convert: Name)).mapE(enterFresh)
         _ <-  index(body)
       } yield ()
     }

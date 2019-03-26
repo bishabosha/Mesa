@@ -2,76 +2,62 @@ package eec
 package compiler
 package types
 
-object Typers {
+import Types._
+import TypeOps._
+import Type._
+import core.Names._
+import Name._
+import core.Constants._
+import Constant._
+import core.Modifiers._
+import ast._
+import ast.Trees._
+import Tree._
+import TreeOps._
+import error._
+import CompilerErrors._
+import CompilerErrorOps._
+import core.Contexts._
+import Context._
+import util.{Convert, Showable}
+import Mode._
+import Convert._
 
-  import Types._
-  import TypeOps._
-  import Type._
-  import core.Names._
-  import Name._
-  import core.Constants._
-  import Constant._
-  import core.Modifiers._
-  import ast._
-  import ast.Trees._
-  import Tree._
-  import TreeOps._
-  import error._
-  import CompilerErrors._
-  import CompilerErrorOps._
-  import core.Contexts._
-  import Context._
-  import util.Convert
-  import Mode._
+import implied NameOps._
+import implied TypeOps._
+import implied CompilerErrorOps._
+import implied TreeOps._
+
+object Typers {
   import Stoup._
 
-  private val toType = {
-    import implied TypeOps._
-    Convert[List[Type], Type]
-  }
-  
-  private val typeToList = {
-    import implied TypeOps._
-    Convert[Type, List[Type]]
-  }
-
-  private val getName = {
-    import implied TreeOps._
-    Convert[Tree, Name]
-  }
-
-  private val rootName = {
-    import implied NameOps._
-    rootString.readAs
-  }
-
+  private val rootName    = rootString.readAs
   private[Typers] val any = WildcardType
 
   enum Stoup {
-    case DependsOn(tpd: Tree)
+    case DependsOn(z: Name)
     case Blank
   }
 
   object Stoup {
     def stoup given (s: Stoup) = s
 
-    def onStoupDepends[O] given Stoup (handler: given Stoup => O): O | Unit =
+    def onStoupDepends[O](handler: given Stoup => O) given Stoup: O | Unit =
       stoup match {
-        case Blank            =>
-        case DependsOn(tree)  => handler
+        case Blank        =>
+        case d: DependsOn => handler
       }
   }
 
   object StoupOps {
-    import util.Showable
-    import Stoup._
-
-    implied for Showable[Stoup] {
-      import implied TreeOps._
-
+    implied given Context for Showable[Stoup] {
       def (stoup: Stoup) show = stoup match {
-        case Blank            => "Γ | -"
-        case DependsOn(tree)  => s"Γ | ${tree.show}"
+        case Blank => "Γ | -"
+
+        case DependsOn(name) =>
+          getType(name).fold
+            { err => s"Γ | <error: ${err.show}>" }
+            { tpe => s"Γ | ${tpe.show}: ${name.show}" }
       }
     }
   }
@@ -112,28 +98,19 @@ object Typers {
         TyperErrors.tpesNotUnifyTo(tpe)
     }
 
-  def resolveVariables(tpe: Type) given Context: Type = tpe match {
-    case FunctionType(arg, body) =>
-      FunctionType(resolveVariables(arg), resolveVariables(body))
-    case AppliedType(f, args) =>
-      AppliedType(resolveVariables(f), args.map(resolveVariables))
-    case Product(tpes) =>
-      Product(tpes.map(resolveVariables))
-    case TypeRef(name) =>
+  def resolveVariables(tpe: Type) given Context: Type = {
+    tpe.mapTypeRefs { name =>
       val lookup = firstCtx(name).flatMap { ctx1 =>
         implied for Context = ctx1
         getType(name)
       }
       lookup.fold
-        { notFound => Variable(name) }
+        { _   => Variable(name) }
         { tpe =>
-          if isDefined(tpe) then
-            TypeRef(name)
-          else
-            Variable(name)
+            if isDefined(tpe) then TypeRef(name)
+            else Variable(name)
         }
-    case _ =>
-      tpe
+    }
   }
 
   def checkFunctorWithProto(functor: Tree, proto: Type): Checked[Type] = {
@@ -147,8 +124,8 @@ object Typers {
           toCurriedList(functorTyp1).last
         else
           TyperErrors.functorNotMatchProto(functor, functorTyp1, proto1)
-      case _ =>
-        TyperErrors.noApplyNonFunctionType
+
+      case _ => TyperErrors.noApplyNonFunctionType
     }
   }
 
@@ -161,8 +138,8 @@ object Typers {
           ret1.unify(pt)
         else
           TyperErrors.functionNotMatchProto(fun, arg1, argProto)
-      case _ =>
-        TyperErrors.noApplyNonFunctionType
+
+      case _ => TyperErrors.noApplyNonFunctionType
     }
   }
 
@@ -197,8 +174,8 @@ object Typers {
 
   private def functionTypeTpe(args1: List[Tree], body1: Tree)
                              given Mode: Checked[Type] = {
-    val argTpes = toType(args1.map(_.tpe))
-    val fType   = FunctionType(argTpes, body1.tpe)
+    val argTpe  = args1.map(_.tpe).convert
+    val fType   = FunctionType(argTpe, body1.tpe)
     if mode != PrimitiveType && !fType.isComputationType then
       TyperErrors.noCompCodomain
     else
@@ -228,7 +205,7 @@ object Typers {
     if pt == any then {
       ts.mapE(_.typed(any))
     } else {
-      val ptAsTuple = typeToList(pt)
+      val ptAsTuple = pt.convert
       if ts.length != ptAsTuple.length then
         TyperErrors.tupleNoMatch(pt, ptAsTuple)
       else
@@ -239,7 +216,7 @@ object Typers {
                  (id: Id, pt: Type)
                  given Context, Mode, Stoup: Checked[Tree] =
     for (ts1 <- typeAsTuple(ts, pt))
-      yield Parens(ts1)(id, toType(ts1.map(_.tpe)))
+      yield Parens(ts1)(id, ts1.map(_.tpe).convert)
 
   private def typeAsDestructor
       (fTpe: Type, pt: Type): Checked[(List[Type], Type)] =
@@ -249,8 +226,8 @@ object Typers {
         val ret           = ret0.unifyFromAll(unifications)
         val fTpeArgs      = args0.reverse.map(_.unifyFromAll(unifications))
         (fTpeArgs, ret)
-      case _ =>
-        TyperErrors.emptyFunctor(fTpe)
+
+      case _ => TyperErrors.emptyFunctor(fTpe)
     }
 
   private def typeAsFunctorArgs
@@ -264,12 +241,8 @@ object Typers {
   private def unifyConstructorToHkType
       (functor: Tree, args: List[Type]): Checked[Type] = {
     val res :: args0 = toCurriedList(functor.tpe).reverse
-    res match {
-      case _ if args0.length == args.length =>
-        res
-      case _ =>
-        TyperErrors.hkArgsDoNotUnify(functor, args0, args)
-    }
+    if args0.length == args.length then res
+    else TyperErrors.hkArgsDoNotUnify(functor, args0, args)
   }
 
   def typedApplyType(functor: Tree, args: List[Tree])
@@ -289,30 +262,29 @@ object Typers {
     for {
       fun1      <-  fun.typed(any)
       args1     <-  args.mapE(_.typed(any))
-      argsProto <-  toType(args1.map(_.tpe))
+      argsProto <-  args1.map(_.tpe).convert
       tpe       <-  checkFunWithProto(fun1, argsProto)(pt)
       // _         <-  assertStoupEmptyForBang(fun1, args1)
     } yield Apply(fun1, args1)(id, tpe)
 
-  def evalStoupTerm(tpd: Tree): Stoup = tpd match {
-    case Parens(tpes) =>
-      tpes.collectFirst { case t if t.tpe.isComputationType => t }
-          .map(DependsOn(_))
-          .getOrElse(Blank)
-    case Function(_, body) =>
-      evalStoupTerm(body)
-    case Apply(Ident(ComputationTag), List(_)) =>
-      Blank
-    case Apply(function, _) =>
-      evalStoupTerm(function)
-    case Let(_, value, _) =>
-      evalStoupTerm(value)
-    case _: Literal =>
-      Blank
-  }
+  // def evalStoupTerm(tpd: Tree): Stoup = tpd match {
+  //   case Parens(tpes) =>
+  //     tpes.collectFirst { case t if t.tpe.isComputationType => t }
+  //         .fold(Blank)(t => DependsOn(t.convert))
+  //   case Function(_, body) =>
+  //     evalStoupTerm(body)
+  //   case Apply(Ident(ComputationTag), List(_)) =>
+  //     Blank
+  //   case Apply(function, _) =>
+  //     evalStoupTerm(function)
+  //   case Let(_, value, _) =>
+  //     evalStoupTerm(value)
+  //   case _: Literal =>
+  //     Blank
+  // }
 
   // def assertStoupEmptyForBang(fun1: Tree, args: List[Tree])
-  //                            given Stoup: Checked[Unit] = {
+  //                            given Stoup, Context: Checked[Unit] = {
   //   fun1.tpe match {
   //     case `bangConstructor` =>
   //       args match {
@@ -434,7 +406,7 @@ object Typers {
         for {
           next  <- lookIn(id)
           tpe   <- declarePackage(rootName, name)
-        } yield (
+        } yield {
           tail.foldLeftE(next, Ident(name)(id, tpe)) { (acc, pair) =>
             val (current, parent) = acc
             val (id, name)        = pair
@@ -445,9 +417,9 @@ object Typers {
             } yield
               (next, Select(parent, name)(id, tpe))
           }
-        )
-      case _ =>
-        (ctx, EmptyTree)
+        }
+
+      case _ => (ctx, EmptyTree)
     }
 
   def typedPackageDef(pid: Tree, stats: List[Tree])
@@ -480,7 +452,7 @@ object Typers {
                   body.typed(ret)
                 }
       _     <-  checked {
-                  val name = getName(sig)
+                  val name = (sig.convert: Name)
                   putType(name, resolveVariables(tpe))
                   if modifiers.contains(Modifier.Primitive) then {
                     setPrimitive(name)
@@ -567,6 +539,7 @@ object Typers {
       idRefTpe  <- checked {
         implied for Context = fstCtx
         getType(name)
+        // check that if its not a computation type, then its not in the stoup
       }
     } yield Ident(name)(id, idRefTpe.freshVariables)
 

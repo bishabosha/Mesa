@@ -2,12 +2,17 @@ package eec
 package compiler
 package core
 
-object Names {
+import types.Types._
+import Type._
+import Contexts.Id
+import util.{Showable, Readable}
 
+object Names {
   import Name._
-  import types.Types._
-  import Type._
-  import Contexts.Id
+  import Derived._
+
+  import implied NameOps._
+  import implied DerivedOps._
 
   enum Derived derives Eql {
     case Str(str: String)
@@ -25,7 +30,6 @@ object Names {
   val rootString: String  = "_root_"
 
   val bangConstructor = {
-    import implied NameOps._
     FunctionType(
       Variable("$v".readAs),
       AppliedType(
@@ -36,7 +40,6 @@ object Names {
   }
 
   val eitherConstructor = {
-    import implied NameOps._
     FunctionType(
       Variable("$l".readAs),
       FunctionType(
@@ -53,7 +56,6 @@ object Names {
   }
 
   val bootstrapped = {
-    import implied NameOps._
     List(
       ComputationTag  -> bangConstructor,
       EitherTag       -> eitherConstructor,
@@ -67,12 +69,9 @@ object Names {
   }
 
   object DerivedOps {
-    import Derived._
-    import eec.util.{Showable, Readable}
-
     implied for Showable[Derived] {
       def (n: Derived) show = n match {
-        case Str(str) => str
+        case Str(str)           => str
         case Synthetic(id, str) => s"<$str:$id>"
       }
     }
@@ -83,10 +82,6 @@ object Names {
   }
 
   object NameOps {
-    import Name._
-    import Derived._
-    import eec.util.{Showable, Readable}
-
     def (name: Name) promoteComp: Name = name match {
       case From(d)  => Comp(d)
       case _        => name
@@ -111,12 +106,8 @@ object Names {
         case EitherTag      => "Either"
         case VoidTag        => "Void"
         case EmptyName      => emptyString
-        case Comp(n)        =>
-          import implied DerivedOps._
-          n.show
-        case From(n)        =>
-          import implied DerivedOps._
-          n.show
+        case Comp(n)        => n.show
+        case From(n)        => n.show
       }
     }
 
@@ -131,9 +122,7 @@ object Names {
         case "Char"     => CharTag
         case "Either"   => EitherTag
         case "Void"     => VoidTag
-        case str        =>
-          import implied DerivedOps._
-          From(infer[Readable[Derived]].readAs(str))
+        case str        => From(infer[Readable[Derived]].readAs(str))
       }
     }
   }

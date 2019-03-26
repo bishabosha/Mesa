@@ -1,5 +1,4 @@
-package eec
-package compiler
+package eec.compiler
 package ast
 
 import Trees.Tree._

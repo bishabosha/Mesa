@@ -2,15 +2,24 @@ package eec
 package compiler
 package types
 
+import scala.collection.generic.CanBuild
+import scala.annotation.tailrec
+
+import ast.Trees._
+import Tree._
+import core.Names
+import Names._
+import Name._
+import util.{Showable,|>,StackMachine}
+import StackMachine._
+import Program._
+
+import implied NameOps._
+
 object Types {
-  import collection.generic._
-  import collection.mutable._
-  import annotation._
-  import core.Names
-  import Names._
-  import Name._
   import Type._
-  import ast.Trees._
+  import TypeOps._
+  import TypeVariableOps._
 
   object Bootstraps {
     val BooleanType = TypeRef(BooleanTag)
@@ -35,8 +44,6 @@ object Types {
   opaque type TypeVariableOps = Type
 
   private object TypeVariableOps {
-    import TypeOps._
-
     def apply(tpe: Type): TypeVariableOps = tpe
 
     def (ops: TypeVariableOps) zipWith[O, That](subWith: Type)
@@ -59,32 +66,36 @@ object Types {
           Variable(sub)
         else
           by
-      case other =>
-        Variable(other)
+
+      case other => Variable(other)
     }
 
     def (tpe: TypeVariableOps) mapVariables(f: Name => Type): Type = {
-      import util.StackMachine._
-      import Program._
+      tpe.mapLeaves {
+        case Variable(name) => f(name)
+        case tpe1           => tpe1
+      }
+    }
 
+    def (tpe: TypeVariableOps) mapLeaves(f: Type => Type): Type = {
       val compiler = Compiler[Type, Type] {
         case FunctionType(arg, body) =>
           stack =>
             val a1 :: a2 :: rest = stack
             FunctionType(a1, a2) :: rest
+
         case AppliedType(f, args) =>
           stack =>
             val functor :: stack1 = stack
             val (removed, rest) = stack1.splitAt(args.length)
             AppliedType(functor, removed) :: rest
+
         case Product(tpes1) =>
           stack =>
             val (removed, rest) = stack.splitAt(tpes1.length)
             Product(removed) :: rest
-        case Variable(name) =>
-          f(name) :: _
-        case tpe1 =>
-          tpe1 :: _
+
+        case tpe1 => f(tpe1) :: _
       }
 
       tpe.foldLeft(of[Type])(evalLeft(compiler)).unsafeInterpret
@@ -93,28 +104,19 @@ object Types {
 
   object TypeOps {
 
-    import collection._
-    import util.Showable
-    import Type._
-    import Tree._
-    import util.|>
-
     def (tpe: Type) foldLeft[O]
         (seed: O)
         (f: (O, Type) => O): O = {
       @tailrec
       def inner(acc: O, tpes: List[Type]): O = tpes match {
         case Nil => acc
+
         case tpe :: rest =>
           tpe match {
-            case AppliedType(t, tpes) =>
-              inner(f(acc, tpe), t :: tpes ::: rest)
-            case FunctionType(a1, b1) =>
-              inner(f(acc, tpe), a1 :: b1 :: rest)
-            case Product(tpes) =>
-              inner(f(acc, tpe), tpes ::: rest)
-            case _ =>
-              inner(f(acc, tpe), rest)
+            case AppliedType(t, tpes) => inner(f(acc, tpe), t :: tpes ::: rest)
+            case FunctionType(a1, b1) => inner(f(acc, tpe), a1 :: b1 :: rest)
+            case Product(tpes)        => inner(f(acc, tpe), tpes ::: rest)
+            case _                    => inner(f(acc, tpe), rest)
           }
       }
       inner(seed, tpe :: Nil)
@@ -129,19 +131,32 @@ object Types {
           args: List[Type],
           apps: List[Type]): O = args match {
         case Nil => acc
+
         case arg :: argRest => apps match {
           case Nil => acc
+
           case app :: appsRest =>
             if canUnify(arg, app) then
               (arg, app) match {
                 case (AppliedType(functor1, args1), AppliedType(functor2, args2)) =>
-                  inner(f(acc, arg, app), functor1 :: args1 ::: argRest, functor2 :: args2 ::: appsRest)
+                  inner(
+                    f(acc, arg, app),
+                    functor1 :: args1 ::: argRest,
+                    functor2 :: args2 ::: appsRest)
+
                 case (FunctionType(a1, b1), FunctionType(a2, b2)) =>
-                  inner(f(acc, arg, app), a1 :: b1 :: argRest, a2 :: b2 :: appsRest)
+                  inner(
+                    f(acc, arg, app),
+                    a1 :: b1 :: argRest,
+                    a2 :: b2 :: appsRest)
+
                 case (Product(tpes1), Product(tpes2)) =>
-                  inner(f(acc, arg, app), tpes1 ::: argRest, tpes2 ::: appsRest)
-                case _ =>
-                  inner(f(acc, arg, app), argRest, appsRest)
+                  inner(
+                    f(acc, arg, app),
+                    tpes1 ::: argRest,
+                    tpes2 ::: appsRest)
+
+                case _ => inner(f(acc, arg, app), argRest, appsRest)
               }
             else
               acc
@@ -156,22 +171,27 @@ object Types {
     }
 
     def canUnify(arg: Type, app: Type): Boolean = (arg, app) match {
-      case (Product(tpes1), Product(tpes2)) =>
-        tpes1.size == tpes2.size
-      case (Variable(_: Comp), _) =>
-        app.isComputationType
+      case (Product(tpes1), Product(tpes2)) => tpes1.size == tpes2.size
+      case (Variable(_:Comp), _)            => app.isComputationType
+
       case (AppliedType(_, args1), AppliedType(_, args2)) =>
         args1.size == args2.size
-      case ( _: FunctionType,   _: FunctionType )
-      |    ( _: TypeRef,        _: TypeRef      )
-      |    ( _: Variable
-           |    WildcardType,   _               )
-      |    ( _: PackageInfo,    _: PackageInfo  )
-      |    (    EmptyType,         EmptyType    )
-      |    (    Untyped,           Untyped      ) =>
-        true
-      case _ =>
-        false
+
+      case ( _:FunctionType,   _:FunctionType )
+      |    ( _:TypeRef,        _:TypeRef      )
+      |    ( _:Variable
+           |   WildcardType,   _              )
+      |    ( _:PackageInfo,    _:PackageInfo  )
+      |    (   EmptyType,        EmptyType    )
+      |    (   Untyped,          Untyped      ) => true
+      case _                                    => false
+    }
+
+    def (tpe: Type) mapTypeRefs(f: Name => Type): Type = {
+      TypeVariableOps(tpe).mapLeaves {
+        case TypeRef(name)  => f(name)
+        case tpe1           => tpe1
+      }
     }
 
     def (tpe: Type) =!= (other: Type): Boolean =
@@ -188,10 +208,8 @@ object Types {
       @tailrec
       def inner(acc: List[Name], tpe: Type): List[Name] =
         tpe match {
-          case PackageInfo(parent, name) =>
-            inner(name :: acc, parent)
-          case _ =>
-            acc
+          case PackageInfo(parent, name)  => inner(name :: acc, parent)
+          case _                          => acc
         }
       inner(Nil, tpe)
     }
@@ -209,8 +227,8 @@ object Types {
       defSig match {
         case DefSig(_, args) =>
           toFunctionType(toCurriedList(t).drop(args.length))
-        case _ =>
-          EmptyType
+
+        case _ => EmptyType
       }
 
     def toFunctionType(ts: List[Type]): Type =
@@ -220,12 +238,10 @@ object Types {
       }
 
     def (subFrom: Type) unifications(subWith: Type): List[(Name, Type)] = {
-      import TypeVariableOps._
       TypeVariableOps(subFrom).zipWith(subWith)((_, _))
     }
 
     def (tpe: Type) unifyFrom(subFrom: Type)(subWith: Type): Type = {
-      import TypeVariableOps._
       subFrom.zipFold(subWith)(tpe) { (acc, arg, sub) =>
         arg match {
           case Variable(name) => unifyImpl(acc, name, sub)
@@ -239,27 +255,23 @@ object Types {
 
     def (tpe: Type) unifyFromAll(unifications: Iterable[(Name, Type)]): Type =
       unifications.foldLeft(tpe) { (acc, pair) =>
-        import TypeVariableOps._
         val (sub, by) = pair
         unifyImpl(acc, sub, by)
       }
 
     def (tpe: Type) replaceVariable(from: Name)(by: Name): Type = {
-      import TypeVariableOps._
       unifyImpl(tpe, from, Variable(by))
     }
 
     def (tpe: Type) replaceVariables(f: Name => Option[Name]): Type = {
-      import TypeVariableOps._
       var seen = Set[Name]()
       tpe.foldLeft(tpe) { (acc, tpe) =>
         tpe match {
           case Variable(n) if !seen.contains(n) =>
             seen += n
-            f(n).map(acc.replaceVariable(n)(_))
-                .getOrElse(acc)
-          case _ =>
-            acc
+            f(n).fold(acc)(acc.replaceVariable(n)(_))
+
+          case _ => acc
         }
       }
     }
@@ -268,6 +280,7 @@ object Types {
       @tailrec
       def inner(acc: Boolean, tpes: List[Type]): Boolean = tpes match {
         case Nil => acc
+
         case tpe :: tpes => tpe match {
           case AppliedType(TypeRef(ComputationTag), List(_))
           |    TypeRef(_: Comp)
@@ -281,32 +294,20 @@ object Types {
     }
 
     implied for Showable[Type] {
-      import implied NameOps._
-      import util.StackMachine._
-      import Program._
 
       def (tpe: Type) show: String =
         tpe.foldLeft(of[String])(evalLeft(compiler)).unsafeInterpret
 
       private val compiler = Compiler[Type, String] {
-        case FunctionType(arg, body) =>
-          fromFunctionType(arg, body)
-        case AppliedType(f, args) =>
-          fromAppliedType(f, args)
-        case Product(tpes1) =>
-          fromProduct(tpes1)
-        case TypeRef(t) =>
-          t.show :: _
-        case Variable(t) =>
-          t.show :: _
-        case PackageInfo(parent, name) =>
-          showPackage(parent, name) :: _
-        case WildcardType =>
-          "<anytype>" :: _
-        case Untyped =>
-          "<untyped>" :: _
-        case EmptyType =>
-          "<emptytype>" :: _
+        case FunctionType(arg, body)    => fromFunctionType(arg, body)
+        case AppliedType(f, args)       => fromAppliedType(f, args)
+        case Product(tpes1)             => fromProduct(tpes1)
+        case TypeRef(t)                 => t.show :: _
+        case Variable(t)                => t.show :: _
+        case PackageInfo(parent, name)  => showPackage(parent, name) :: _
+        case WildcardType               => "<anytype>" :: _
+        case Untyped                    => "<untyped>" :: _
+        case EmptyType                  => "<emptytype>" :: _
       }
 
       private def fromFunctionType(arg: Type, body: Type)
@@ -334,11 +335,16 @@ object Types {
 
         val functor :: stack1 = stack
         val (removed, rest) = stack1.splitAt(args.length)
-        val str =
-          if removed.isEmpty then
+        val str = {
+          if removed.isEmpty then {
             functor
-          else
-            checkAll(args, removed).mkString(s"$functor ", " ", "")
+          } else {
+            val init =
+              if f == TypeRef(ComputationTag) && args.length == 1 then functor
+              else s"$functor "
+            checkAll(args, removed).mkString(init, " ", "")
+          }
+        }
         str :: rest
       }
 
@@ -367,28 +373,6 @@ object Types {
         case Product(ls)  => ls
         case tpe          => tpe :: Nil
       }
-    }
-
-    import Tree._
-    def (tree: Tree) withType(tpe: Type): Tree = tree match {
-      case t: Select        => t.copy()(t.id, tpe)
-      case t: Ident         => t.copy()(t.id, tpe)
-      case t: PackageDef    => t.copy()(t.id, tpe)
-      case t: DefDef        => t.copy()(t.id, tpe)
-      case t: DefSig        => t.copy()(t.id, tpe)
-      case t: Apply         => t.copy()(t.id, tpe)
-      case t: Function      => t.copy()(t.id, tpe)
-      case t: Let           => t.copy()(t.id, tpe)
-      case t: Literal       => t.copy()(t.id, tpe)
-      case t: CaseExpr      => t.copy()(t.id, tpe)
-      case t: CaseClause    => t.copy()(t.id, tpe)
-      case t: Alternative   => t.copy()(t.id, tpe)
-      case t: Parens        => t.copy()(t.id, tpe)
-      case t: Bind          => t.copy()(t.id, tpe)
-      case t: Unapply       => t.copy()(t.id, tpe)
-      case t: Tagged        => t.copy()(t.id, tpe)
-      case t: TreeSeq       => t
-      case EmptyTree        => EmptyTree
     }
   }
 }

@@ -168,7 +168,7 @@ Wildcard: '_';
 
 BooleanLiteral: 'True' | 'False';
 
-CompId: Varid '#';
+CompId: (Varid | Patid) '#';
 Patid: Upper Idrest;
 Varid: Lower Idrest;
 OpId: Op;
@@ -785,6 +785,6 @@ NEWLINE: NL+ -> skip;
 
 WS: WhiteSpace+ -> skip;
 
-COMMENT: '{-|' .*? '-}' Sep? -> skip;
+COMMENT: '{-' .*? '-}' Sep? -> skip;
 
 LINE_COMMENT: Dashes (~[\r\n])* Sep? -> skip;

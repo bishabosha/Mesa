@@ -2,7 +2,15 @@ package eec
 package compiler
 package error
 
+import scala.annotation.tailrec
+import scala.collection.generic.CanBuildFrom
+import scala.collection.mutable
+import scala.util.control.NonFatal
+
+import util.Showable
+
 object CompilerErrors {
+  import CompilerError._
 
   enum CompilerError derives Eql {
     case UnexpectedType(msg: String)
@@ -14,12 +22,6 @@ object CompilerErrors {
   type Checked[O] = O | CompilerError
 
   object CompilerErrorOps {
-
-    import CompilerError._
-    import eec.util.Showable
-    import collection.generic.CanBuildFrom
-    import collection.mutable.Builder
-    import annotation.tailrec
 
     def checked[O](o: Checked[O]): Checked[O] = o
 
@@ -35,15 +37,14 @@ object CompilerErrors {
         case _                  => f(o.asInstanceOf[O])
       }
 
-    def (o: Checked[O]) filter[O](f: O => Boolean)(orElse: O => CompilerError): Checked[O] =
+    def (o: Checked[O]) filter[O](f: O => Boolean)
+        (orElse: O => CompilerError): Checked[O] =
       o match {
-        case err: CompilerError =>
-          err
+        case err: CompilerError => err
+
         case _ =>
-          if f(o.asInstanceOf[O]) then
-            o
-          else
-            orElse(o.asInstanceOf[O])
+          if f(o.asInstanceOf[O]) then o
+          else orElse(o.asInstanceOf[O])
       }
 
     def (o: Checked[O]) flatMap[O, U](f: O => Checked[U]): Checked[U] =
@@ -55,22 +56,17 @@ object CompilerErrors {
     def (c: CC[A]) mapE[CC[A] <: Iterable[A], A, O, That](f: A => Checked[O])
         given (bf: CanBuildFrom[CC[A], O, That]): Checked[That] = {
 
-      val b = bf(c)
-
       @tailrec
-      def inner(it: Iterator[A]): Checked[That] =
+      def inner(acc: mutable.Builder[O, That], it: Iterator[A]): Checked[That] =
         if it.hasNext then
           f(it.next) match {
-            case err: CompilerError =>
-              err
-            case o =>
-              b += o.asInstanceOf[O]
-              inner(it)
+            case err: CompilerError => err
+            case o                  => inner(acc += o.asInstanceOf[O], it)
           }
         else
-          b.result
+          acc.result
 
-      inner(c.iterator)
+      inner(bf(c), c.iterator)
     }
 
     def (l: Iterable[A]) foldLeftE[A, O](seed: O)
@@ -90,7 +86,6 @@ object CompilerErrors {
     }
 
     def (f: => O) recoverDefault[O]: Checked[O] = {
-      import scala.util.control._
       f.recover {
         case e: Exception if NonFatal(e) => Internal(e)
       }
@@ -98,8 +93,6 @@ object CompilerErrors {
 
     def (f: => O) recover[O]
         (opt: PartialFunction[Exception, CompilerError]): Checked[O] = {
-      import scala.util.control._
-
       try {
         f
       } catch {
@@ -110,14 +103,17 @@ object CompilerErrors {
 
     implied for Showable[CompilerError] {
       def (e: CompilerError) show = e match {
-        case Internal(e) =>
-          val trace = e
-            .getStackTraceString
-            .split("\n")
-            .toSeq
-            .map("    " + _)
-            .mkString("\n")
-          s"Internal: ${e.getClass.getSimpleName}: ${e.getMessage}\nDebug trace:\n$trace"
+        case Internal(error) =>
+          val trace = {
+            error
+              .getStackTraceString
+              .split("\n")
+              .toSeq
+              .map("    " + _)
+              .mkString("\n")
+          }
+          s"Internal: ${e.getClass.getSimpleName}: ${error.getMessage}\nDebug trace:\n$trace"
+
         case UnexpectedType(msg)  => s"UnexpectedType: $msg"
         case IllegalState(msg)    => s"IllegalState: $msg"
         case SyntaxError(msg)     => s"SyntaxError: $msg"

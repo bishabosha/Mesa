@@ -2,14 +2,20 @@ package eec
 package compiler
 package ast
 
-object Trees {
+import core._
+import Names._
+import Constants._
+import Contexts._
+import Modifiers._
+import types.Types._
+import annotation._
+import util.{Showable, |>, Convert}
 
-  import core.Names._
-  import core.Constants._
-  import core.Contexts._
-  import core.Modifiers._
-  import types.Types._
-  import annotation._
+import implied Printing.untyped.AstOps._
+import implied NameOps._
+
+object Trees {
+  import Tree._
 
   enum Tree(val id: Id, val tpe: Type) derives Eql {
     case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(id, tpe)
@@ -34,10 +40,6 @@ object Trees {
 
   object TreeOps {
 
-    import Tree._
-    import util.{Showable, |>, Convert}
-    import implied core.Printing.untyped.AstOps._
-
     implied for Showable[Tree] {
       def (t: Tree) show = toAst(t).toString
     }
@@ -61,7 +63,6 @@ object Trees {
     }
 
     implied uniqName for (Tree |> Name) {
-      import implied NameOps._
       def apply(tree: Tree) = tree match {
         case DefSig(name, _)      => name
         case DefDef(_, sig, _, _) => apply(sig)

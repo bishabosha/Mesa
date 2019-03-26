@@ -2,22 +2,34 @@ package eec
 package compiler
 package core
 
+import scala.collection.mutable
+import scala.annotation.tailrec
+
+import Names._
+import Name._
+import NameOps._
+import Derived._
+import error.CompilerErrors._
+import CompilerErrorOps._
+import types.Types._
+import Type._
+import TypeOps._
+import util.Showable
+
+import implied NameOps._
+import implied TypeOps._
+
 object Contexts {
-  import types.Types._
-  import Type._
-  import core.Names._
-  import Name._
-  import error._
-  import CompilerErrors._
-  import collection._
-  import annotation._
+  import Mode._
+  import Id._
+  import IdGen._
 
   type Scope          = mutable.Buffer[(Sym, Context)]
   type TypeTable      = mutable.Map[Name, Type]
   type PrimTable      = mutable.Buffer[Name]
   type Modal[X]       = given Mode => X
   type Contextual[O]  = given Context => O
-  type IdMaker[O]     = given IdGen => O
+  type IdReader[O]    = given IdGen => O
   opaque type Id      = Long
 
   enum Mode derives Eql {
@@ -25,7 +37,6 @@ object Contexts {
   }
 
   object Mode {
-
     inline def mode given (m: Mode) = m
 
     def isPattern given Mode =
@@ -41,9 +52,6 @@ object Contexts {
   }
 
   object ModeOps {
-    import Mode._
-    import util.Showable
-
     implied for Showable[Mode] {
       def (m: Mode) show: String = m match {
         case Pat | PatAlt => "pattern"
@@ -61,8 +69,6 @@ object Contexts {
   }
 
   final class IdGen {
-    import Id._
-
     private[this] var _id: Id = Id.initId
 
     def fresh(): Id = {
@@ -80,15 +86,11 @@ object Contexts {
 
   case class Sym(id: Id, name: Name)
 
-  private val rootPkg = {
-    import implied NameOps._
+  private val rootPkg =
     PackageInfo(TypeRef(rootString.readAs), rootString.readAs)
-  }
 
-  private val rootSym = {
-    import implied NameOps._
+  private val rootSym =
     Sym(Id.rootId, rootString.readAs)
-  }
 
   sealed trait Context (
     val scope: Scope,
@@ -114,19 +116,13 @@ object Contexts {
   )
 
   object Context {
-    import TypeOps._
-    import NameOps._
-    import Derived._
-    import CompilerErrorOps._
-    import IdGen._
-
     def ctx given (c: Context) = c
 
     def rootCtx given Context = {
       @tailrec
       def inner(ctx: Context): Context = ctx match {
         case _: RootContext => ctx
-        case f: Fresh       => inner(f.outer)
+        case ctx: Fresh     => inner(ctx.outer)
       }
       inner(ctx)
     }
@@ -138,10 +134,9 @@ object Contexts {
           ctxIt
         else ctxIt match {
           case _: RootContext =>
-            import implied NameOps._
             CompilerError.IllegalState(s"name not found: ${name.show}")
-          case f: Fresh =>
-            inner(f.outer)
+
+          case ctx: Fresh => inner(ctx.outer)
         }
       inner(ctx)
     }
@@ -154,7 +149,6 @@ object Contexts {
       }
 
     def contains(name: Name) given Context: Boolean = {
-      import implied NameOps._
       name != emptyString.readAs && (
         ctx.scope.collectFirst { case (Sym(_, `name`), _) => () }
            .isDefined
@@ -163,7 +157,6 @@ object Contexts {
 
     def enterFresh(id: Id, name: Name) given Context: Checked[Context] =
       if contains(name) then {
-        import implied NameOps._
         CompilerError.UnexpectedType(
           s"Illegal shadowing in scope of name: ${name.show}")
       } else {
@@ -193,7 +186,6 @@ object Contexts {
       ctx.typeTable += pair
 
     def getType(name: Name) given Context: Checked[Type] = {
-      import implied NameOps._
       lazy val root = rootCtx
       if name == rootString.readAs && (ctx `eq` root) then
         rootPkg
@@ -231,18 +223,18 @@ object Contexts {
                       given Context: Checked[Type] = {
       val outer = ctx match {
         case _: RootContext => ctx
-        case f: Fresh       => f.outer
+        case ctx: Fresh     => ctx.outer
       }
       checked {
         implied for Context = outer
         for (parentTpe <- getType(parent)) yield (
           parentTpe match {
-            case p @ PackageInfo(_,_) =>
-              val tpe = PackageInfo(p, name)
+            case _: PackageInfo =>
+              val tpe = PackageInfo(parentTpe, name)
               putType(name, tpe)
               tpe
+
             case _ =>
-              import implied NameOps._
               CompilerError.UnexpectedType(
                 s"name `${parent.show}` does not refer to a package")
           }
@@ -255,7 +247,6 @@ object Contexts {
   }
 
   object ContextOps {
-    import util.Showable
     import Scoping._
 
     enum Scoping derives Eql {
@@ -267,8 +258,6 @@ object Contexts {
     }
 
     def (ctx: Context) toScoping: Seq[Scoping] = {
-      import implied NameOps._
-      import implied TypeOps._
 
       def branch(c: Context): Seq[Scoping] = {
         for {
@@ -277,21 +266,22 @@ object Contexts {
                     context.scope.nonEmpty || name != emptyString.readAs
                   }
           (sym, context)  = pair
-          tpeOpt          = c.typeTable.get(sym.name).map(t => TypeDef(t.show))
-          tpe             = tpeOpt.getOrElse(EmptyType)
+          tpeOpt          = c.typeTable.get(sym.name)
+          tpe             = tpeOpt.fold(EmptyType)(t => TypeDef(t.show))
           name            = sym.name.show
         } yield ScopeDef(ForName(name), tpe, context.toScoping)
       }
 
+      def (ctx: Fresh) hasMembers = ctx.scope.nonEmpty || ctx.typeTable.nonEmpty
+
       ctx match {
-        case c: RootContext =>
+        case ctx: RootContext =>
           List(
             ScopeDef(ForName(rootSym.name.show),
-            TypeDef(rootPkg.show), branch(c)))
-        case f: Fresh if f.scope.nonEmpty || f.typeTable.nonEmpty =>
-          branch(f)
-        case _ =>
-          Nil
+            TypeDef(rootPkg.show), branch(ctx)))
+
+        case ctx: Fresh if ctx.hasMembers => branch(ctx)
+        case _                            => Nil
       }
     }
   }

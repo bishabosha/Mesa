@@ -11,4 +11,6 @@
   which caused conflicts such as `Either l r != l` and having to rebind types
   - at least for checking, the codomains should be unified for constructor and
     functor type, then the subpatterns are checked on that
-  - unknown yet for wildcard check 
+  - unknown yet for wildcard check
+
+* can you match on n-ary tuples and preserve linearity

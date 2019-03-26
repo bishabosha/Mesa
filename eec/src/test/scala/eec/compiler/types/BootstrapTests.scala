@@ -2,30 +2,38 @@ package eec
 package compiler
 package types
 
-object BootstrapTests {
-  import core.Contexts._
-  import core.Names._
-  import error.CompilerErrors._
-  import parsing.EntryPoint._
-  import Typers._
-  import Namers._
-  import CompilerErrorOps._
-  import Namers._
-  import Types._
-  import ast.Trees._
+import core.Contexts._
+import core.Names._
+import error.CompilerErrors._
+import parsing.EntryPoint._
+import Typers._
+import Namers._
+import CompilerErrorOps._
+import Namers._
+import Types._
+import ast.Trees._
+import util.Convert
+import Convert._
 
-  import org.junit.Test
-  import org.junit.Assert._
+import org.junit.Test
+import org.junit.Assert._
+
+import implied CompilerErrorOps._
+import implied TreeOps._
+import implied TypeOps._
+import implied NameOps._
+
+object BootstrapTests {
 
   private val any = Type.WildcardType
 
-  def typeExpr: String => Type => Contextual[IdMaker[Checked[Tree]]] =
+  def typeExpr: String => Type => Contextual[IdReader[Checked[Tree]]] =
     typeCore(parseExpr)
 
-  def typeStat: String => Type => Contextual[IdMaker[Checked[Tree]]] =
+  def typeStat: String => Type => Contextual[IdReader[Checked[Tree]]] =
     typeCore(parseStat)
 
-  private def typeCore(f: String => IdMaker[Checked[Tree]])
+  private def typeCore(f: String => IdReader[Checked[Tree]])
                       (str: String)
                       (pt: Type) given IdGen, Context =
     for {
@@ -35,8 +43,6 @@ object BootstrapTests {
     } yield tpd
 
   def failIfTyped(tpd: Checked[Tree]): Unit = {
-    import implied TreeOps._
-    import implied TypeOps._
     tpd.fold
       { err => () }
       { tpd =>
@@ -47,15 +53,11 @@ object BootstrapTests {
   }
 
   def failIfAllTyped(tpd: Checked[Iterable[Tree]]): Unit = {
-    import implied TypeOps._
-    import implied TreeOps._
-    import implied NameOps._
-    import util.Convert
     tpd.fold
       { err => () }
       { tpds =>
         val tpes = tpds.map { t =>
-          val nameStr = Convert[Tree, Name](t).show
+          val nameStr = (t.convert: Name).show
           val tpeStr  = t.tpe.show
           s"$nameStr: $tpeStr"
         }
@@ -65,8 +67,6 @@ object BootstrapTests {
   }
 
   def checkTpe(parsed: Checked[Tree], checkTpe: String): Unit = {
-      import implied CompilerErrorOps._
-      import implied TypeOps._
       parsed.fold
         { err => fail(err.show) }
         { tpd => assertEquals(checkTpe, tpd.tpe.show) }

@@ -10,6 +10,8 @@ two kinds of match?
 `!x` binds a value `x` that has no sub-computation in its evaluation
   * `Γ | − ⊢ t: A` -> `Γ | − ⊢ !t: !A`
 
+`\(f: A -> B#) => \(x: !A) => let !y = x in f y` -> `(A -> B#) -> (!A -> B#)`
+
 Is it possible to pass `t: A#` as a value that is not computed yet? or does the act
 of passing it require evaluation?
   * Asking because rule for functions:
@@ -21,10 +23,8 @@ of passing it require evaluation?
   if `t` is a computation that to evaluate as type `B#`, has the first sub-computation `z: A#`,
   then `\(z: A#) -* t` has no linear dependence to evaluate as type `A# -* B#`
 
-is `!(!a)` ok?
-  * maybe not since `Γ | z:A# ⊢ z:A#` -> `Γ | z:!A ⊢ z:!A`
-  * however if it just trivially returns its argument, then !a is returned without evaluation
-  * assume ok in first prototype
+is `\x => !(!x)` ok?
+  => yes because it depends on no variable in the stoup
 
 let !x be t in u
   =>  t is a computation of arbitrary linearity

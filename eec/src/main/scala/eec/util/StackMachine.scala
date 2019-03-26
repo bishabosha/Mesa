@@ -1,8 +1,10 @@
 package eec
 package util
 
+import scala.annotation.tailrec
+
 object StackMachine {
-  import annotation.tailrec
+  import Compiler._
   import Program._
 
   type Stack     [T] = List[T]
@@ -18,8 +20,6 @@ object StackMachine {
   opaque type Program[T] = List[Statement[T]]
 
   object Program {
-    import Compiler._
-
     inline def of[T]: Program[T] = Nil
 
     def evalLeft[I,T](compiler: Compiler[I, T])

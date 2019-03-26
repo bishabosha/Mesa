@@ -2,20 +2,20 @@ package eec
 package compiler
 package parsing
 
-import ast.Trees._
 import Parsers._
-import error.CompilerErrors._
-import core.Contexts._
+import ast.Trees.Tree
+import error.CompilerErrors.Checked
+import core.Contexts.IdReader
 
 object EntryPoint {
 
-  val parseEEC: String => IdMaker[Checked[Tree]] =
+  val parseEEC: String => IdReader[Checked[Tree]] =
     eecParser `toTreeParser` fromTranslationUnit
 
-  val parseStat: String => IdMaker[Checked[Tree]] =
+  val parseStat: String => IdReader[Checked[Tree]] =
     statParser `toTreeParser` fromStatAsTop
 
-  val parseExpr: String => IdMaker[Checked[Tree]] =
+  val parseExpr: String => IdReader[Checked[Tree]] =
     exprParser `toTreeParser` fromExprAsTop
 
 }

@@ -2,22 +2,23 @@ package eec
 package compiler
 package types
 
+import core.Contexts._
+import ast.Trees._
+import parsing.EntryPoint._
+import error.CompilerErrors._
+import error.CompilerErrors.CompilerError._
+import Types._
+import types.Typers._
+import error.CompilerErrors._
+import BootstrapTests._
+import CompilerErrorOps._
+
 import org.junit.Test
 import org.junit.Assert._
 
 class TyperTest {
 
-  import core.Contexts._
-  import ast.Trees._
-  import parsing.EntryPoint._
-  import error.CompilerErrors._
-  import error.CompilerErrors.CompilerError._
-  import Types._
-  import types.Typers._
-  import error.CompilerErrors._
-  import BootstrapTests._
-
-  val any = types.Types.Type.WildcardType
+  val any = Type.WildcardType
 
   @Test def typecheckInteger() = typecheck(
     "0"   -> "Integer",
@@ -71,9 +72,9 @@ class TyperTest {
   )
 
   @Test def typecheckCompute() = typecheck(
-    "!()"       -> "! ()",
-    "!((),())"  -> "! ((), ())",
-    "(!(),!())" -> "(! (), ! ())"
+    "!()"       -> "!()",
+    "!((),())"  -> "!((), ())",
+    "(!(),!())" -> "(!(), !())"
   )
 
   @Test def noTypeCompute() = noType(
@@ -83,7 +84,7 @@ class TyperTest {
 
   @Test def typecheckIf() = typecheck(
     "if True then () else ()" -> "()",
-    """\(a: Boolean) (b: Boolean) => if a then !b else !False""" -> "Boolean -> Boolean -> ! Boolean"
+    """\(a: Boolean) (b: Boolean) => if a then !b else !False""" -> "Boolean -> Boolean -> !Boolean"
   )
 
   @Test def failIf() = noType(
@@ -167,7 +168,7 @@ class TyperTest {
 
   @Test def typecheckLet() = typecheck(
     "let !x = !() in ()"  -> "()",
-    "let !x = !0 in !x"   -> "! Integer"
+    "let !x = !0 in !x"   -> "!Integer"
   )
 
   @Test def failLet() = noType(
@@ -178,13 +179,12 @@ class TyperTest {
 
   @Test def typecheckBind(): Unit = {
     typecheck(
-      """\(ma: !a) (f: a -> !b) => let !a = ma in f a"""      -> "! a -> (a -> ! b) -> ! b",
-      """\(ma: !a) => \(f: a -> !b) => let !a = ma in f a"""  -> "! a -> (a -> ! b) -> ! b",
-      """\(a: !a) (f: a -> !b) => let !a = a in f a"""        -> "! a -> (a -> ! b) -> ! b")
+      """\(ma: !a) (f: a -> !b) => let !a = ma in f a"""      -> "!a -> (a -> !b) -> !b",
+      """\(ma: !a) => \(f: a -> !b) => let !a = ma in f a"""  -> "!a -> (a -> !b) -> !b",
+      """\(a: !a) (f: a -> !b) => let !a = a in f a"""        -> "!a -> (a -> !b) -> !b")
   }
 
   def typecheck(seq: (String, String)*): Unit = {
-    import CompilerErrorOps._
     initialCtx.flatMap { (idGen, ctx) =>
       implied for IdGen = idGen
       implied for Context = ctx
@@ -193,7 +193,6 @@ class TyperTest {
   }
 
   def noType(seq: String*): Unit = {
-    import CompilerErrorOps._
     initialCtx.flatMap { (idGen, ctx) =>
       implied for IdGen = idGen
       implied for Context = ctx

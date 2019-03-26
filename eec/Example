@@ -10,6 +10,38 @@ primitive Right x : r -> Either l r
 primitive absurd v : Void -> a
 primitive a == b : a -> a -> Boolean
 
+{-
+primitive linear s : (A | B# ) -> !()
+
+primitive linear s : (A | B#) -> !()
+
+data Either# = Left# l
+            |  Right# r
+
+case# list of Cons#(x, xs) => x : xs
+-}
+
+{- Example given in the EEC paper
+    - f,x are of computation types
+    - f is just a variable; variables are not linear
+    - x is just a variable; variables are not linear
+    - given term `lift g y`:
+      - passing g to lift depends linearly on nothing
+      - passing y to lift depends linearly on nothing
+      => is application lazy?
+-}
+lift : (A -> B#) -> !A -> B# =
+  \(f: A -> B#)(x: !A) => let !y = x in f y
+
+{- this example is not allowed:
+  `| (f: A -> B#) -* \(x: !A) => let !y = x in f y`
+  - `f y` must not depend linearly on anything,
+    however there is linear dependence on f
+-}
+
+ma >>= f : !A -> (A -> !B) -> !B =
+  (lift f) ma
+
 fst p : (a, b) -> !a =
   case p of (a, _) => !a
 
@@ -54,12 +86,6 @@ e : Char = 'e'
 
 unit : () = ()
 
-lift f : (a -> b#) -> !a -> b# =
-  \(c: !a) => let !x = c in f x
-
-ma >>= f : !a -> (a -> !b) -> !b =
-  (lift f) ma
-
 succ x : Integer -> !Integer =
   !(x + 1)
 
@@ -86,7 +112,7 @@ main : !() =
     let !y = readInteger >>= succ in
     putStrLn ("paired: " ++ (debug (x, y)))
 
-{-| example expressions to try:
+{- example expressions to try:
     primitive fst p: (a, b) -> a
     primitive snd p: (a, b) -> b
     primitive x == y: a -> a -> Boolean
