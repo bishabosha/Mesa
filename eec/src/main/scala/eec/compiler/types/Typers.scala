@@ -56,8 +56,8 @@ object Typers {
 
         case DependsOn(name) =>
           getType(name).fold
-            { err => s"Γ | <error: ${err.show}>" }
-            { tpe => s"Γ | ${tpe.show}: ${name.show}" }
+            { err => s"Γ | ${name.show}: <error: ${err.show}>" }
+            { tpe => s"Γ | ${name.show}: ${tpe.show}" }
       }
     }
   }
