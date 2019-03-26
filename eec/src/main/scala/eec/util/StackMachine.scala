@@ -12,23 +12,19 @@ object StackMachine {
 
   opaque type Compiler[I,T] = I => Statement[T]
 
-  object Compiler {
-    def apply[I, T](compiler: I => Statement[T]): Compiler[I, T]   = compiler
-    def (compiler: Compiler[I, T]) unseal[I, T]: I => Statement[T] = compiler
-  }
-
   opaque type Program[T] = List[Statement[T]]
 
   object Program {
     inline def of[T]: Program[T] = Nil
 
-    def evalLeft[I,T](compiler: Compiler[I, T])
+    def evalLeft[I,T](compiler: I => Statement[T])
                      (program: Program[T], i: I): Program[T] =
-      compiler.unseal(i) :: program
+      compiler(i) :: program
 
-    def evalRight[I,T](compiler: Compiler[I, T])
-                      (i: I, program: Program[T]): Program[T] =
-      compiler.unseal(i) :: program
+    def (input: I) compile[I, O]
+        (foldLeft: I => Program[O] => ((Program[O], I) => Program[O]) => Program[O])
+        (compiler: I => Statement[O]): O =
+      foldLeft(input)(of[O])(evalLeft(compiler)).unsafeInterpret
 
     private def (program: Program[T]) run[T]: Stack[T] = {
       @tailrec
@@ -41,6 +37,5 @@ object StackMachine {
     }
 
     def (program: Program[T]) unsafeInterpret [T] = program.run.head
-    def (program: Program[T]) interpret       [T] = program.run.headOption
   }
 }

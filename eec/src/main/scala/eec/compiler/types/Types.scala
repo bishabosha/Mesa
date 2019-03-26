@@ -60,6 +60,13 @@ object Types {
       b.result
     }
 
+    def (tpe: TypeVariableOps) mapVariables(f: Name => Type): Type = {
+      tpe.mapLeaves {
+        case Variable(name) => f(name)
+        case tpe1           => tpe1
+      }
+    }
+
     def unifyImpl(tpe: Type, sub: Name, by: Type): Type = tpe.mapVariables {
       case `sub` =>
         if by == WildcardType then
@@ -69,16 +76,24 @@ object Types {
 
       case other => Variable(other)
     }
+  }
 
-    def (tpe: TypeVariableOps) mapVariables(f: Name => Type): Type = {
+  object TypeOps {
+
+    def (tpe: Type) mapTypeRefs(f: Name => Type): Type = {
       tpe.mapLeaves {
-        case Variable(name) => f(name)
+        case TypeRef(name)  => f(name)
         case tpe1           => tpe1
       }
     }
 
-    def (tpe: TypeVariableOps) mapLeaves(f: Type => Type): Type = {
-      val compiler = Compiler[Type, Type] {
+    private[Types] def (tpe: Type) compute[O]
+                       (compiler: Type => Statement[O]): O = {
+      tpe.compile[Type, O](foldLeft)(compiler)
+    }
+
+    private[Types] def (tpe: Type) mapLeaves(f: Type => Type): Type = {
+      tpe.compute {
         case FunctionType(arg, body) =>
           stack =>
             val a1 :: a2 :: rest = stack
@@ -97,12 +112,7 @@ object Types {
 
         case tpe1 => f(tpe1) :: _
       }
-
-      tpe.foldLeft(of[Type])(evalLeft(compiler)).unsafeInterpret
     }
-  }
-
-  object TypeOps {
 
     def (tpe: Type) foldLeft[O]
         (seed: O)
@@ -185,13 +195,6 @@ object Types {
       |    (   EmptyType,        EmptyType    )
       |    (   Untyped,          Untyped      ) => true
       case _                                    => false
-    }
-
-    def (tpe: Type) mapTypeRefs(f: Name => Type): Type = {
-      TypeVariableOps(tpe).mapLeaves {
-        case TypeRef(name)  => f(name)
-        case tpe1           => tpe1
-      }
     }
 
     def (tpe: Type) =!= (other: Type): Boolean =
@@ -295,19 +298,18 @@ object Types {
 
     implied for Showable[Type] {
 
-      def (tpe: Type) show: String =
-        tpe.foldLeft(of[String])(evalLeft(compiler)).unsafeInterpret
-
-      private val compiler = Compiler[Type, String] {
-        case FunctionType(arg, body)    => fromFunctionType(arg, body)
-        case AppliedType(f, args)       => fromAppliedType(f, args)
-        case Product(tpes1)             => fromProduct(tpes1)
-        case TypeRef(t)                 => t.show :: _
-        case Variable(t)                => t.show :: _
-        case PackageInfo(parent, name)  => showPackage(parent, name) :: _
-        case WildcardType               => "<anytype>" :: _
-        case Untyped                    => "<untyped>" :: _
-        case EmptyType                  => "<emptytype>" :: _
+      def (tpe: Type) show: String = {
+        tpe.compute {
+          case FunctionType(arg, body)    => fromFunctionType(arg, body)
+          case AppliedType(f, args)       => fromAppliedType(f, args)
+          case Product(tpes1)             => fromProduct(tpes1)
+          case TypeRef(t)                 => t.show :: _
+          case Variable(t)                => t.show :: _
+          case PackageInfo(parent, name)  => showPackage(parent, name) :: _
+          case WildcardType               => "<anytype>" :: _
+          case Untyped                    => "<untyped>" :: _
+          case EmptyType                  => "<emptytype>" :: _
+        }
       }
 
       private def fromFunctionType(arg: Type, body: Type)

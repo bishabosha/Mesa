@@ -380,10 +380,8 @@ object Typers {
   }
 
   def getPrimitiveType(name: Name) given Context: Checked[Type] =
-    if isPrimitive(name) then
-      getType(name)
-    else
-      TyperErrors.nameNotConstructor(name)
+    if isPrimitive(name) then getType(name)
+    else TyperErrors.nameNotConstructor(name)
 
   def typedUnapply(functor: Name, args: List[Tree])
                   (id: Id, pt: Type)
@@ -414,8 +412,7 @@ object Typers {
             for {
               next  <- lookIn(id)
               tpe   <- declarePackage(packageName(parent.tpe), name)
-            } yield
-              (next, Select(parent, name)(id, tpe))
+            } yield (next, Select(parent, name)(id, tpe))
           }
         }
 
