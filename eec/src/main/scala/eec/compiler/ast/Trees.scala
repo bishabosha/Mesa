@@ -94,8 +94,10 @@ object Trees {
     }
 
     def (tree: Tree) addModifiers(mods: Set[Modifier]): Tree = tree match {
-      case d: DefDef  => d.copy(modifiers = (d.modifiers ++ mods))(d.id, d.tpe)
-      case _          => tree
+      case tree: DefDef =>
+        tree.copy(modifiers = (tree.modifiers ++ mods))(tree.id, tree.tpe)
+
+      case _ => tree
     }
   }
 }

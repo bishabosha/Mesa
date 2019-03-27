@@ -115,69 +115,67 @@ object Types {
     }
 
     def (tpe: Type) foldLeft[O]
-        (seed: O)
+        (z: O)
         (f: (O, Type) => O): O = {
       @tailrec
-      def inner(acc: O, tpes: List[Type]): O = tpes match {
-        case Nil => acc
+      def inner(z: O, tpes: List[Type]): O = tpes match {
+        case Nil => z
 
         case tpe :: rest =>
           tpe match {
-            case AppliedType(t, tpes) => inner(f(acc, tpe), t :: tpes ::: rest)
-            case FunctionType(a1, b1) => inner(f(acc, tpe), a1 :: b1 :: rest)
-            case Product(tpes)        => inner(f(acc, tpe), tpes ::: rest)
-            case _                    => inner(f(acc, tpe), rest)
+            case AppliedType(t, tpes) => inner(f(z, tpe), t :: tpes ::: rest)
+            case FunctionType(a1, b1) => inner(f(z, tpe), a1 :: b1 :: rest)
+            case Product(tpes)        => inner(f(z, tpe), tpes ::: rest)
+            case _                    => inner(f(z, tpe), rest)
           }
       }
-      inner(seed, tpe :: Nil)
+      inner(z, tpe :: Nil)
     }
 
-    def (subFrom: Type) zipFold[O, That](subWith: Type)(seed: O)
+    def (subFrom: Type) zipFold [O, That]
+        (subWith: Type)
+        (z: O)
         (f: (O, Type, Type) => O): O = {
 
       @tailrec
-      def inner(
-          acc: O,
-          args: List[Type],
-          apps: List[Type]): O = args match {
-        case Nil => acc
+      def inner(z: O, args: List[Type], apps: List[Type]): O = args match {
+        case Nil => z
 
         case arg :: argRest => apps match {
-          case Nil => acc
+          case Nil => z
 
           case app :: appsRest =>
-            if canUnify(arg, app) then
-              (arg, app) match {
-                case (AppliedType(functor1, args1), AppliedType(functor2, args2)) =>
-                  inner(
-                    f(acc, arg, app),
-                    functor1 :: args1 ::: argRest,
-                    functor2 :: args2 ::: appsRest)
+            if canUnify(arg, app) then (arg, app) match {
+              case (AppliedType(fun1, tpes1), AppliedType(fun2, tpes2)) =>
+                inner(
+                  f(z, arg, app),
+                  fun1 :: tpes1 ::: argRest,
+                  fun2 :: tpes2 ::: appsRest
+                )
 
-                case (FunctionType(a1, b1), FunctionType(a2, b2)) =>
-                  inner(
-                    f(acc, arg, app),
-                    a1 :: b1 :: argRest,
-                    a2 :: b2 :: appsRest)
+              case (FunctionType(a1, b1), FunctionType(a2, b2)) =>
+                inner(
+                  f(z, arg, app),
+                  a1 :: b1 :: argRest,
+                  a2 :: b2 :: appsRest
+                )
 
-                case (Product(tpes1), Product(tpes2)) =>
-                  inner(
-                    f(acc, arg, app),
-                    tpes1 ::: argRest,
-                    tpes2 ::: appsRest)
+              case (Product(tpes1), Product(tpes2)) =>
+                inner(
+                  f(z, arg, app),
+                  tpes1 ::: argRest,
+                  tpes2 ::: appsRest
+                )
 
-                case _ => inner(f(acc, arg, app), argRest, appsRest)
-              }
-            else
-              acc
+              case _ => inner(f(z, arg, app), argRest, appsRest)
+            } else {
+              z
+            }
         }
       }
 
-      if WildcardType == subWith || WildcardType == subFrom then
-        seed
-      else {
-        inner(seed, subFrom :: Nil, subWith :: Nil)
-      }
+      if WildcardType == subWith || WildcardType == subFrom then z
+      else inner(z, subFrom :: Nil, subWith :: Nil)
     }
 
     def canUnify(arg: Type, app: Type): Boolean = (arg, app) match {
@@ -197,10 +195,11 @@ object Types {
       case _                                    => false
     }
 
-    def (tpe: Type) =!= (other: Type): Boolean =
+    def (tpe: Type) =!= (other: Type): Boolean = {
       tpe   == other        ||
       tpe   == WildcardType ||
       other == WildcardType
+    }
 
     def packageName(tpe: Type): Name = tpe match {
       case PackageInfo(_, name) => name
@@ -209,11 +208,10 @@ object Types {
 
     def packageNames(tpe: Type): List[Name] = {
       @tailrec
-      def inner(acc: List[Name], tpe: Type): List[Name] =
-        tpe match {
-          case PackageInfo(parent, name)  => inner(name :: acc, parent)
-          case _                          => acc
-        }
+      def inner(acc: List[Name], tpe: Type): List[Name] = tpe match {
+        case PackageInfo(parent, name)  => inner(name :: acc, parent)
+        case _                          => acc
+      }
       inner(Nil, tpe)
     }
 
@@ -234,15 +232,13 @@ object Types {
         case _ => EmptyType
       }
 
-    def toFunctionType(ts: List[Type]): Type =
-      ts.reverse match {
-        case t :: rest  => rest.foldLeft(t)((acc, t1) => FunctionType(t1, acc))
-        case Nil        => EmptyType
-      }
-
-    def (subFrom: Type) unifications(subWith: Type): List[(Name, Type)] = {
-      TypeVariableOps(subFrom).zipWith(subWith)((_, _))
+    def toFunctionType(ts: List[Type]): Type = ts.reverse match {
+      case t :: rest  => rest.foldLeft(t)((acc, t1) => FunctionType(t1, acc))
+      case Nil        => EmptyType
     }
+
+    def (subFrom: Type) unifications(subWith: Type): List[(Name, Type)] =
+      TypeVariableOps(subFrom).zipWith(subWith)((_, _))
 
     def (tpe: Type) unifyFrom(subFrom: Type)(subWith: Type): Type = {
       subFrom.zipFold(subWith)(tpe) { (acc, arg, sub) =>
@@ -256,15 +252,15 @@ object Types {
     inline def (tpe: Type) unify(subWith: Type) =
       tpe.unifyFrom(tpe)(subWith)
 
-    def (tpe: Type) unifyFromAll(unifications: Iterable[(Name, Type)]): Type =
+    def (tpe: Type) unifyFromAll(unifications: Iterable[(Name, Type)]): Type = {
       unifications.foldLeft(tpe) { (acc, pair) =>
         val (sub, by) = pair
         unifyImpl(acc, sub, by)
       }
-
-    def (tpe: Type) replaceVariable(from: Name)(by: Name): Type = {
-      unifyImpl(tpe, from, Variable(by))
     }
+
+    def (tpe: Type) replaceVariable(from: Name)(by: Name): Type =
+      unifyImpl(tpe, from, Variable(by))
 
     def (tpe: Type) replaceVariables(f: Name => Option[Name]): Type = {
       var seen = Set[Name]()
@@ -298,18 +294,16 @@ object Types {
 
     implied for Showable[Type] {
 
-      def (tpe: Type) show: String = {
-        tpe.compute {
-          case FunctionType(arg, body)    => fromFunctionType(arg, body)
-          case AppliedType(f, args)       => fromAppliedType(f, args)
-          case Product(tpes1)             => fromProduct(tpes1)
-          case TypeRef(t)                 => t.show :: _
-          case Variable(t)                => t.show :: _
-          case PackageInfo(parent, name)  => showPackage(parent, name) :: _
-          case WildcardType               => "<anytype>" :: _
-          case Untyped                    => "<untyped>" :: _
-          case EmptyType                  => "<emptytype>" :: _
-        }
+      def (tpe: Type) show: String = tpe.compute {
+        case FunctionType(arg, body)    => fromFunctionType(arg, body)
+        case AppliedType(f, args)       => fromAppliedType(f, args)
+        case Product(tpes1)             => fromProduct(tpes1)
+        case TypeRef(t)                 => t.show :: _
+        case Variable(t)                => t.show :: _
+        case PackageInfo(parent, name)  => showPackage(parent, name) :: _
+        case WildcardType               => "<anytype>" :: _
+        case Untyped                    => "<untyped>" :: _
+        case EmptyType                  => "<emptytype>" :: _
       }
 
       private def fromFunctionType(arg: Type, body: Type)
@@ -324,7 +318,6 @@ object Types {
 
       private def fromAppliedType(f: Type, args: List[Type])
                                  (stack: Stack[String]) = {
-
         def checkAll(tpes: List[Type], strs: List[String]) =
           tpes.zip(strs).map(check)
 

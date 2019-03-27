@@ -25,51 +25,49 @@ object CompilerErrors {
 
     def checked[O](o: Checked[O]): Checked[O] = o
 
-    def (o: Checked[O]) fold[O, U](e: CompilerError => U)(f: O => U): U =
-      o match {
-        case err: CompilerError => e(err)
-        case _                  => f(o.asInstanceOf[O])
-      }
+    def (o: Checked[O]) fold [O, U]
+        (e: CompilerError => U)
+        (f: O => U): U = o match {
+      case err: CompilerError => e(err)
+      case _                  => f(o.asInstanceOf[O])
+    }
 
-    def (o: Checked[O]) map[O, U](f: O => U): Checked[U] =
-      o match {
-        case err: CompilerError => err
-        case _                  => f(o.asInstanceOf[O])
-      }
+    def (o: Checked[O]) map [O, U] (f: O => U): Checked[U] = o match {
+      case err: CompilerError => err
+      case _                  => f(o.asInstanceOf[O])
+    }
 
-    def (o: Checked[O]) filter[O](f: O => Boolean)
-        (orElse: O => CompilerError): Checked[O] =
-      o match {
-        case err: CompilerError => err
+    def (o: Checked[O]) filter [O]
+        (orElse: => CompilerError)
+        (f: O => Boolean): Checked[O] = o match {
+      case err: CompilerError => err
+      case _                  => if f(o.asInstanceOf[O]) then o else orElse
+    }
 
-        case _ =>
-          if f(o.asInstanceOf[O]) then o
-          else orElse(o.asInstanceOf[O])
-      }
+    def (o: Checked[O]) flatMap [O, U]
+        (f: O => Checked[U]): Checked[U] = o match {
+      case err: CompilerError => err
+      case _                  => f(o.asInstanceOf[O])
+    }
 
-    def (o: Checked[O]) flatMap[O, U](f: O => Checked[U]): Checked[U] =
-      o match {
-        case err: CompilerError => err
-        case _                  => f(o.asInstanceOf[O])
-      }
-
-    def (c: CC[A]) mapE[CC[A] <: Iterable[A], A, O, That](f: A => Checked[O])
+    def (c: CC[A]) mapE [CC[A] <: Iterable[A], A, O, That]
+        (f: A => Checked[O])
         given (bf: CanBuildFrom[CC[A], O, That]): Checked[That] = {
-
       @tailrec
-      def inner(acc: mutable.Builder[O, That], it: Iterator[A]): Checked[That] =
-        if it.hasNext then
-          f(it.next) match {
-            case err: CompilerError => err
-            case o                  => inner(acc += o.asInstanceOf[O], it)
-          }
-        else
+      def inner(acc: mutable.Builder[O, That], it: Iterator[A]): Checked[That] = {
+        if it.hasNext then f(it.next) match {
+          case err: CompilerError => err
+          case o                  => inner(acc += o.asInstanceOf[O], it)
+        } else {
           acc.result
+        }
+      }
 
       inner(bf(c), c.iterator)
     }
 
-    def (l: Iterable[A]) foldLeftE[A, O](seed: O)
+    def (l: Iterable[A]) foldLeftE[A, O]
+        (z: O)
         (f: (O, A) => Checked[O]): Checked[O] = {
 
       @tailrec
@@ -82,7 +80,7 @@ object CompilerErrors {
         else
           acc
 
-      inner(seed, l.iterator)
+      inner(z, l.iterator)
     }
 
     def (f: => O) recoverDefault[O]: Checked[O] = {

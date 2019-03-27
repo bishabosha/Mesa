@@ -37,15 +37,13 @@ object Contexts {
   }
 
   object Mode {
-    inline def mode given (m: Mode) = m
+    inline def mode given (mode: Mode) = mode
 
     def isPattern given Mode =
-      Pat     == mode ||
-      PatAlt  == mode
+      Pat == mode || PatAlt == mode
 
     def isType given Mode =
-      Typing        == mode ||
-      PrimitiveType == mode
+      Typing == mode || PrimitiveType == mode
 
     def isTerm given Mode =
       Term == mode
@@ -129,7 +127,7 @@ object Contexts {
 
     def firstCtx(name: Name) given Context: Checked[Context] = {
       @tailrec
-      def inner(ctx: Context): Checked[Context] =
+      def inner(ctx: Context): Checked[Context] = {
         if ctx.scope.view.map(_._1.name).contains(name) then
           ctx
         else ctx match {
@@ -138,24 +136,26 @@ object Contexts {
 
           case ctx: Fresh => inner(ctx.outer)
         }
+      }
       inner(ctx)
     }
 
-    def lookIn(id: Id) given Context: Checked[Context] =
+    def lookIn(id: Id) given Context: Checked[Context] = {
       ctx.scope.collectFirst[Checked[Context]] {
         case (Sym(`id`, _), c) => c
       }.getOrElse {
         CompilerError.IllegalState(s"No context found for Id(${id})")
       }
-
-    def contains(name: Name) given Context: Boolean = {
-      name != emptyString.readAs && (
-        ctx.scope.collectFirst { case (Sym(_, `name`), _) => () }
-           .isDefined
-      )
     }
 
-    def enterFresh(id: Id, name: Name) given Context: Checked[Context] =
+    def contains(name: Name) given Context: Boolean = {
+      name != emptyString.readAs && {
+        ctx.scope.collectFirst { case (Sym(_, `name`), _) => () }
+           .isDefined
+      }
+    }
+
+    def enterFresh(id: Id, name: Name) given Context: Checked[Context] = {
       if contains(name) then {
         CompilerError.UnexpectedType(
           s"Illegal shadowing in scope of name: ${name.show}")
@@ -164,6 +164,7 @@ object Contexts {
         ctx.scope += Sym(id, name) -> newCtx
         newCtx
       }
+    }
 
     def commitId(id: Id) given Context: Unit = {
       val first = ctx.scope.collectFirst {
@@ -196,10 +197,11 @@ object Contexts {
         )
     }
 
-    def (tpe: Type) freshVariables given Context: Type =
+    def (tpe: Type) freshVariables given Context: Type = {
       tpe.replaceVariables {
         _.updateDerivedStr(Synthetic(ctx.localIdGen.fresh(), _))
       }
+    }
 
     def enterBootstrapped given Context, IdGen: Checked[Unit] = {
       val root = rootCtx
@@ -276,7 +278,8 @@ object Contexts {
         case ctx: RootContext =>
           List(
             ScopeDef(ForName(rootSym.name.show),
-            TypeDef(rootPkg.show), branch(ctx)))
+            TypeDef(rootPkg.show), branch(ctx))
+          )
 
         case ctx: Fresh if ctx.hasMembers => branch(ctx)
         case _                            => Nil

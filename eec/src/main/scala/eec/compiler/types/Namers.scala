@@ -22,7 +22,8 @@ object Namers {
   private[this] val anon: Name  = emptyString.readAs
 
   def namedDefDef(name: Name, args: List[Tree], sigId: Id)
-                 (tpeAs: Tree, body: Tree) given Context, Mode: Checked[Unit] =
+                 (tpeAs: Tree, body: Tree)
+                 given Context, Mode: Checked[Unit] = {
     enterFresh(sigId, name).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
@@ -30,9 +31,11 @@ object Namers {
         _ <-  index(body)
       } yield ()
     }
+  }
 
   def namedFunctionTerm(args: List[Tree], body: Tree)
-                       (id: Id) given Context, Mode: Checked[Unit] =
+                       (id: Id)
+                       given Context, Mode: Checked[Unit] = {
     enterFresh(id, anon).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
@@ -40,9 +43,10 @@ object Namers {
         _ <-  index(body)
       } yield ()
     }
+  }
 
-  def namedPackageDef
-      (pid: Tree, stats: List[Tree]) given Context, Mode: Checked[Unit] = {
+  def namedPackageDef(pid: Tree, stats: List[Tree])
+                     given Context, Mode: Checked[Unit] = {
     val cPkgCtx = pid.toNamePairs.foldLeftE(ctx) { (pkgCtx, pair) =>
       val (id, pkgName)   = pair
       implied for Context = pkgCtx
@@ -55,15 +59,18 @@ object Namers {
     }
   }
 
-  def namedApplyTerm
-      (fun: Tree, args: List[Tree]) given Context, Mode: Checked[Unit] =
+  def namedApplyTerm(fun: Tree, args: List[Tree])
+                    given Context, Mode: Checked[Unit] = {
     for {
       _ <- index(fun)
       _ <- args.mapE(index)
     } yield ()
+  }
 
-  def namedLet(letName: Name, letId: Id)(value: Tree, continuation: Tree)
-              (id: Id) given Context, Mode: Checked[Unit] =
+  def namedLet(letName: Name, letId: Id)
+              (value: Tree, continuation: Tree)
+              (id: Id)
+              given Context, Mode: Checked[Unit] = {
     for {
       _ <-  index(value)
       _ <-  enterFresh(id, anon).flatMap { ctx1 =>
@@ -74,9 +81,10 @@ object Namers {
               } yield ()
             }
     } yield ()
+  }
 
-  def namedCaseExpr
-      (selector: Tree, cases: List[Tree]) given Context, Mode: Checked[Unit] =
+  def namedCaseExpr(selector: Tree, cases: List[Tree])
+                   given Context, Mode: Checked[Unit] = {
     for {
       _ <-  index(selector)
       _ <-  cases.mapE { caseClause =>
@@ -86,42 +94,48 @@ object Namers {
               }
             }
     } yield ()
+  }
 
-  def namedCaseClause
-      (pat: Tree, guard: Tree, body: Tree) given Context, Mode: Checked[Unit] =
+  def namedCaseClause(pat: Tree, guard: Tree, body: Tree)
+                     given Context, Mode: Checked[Unit] = {
     for {
       _ <- indexAsPattern(pat)
       _ <- index(guard) // idents here are normal refs to variables in this scope
       _ <- index(body)
     } yield ()
+  }
 
   def namedAlternative(alts: List[Tree]) given Context, Mode: Checked[Unit] = {
     implied for Mode = Mode.PatAlt
     for (_ <- alts.mapE(index))
-      yield ()
+    yield ()
   }
 
-  def namedUnapply(args: List[Tree]) given Context, Mode: Checked[Unit] =
+  def namedUnapply(args: List[Tree]) given Context, Mode: Checked[Unit] = {
     for (_ <- args.mapE(index))
-      yield ()
+    yield ()
+  }
 
   def namedBind(name: Name, pat: Tree)
-               (id: Id) given Context, Mode: Checked[Unit] =
+               (id: Id)
+               given Context, Mode: Checked[Unit] = {
     for {
       _ <- enterFresh(id, name)
       _ <- index(pat)
     } yield ()
+  }
 
-  def namedParens(args: List[Tree]) given Context, Mode: Checked[Unit] =
+  def namedParens(args: List[Tree]) given Context, Mode: Checked[Unit] = {
     for (_ <- args.mapE(index))
-      yield ()
+    yield ()
+  }
 
-  def namedIdentPat(name: Name)(id: Id) given Context, Mode: Checked[Unit] =
-    if name != Wildcard then
+  def namedIdentPat(name: Name)(id: Id) given Context, Mode: Checked[Unit] = {
+    if name != Wildcard then {
       for (_ <- enterFresh(id, name))
-        yield ()
-    else
-      ()
+      yield ()
+    }
+  }
 
   def indexAsPattern(tree: Tree) given Context: Checked[Unit] = {
     implied for Mode = Mode.Pat
