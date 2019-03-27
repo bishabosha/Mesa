@@ -1,4 +1,4 @@
-package com.xyz.example
+package eec.report.example
 
 primitive x + y : Integer -> Integer -> Integer
 primitive s1 ++ s2 : String -> String -> String

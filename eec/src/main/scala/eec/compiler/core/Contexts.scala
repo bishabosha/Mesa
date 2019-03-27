@@ -116,23 +116,23 @@ object Contexts {
   )
 
   object Context {
-    def ctx given (c: Context) = c
+    def ctx given (ctx: Context) = ctx
 
     def rootCtx given Context = {
       @tailrec
       def inner(ctx: Context): Context = ctx match {
-        case _: RootContext => ctx
-        case ctx: Fresh     => inner(ctx.outer)
+        case ctx: RootContext => ctx
+        case ctx: Fresh       => inner(ctx.outer)
       }
       inner(ctx)
     }
 
     def firstCtx(name: Name) given Context: Checked[Context] = {
       @tailrec
-      def inner(ctxIt: Context): Checked[Context] =
-        if ctxIt.scope.view.map(_._1.name).contains(name) then
-          ctxIt
-        else ctxIt match {
+      def inner(ctx: Context): Checked[Context] =
+        if ctx.scope.view.map(_._1.name).contains(name) then
+          ctx
+        else ctx match {
           case _: RootContext =>
             CompilerError.IllegalState(s"name not found: ${name.show}")
 
@@ -186,8 +186,7 @@ object Contexts {
       ctx.typeTable += pair
 
     def getType(name: Name) given Context: Checked[Type] = {
-      lazy val root = rootCtx
-      if name == rootString.readAs && (ctx `eq` root) then
+      if name == rootString.readAs && (ctx `eq` rootCtx) then
         rootPkg
       else
         ctx.typeTable.getOrElse[Checked[Type]](
@@ -203,7 +202,7 @@ object Contexts {
       }
 
     def enterBootstrapped given Context, IdGen: Checked[Unit] = {
-      lazy val root = rootCtx
+      val root = rootCtx
       if root.scope.nonEmpty then {
         CompilerError.IllegalState("Non-fresh _root_ context")
       } else if idGen.id != Id.initId then {
@@ -221,24 +220,23 @@ object Contexts {
 
     def declarePackage(parent: Name, name: Name)
                       given Context: Checked[Type] = {
-      val outer = ctx match {
-        case _: RootContext => ctx
-        case ctx: Fresh     => ctx.outer
+      val parentCtx = ctx match {
+        case ctx: RootContext => ctx
+        case ctx: Fresh       => ctx.outer
       }
-      checked {
-        implied for Context = outer
-        for (parentTpe <- getType(parent)) yield (
-          parentTpe match {
-            case _: PackageInfo =>
-              val tpe = PackageInfo(parentTpe, name)
-              putType(name, tpe)
-              tpe
+      val parentTpe = checked {
+        implied for Context = parentCtx
+        getType(parent)
+      }
+      parentTpe.flatMap {
+        case pkg: PackageInfo =>
+            val tpe = PackageInfo(pkg, name)
+            putType(name, tpe)
+            tpe
 
-            case _ =>
-              CompilerError.UnexpectedType(
-                s"name `${parent.show}` does not refer to a package")
-          }
-        )
+        case _ =>
+          CompilerError.UnexpectedType(
+            s"name `${parent.show}` does not refer to a package")
       }
     }
 
