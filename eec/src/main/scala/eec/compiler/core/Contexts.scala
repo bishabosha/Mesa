@@ -23,6 +23,8 @@ object Contexts {
   import Mode._
   import Id._
   import IdGen._
+  // import Stoup._
+  import Context._
 
   type Scope          = mutable.Buffer[(Sym, Context)]
   type TypeTable      = mutable.Map[Name, Type]
@@ -82,6 +84,42 @@ object Contexts {
     def idGen given (gen: IdGen) = gen
   }
 
+  // enum Stoup {
+  //   case DependsOn(z: Sym)
+  //   case Blank
+  // }
+
+  // object Stoup {
+  //   def onStoupDepends[O](handler: given Stoup => O)
+  //                        given Context: O | Unit = ctx.stoup match {
+  //     case Blank =>
+
+  //     case d: DependsOn =>
+  //       implied for Stoup = ctx.stoup
+  //       handler
+  //   }
+  // }
+
+  // object StoupOps {
+  //   implied given Context for Showable[Stoup] {
+  //     def (stoup: Stoup) show = stoup match {
+  //       case Blank => "Γ | -"
+
+  //       case DependsOn(Sym(_, name)) =>
+  //         val tpe = for {
+  //           ctx <- firstCtx(name)
+  //           tpe <- checked {
+  //             implied for Context = ctx
+  //             getType(name)
+  //           }
+  //         } yield tpe
+  //         tpe.fold
+  //           { err => s"Γ | ${name.show}: <error: Not Found>" }
+  //           { tpe => s"Γ | ${name.show}: ${tpe.show}" }
+  //     }
+  //   }
+  // }
+
   case class Sym(id: Id, name: Name)
 
   private val rootPkg =
@@ -92,25 +130,35 @@ object Contexts {
 
   sealed trait Context (
     val scope: Scope,
+    var stoup: Option[Sym],
     val typeTable: TypeTable,
     val primTable: PrimTable,
-    val localIdGen: IdGen
-  )
+    val localIdGen: IdGen,
+  ) {
+    def contains(name: Name) =
+      name != emptyString.readAs && {
+          stoup.filter(_.name == name)
+            .orElse(scope.collectFirst { case (Sym(_, `name`), _) => () })
+            .isDefined
+        }
+  }
 
   final class RootContext extends Context(
     new mutable.ArrayBuffer,
+    None,
     new mutable.AnyRefMap,
     new mutable.ArrayBuffer,
-    new IdGen
+    new IdGen,
   )
 
   final class Fresh private[Contexts](
     val outer: Context
   ) extends Context(
     new mutable.ArrayBuffer,
+    None,
     new mutable.AnyRefMap,
     new mutable.ArrayBuffer,
-    new IdGen
+    new IdGen,
   )
 
   object Context {
@@ -128,7 +176,7 @@ object Contexts {
     def firstCtx(name: Name) given Context: Checked[Context] = {
       @tailrec
       def inner(ctx: Context): Checked[Context] = {
-        if ctx.scope.view.map(_._1.name).contains(name) then
+        if ctx.contains(name) then
           ctx
         else ctx match {
           case _: RootContext =>
@@ -140,6 +188,7 @@ object Contexts {
       inner(ctx)
     }
 
+    // no changes required by stoup
     def lookIn(id: Id) given Context: Checked[Context] = {
       ctx.scope.collectFirst[Checked[Context]] {
         case (Sym(`id`, _), c) => c
@@ -148,31 +197,51 @@ object Contexts {
       }
     }
 
-    def contains(name: Name) given Context: Boolean = {
-      name != emptyString.readAs && {
-        ctx.scope.collectFirst { case (Sym(_, `name`), _) => () }
-           .isDefined
-      }
-    }
+    def contains(name: Name) given Context = ctx.contains(name)
 
     def enterFresh(id: Id, name: Name) given Context: Checked[Context] = {
-      if contains(name) then {
-        CompilerError.UnexpectedType(
-          s"Illegal shadowing in scope of name: ${name.show}")
-      } else {
+      enterImpl(id, name) { (id, name) =>
         val newCtx = new Fresh(ctx)
         ctx.scope += Sym(id, name) -> newCtx
         newCtx
       }
     }
 
-    def commitId(id: Id) given Context: Unit = {
-      val first = ctx.scope.collectFirst {
-        case sym @ (Sym(`id`, name), _) => (sym, name)
+    def enterVariable(id: Id, name: Name) given Context: Checked[Unit] = {
+      enterImpl(id, name) { (id, name) =>
+        ctx.scope += Sym(id, name) -> new Fresh(ctx)
+        ()
       }
-      for ((sym, name) <- first) {
+    }
+
+    def enterStoup(id: Id, name: Name) given Context: Checked[Unit] = {
+      enterImpl(id, name)((id, name) => ctx.stoup = Some(Sym(id, name)))
+    }
+
+    def enterImpl[O](id: Id, name: Name)(f: (Id, Name) => given Context => Checked[O]) given Context: Checked[O] = {
+      if contains(name) then {
+        CompilerError.UnexpectedType(
+          s"Illegal shadowing in scope of name: ${name.show}")
+      } else {
+        f(id, name)
+      }
+    }
+
+    def commitId(id: Id) given Context: Unit = {
+      val first = {
+        ctx.stoup.map(sym => (sym, sym.name))
+        .orElse {
+          ctx.scope.collectFirst {
+            case mapping @ (Sym(`id`, name), _) => (mapping, name)
+          }
+        }
+      }
+      for ((mapping: (Sym | (Sym, Context)), name) <- first) {
         if !ctx.typeTable.contains(name) then {
-          ctx.scope -= sym
+          mapping match {
+            case sym: Sym => ctx.stoup = None
+            case mapping: (Sym, Context) => ctx.scope -= mapping
+          }
         }
       }
     }
@@ -212,7 +281,7 @@ object Contexts {
       } else {
         implied for Context = root
         Names.bootstrapped.foreach { (name, tpe) =>
-          for (_ <- enterFresh(idGen.fresh(), name))
+          for (_ <- enterVariable(idGen.fresh(), name))
             yield {
               putType(name -> tpe)
             }

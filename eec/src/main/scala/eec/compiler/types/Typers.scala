@@ -29,60 +29,27 @@ import implied CompilerErrorOps._
 import implied TreeOps._
 
 object Typers {
-  import Stoup._
 
   private val rootName    = rootString.readAs
   private[Typers] val any = WildcardType
 
-  enum Stoup {
-    case DependsOn(z: Name)
-    case Blank
-  }
-
-  object Stoup {
-    def stoup given (s: Stoup) = s
-
-    def onStoupDepends[O](handler: given Stoup => O)
-                         given Stoup: O | Unit = stoup match {
-      case Blank        =>
-      case d: DependsOn => handler
-    }
-  }
-
-  object StoupOps {
-    implied given Context for Showable[Stoup] {
-      def (stoup: Stoup) show = stoup match {
-        case Blank => "Γ | -"
-
-        case DependsOn(name) =>
-          getType(name).fold
-            { err => s"Γ | ${name.show}: <error: ${err.show}>" }
-            { tpe => s"Γ | ${name.show}: ${tpe.show}" }
-      }
-    }
-  }
-
   def (tree: Tree) typedAsExpr(pt: Type) given Context: Checked[Tree] = {
     implied for Mode  = Term
-    implied for Stoup = Blank
     tree.typed(pt)
   }
 
   def (tree: Tree) typedAsTyping(pt: Type) given Context: Checked[Tree] = {
     implied for Mode  = Typing
-    implied for Stoup = Blank
     tree.typed(pt)
   }
 
   def (tree: Tree) typedAsPrimitive(pt: Type) given Context: Checked[Tree] = {
     implied for Mode  = PrimitiveType
-    implied for Stoup = Blank
     tree.typed(pt)
   }
 
   def (tree: Tree) typedAsPattern(pt: Type) given Context: Checked[Tree] = {
     implied for Mode  = Pat
-    implied for Stoup = Blank
     tree.typed(pt)
   }
 
@@ -163,7 +130,7 @@ object Typers {
 
   def typedFunctionTerm(args: List[Tree], body: Tree)
                        (id: Id, pt: Type)
-                       given Context, Mode, Stoup: Checked[Tree] = {
+                       given Context, Mode: Checked[Tree] = {
     lookIn(id).flatMap { fCtx =>
       implied for Context = fCtx
       for {
@@ -186,7 +153,7 @@ object Typers {
 
   def typedFunctionType(args: List[Tree], body: Tree)
                        (id: Id, pt: Type)
-                       given Context, Mode, Stoup: Checked[Tree] = {
+                       given Context, Mode: Checked[Tree] = {
     for {
       args1 <- args.mapE(_.typed(any))
       body1 <- body.typed(any)
@@ -196,7 +163,7 @@ object Typers {
 
   def typedTagged(arg: Name, tpeTree: Tree)
                  (id: Id, pt: Type)
-                 given Context, Mode, Stoup: Checked[Tree] = {
+                 given Context, Mode: Checked[Tree] = {
     for (tpeTree1 <- tpeTree.typedAsTyping(pt))
     yield {
       putType(arg -> tpeTree1.tpe)
@@ -205,7 +172,7 @@ object Typers {
   }
 
   private def typeAsTuple(ts: List[Tree], pt: Type)
-                         given Context, Mode, Stoup: Checked[List[Tree]] = {
+                         given Context, Mode: Checked[List[Tree]] = {
     if pt == any then {
       ts.mapE(_.typed(any))
     } else {
@@ -219,7 +186,7 @@ object Typers {
 
   def typedParens(ts: List[Tree])
                  (id: Id, pt: Type)
-                 given Context, Mode, Stoup: Checked[Tree] = {
+                 given Context, Mode: Checked[Tree] = {
     for (ts1 <- typeAsTuple(ts, pt))
     yield Parens(ts1)(id, ts1.map(_.tpe).convert)
   }
@@ -238,7 +205,7 @@ object Typers {
 
   private def typeAsFunctorArgs(
         functor: Name, ts: List[Tree], fTpeArgs: List[Type])
-      given Context, Mode, Stoup: Checked[List[Tree]] = {
+      given Context, Mode: Checked[List[Tree]] = {
     if ts.length != fTpeArgs.length then
       TyperErrors.argsNotMatchLength
     else
@@ -253,7 +220,7 @@ object Typers {
 
   def typedApplyType(functor: Tree, args: List[Tree])
                     (id: Id)
-                    given Context, Mode, Stoup: Checked[Tree] = {
+                    given Context, Mode: Checked[Tree] = {
     for {
       functor1  <-  functor.typed(any)
       args1     <-  args.mapE(_.typed(any))
@@ -265,44 +232,14 @@ object Typers {
 
   def typedApplyTerm(fun: Tree, args: List[Tree])
                     (id: Id, pt: Type)
-                    given Context, Mode, Stoup: Checked[Tree] = {
+                    given Context, Mode: Checked[Tree] = {
     for {
       fun1      <-  fun.typed(any)
       args1     <-  args.mapE(_.typed(any))
       argsProto <-  args1.map(_.tpe).convert
       tpe       <-  checkFunWithProto(fun1, argsProto)(pt)
-      // _         <-  assertStoupEmptyForBang(fun1, args1)
     } yield Apply(fun1, args1)(id, tpe)
   }
-
-  // def evalStoupTerm(tpd: Tree): Stoup = tpd match {
-  //   case Parens(tpes) =>
-  //     tpes.collectFirst { case t if t.tpe.isComputationType => t }
-  //         .fold(Blank)(t => DependsOn(t.convert))
-  //   case Function(_, body) =>
-  //     evalStoupTerm(body)
-  //   case Apply(Ident(ComputationTag), List(_)) =>
-  //     Blank
-  //   case Apply(function, _) =>
-  //     evalStoupTerm(function)
-  //   case Let(_, value, _) =>
-  //     evalStoupTerm(value)
-  //   case _: Literal =>
-  //     Blank
-  // }
-
-  // def assertStoupEmptyForBang(fun1: Tree, args: List[Tree])
-  //                            given Stoup, Context: Checked[Unit] = {
-  //   fun1.tpe match {
-  //     case `bangConstructor` =>
-  //       args match {
-  //         case List(arg) =>
-  //           onStoupDepends(TyperErrors.stoupNotEmptyBang(arg))
-  //         case _ =>
-  //       }
-  //     case _ =>
-  //   }
-  // }
 
   private def unwrapCompApply(
        tpe: Type)
@@ -316,7 +253,7 @@ object Typers {
   def typedLet(name: Name, nId: Id)
               (value: Tree, cont: Tree)
               (id: Id, pt: Type)
-              given Context, Mode, Stoup: Checked[Tree] = {
+              given Context, Mode: Checked[Tree] = {
     for {
       lCtx    <-  lookIn(id)
       value1  <-  value.typed(any)
@@ -335,7 +272,7 @@ object Typers {
 
   def typeAsCaseClauses(ts: List[Tree], selTpe: Type)
                        (pt: Type)
-                       given Context, Mode, Stoup: Checked[List[Tree]] = {
+                       given Context, Mode: Checked[List[Tree]] = {
     ts.mapE {
       case t @ CaseClause(p,g,b)  => typedCaseClause(p, g, b, selTpe)(t.id, pt)
       case unknown                => TyperErrors.notCaseClase(unknown)
@@ -344,7 +281,7 @@ object Typers {
 
   def typedCaseExpr(selector: Tree, cases: List[Tree])
                    (id: Id, pt: Type)
-                   given Context, Mode, Stoup: Checked[Tree] = {
+                   given Context, Mode: Checked[Tree] = {
     for {
       selector1 <- selector.typed(any)
       cases1    <- typeAsCaseClauses(cases, selector1.tpe)(pt)
@@ -354,7 +291,7 @@ object Typers {
 
   def typedCaseClause(pat: Tree, guard: Tree, body: Tree, selTpe: Type)
                      (id: Id, pt: Type)
-                     given Context, Mode, Stoup: Checked[Tree] = {
+                     given Context, Mode: Checked[Tree] = {
     lookIn(id).flatMap { ccCtx =>
       implied for Context = ccCtx
       for {
@@ -367,7 +304,7 @@ object Typers {
 
   def typedBind(name: Name, body: Tree)
                (id: Id, pt: Type)
-               given Context, Mode, Stoup: Checked[Tree] = {
+               given Context, Mode: Checked[Tree] = {
     for (body1 <- body.typed(pt))
     yield {
       if name == Name.Wildcard then {
@@ -383,7 +320,7 @@ object Typers {
 
   def typedAlternative(patterns: List[Tree])
                       (id: Id, pt: Type)
-                      given Context, Mode, Stoup: Checked[Tree] = {
+                      given Context, Mode: Checked[Tree] = {
     implied for Mode = Mode.PatAlt
     for {
       patterns1 <- patterns.mapE(_.typed(pt))
@@ -397,7 +334,7 @@ object Typers {
 
   def typedUnapply(functor: Name, args: List[Tree])
                   (id: Id, pt: Type)
-                  given Context, Mode, Stoup: Checked[Tree] = {
+                  given Context, Mode: Checked[Tree] = {
     for {
       fCtx  <-  firstCtx(functor)
       fTpe  <-  checked {
@@ -445,7 +382,7 @@ object Typers {
 
   def typedPackageDef(pid: Tree, stats: List[Tree])
                      (id: Id, pt: Type)
-                     given Context, Mode, Stoup: Checked[Tree] = {
+                     given Context, Mode: Checked[Tree] = {
     for {
       pair    <-  typePackaging(pid)
       (pkgCtx, pid1) = pair
@@ -458,7 +395,7 @@ object Typers {
 
   def typedDefDef(modifiers: Set[Modifier], sig: Tree, tpeD: Tree, body: Tree)
                  (id: Id, pt: Type)
-                 given Context, Mode, Stoup: Checked[Tree] = {
+                 given Context, Mode: Checked[Tree] = {
     val typeTpeAs = {
       if modifiers.contains(Modifier.Primitive) then
         typedAsPrimitive
@@ -504,7 +441,7 @@ object Typers {
 
   def typedDefSig(name: Name, args: List[Tree])
                  (id: Id, pt: Type)
-                 given Context, Mode, Stoup: Checked[Tree] = {
+                 given Context, Mode: Checked[Tree] = {
     val pts = toCurriedList(pt)
     if pts.length <= args.length then
       TyperErrors.declArgsNotMatchType(name)
@@ -586,7 +523,7 @@ object Typers {
       TyperErrors.typecheckFail(typed, pt)
   }
 
-  def (tree: Tree) typed(pt: Type) given Context, Mode, Stoup: Checked[Tree] = {
+  def (tree: Tree) typed(pt: Type) given Context, Mode: Checked[Tree] = {
     def inner(tree: Tree, pt: Type) = tree match {
       // Types
       case Select(t,n)      if isType     => typedSelectType(t,n)(tree.id, pt)

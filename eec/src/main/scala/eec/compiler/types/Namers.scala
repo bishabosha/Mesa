@@ -27,7 +27,7 @@ object Namers {
     enterFresh(sigId, name).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
-        _ <-  args.flatMap(toNamePairs).mapE(enterFresh)
+        _ <-  args.flatMap(toNamePairs).mapE(enterVariable)
         _ <-  index(body)
       } yield ()
     }
@@ -39,7 +39,7 @@ object Namers {
     enterFresh(id, anon).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
-        _ <-  args.map(t => t.id -> (t.convert: Name)).mapE(enterFresh)
+        _ <-  args.map(t => t.id -> (t.convert: Name)).mapE(enterVariable)
         _ <-  index(body)
       } yield ()
     }
@@ -76,7 +76,7 @@ object Namers {
       _ <-  enterFresh(id, anon).flatMap { ctx1 =>
               implied for Context = ctx1
               for {
-                _ <- enterFresh(letId, letName)
+                _ <- enterVariable(letId, letName)
                 _ <- index(continuation)
               } yield ()
             }
@@ -120,7 +120,7 @@ object Namers {
                (id: Id)
                given Context, Mode: Checked[Unit] = {
     for {
-      _ <- enterFresh(id, name)
+      _ <- enterVariable(id, name)
       _ <- index(pat)
     } yield ()
   }
@@ -132,8 +132,7 @@ object Namers {
 
   def namedIdentPat(name: Name)(id: Id) given Context, Mode: Checked[Unit] = {
     if name != Wildcard then {
-      for (_ <- enterFresh(id, name))
-      yield ()
+      enterVariable(id, name)
     }
   }
 
