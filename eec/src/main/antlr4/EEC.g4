@@ -19,11 +19,17 @@ stableId: id | id '.' id;
 // -- Types
 //
 
-type: infixType | func;
+type: infixType | func | linearFunc;
 
 func: infixType ('->' infixType)+;
 
-infixType: simpleType | prefixType;
+linearFunc: infixType '-*' infixType;
+
+inlineType: functorType (CoTensor | Tensor) functorType;
+
+infixType: functorType | inlineType;
+
+functorType: simpleType | prefixType;
 
 productType: '(' type (',' type)* ')' | '()';
 
@@ -35,13 +41,31 @@ simpleType: CompId | qualId | productType;
 // -- Expressions
 //
 
-expr: lambda | letExpr | caseExpr | expr1 | expr expr;
+expr:
+	lambda
+	| linearLambda
+	| letExpr
+	| letTensorExpr
+	| caseExpr
+	| linearCaseExpr
+	| expr1
+	| expr expr
+	| expr eval;
+
+eval: '[' expr ']';
 
 lambda: '\\' bindings '=>' expr;
 
+linearLambda: '|' '(' binding ')' '-*' expr;
+
 letExpr: 'let' '!' (Varid | Wildcard) '=' expr 'in' expr;
 
+letTensorExpr:
+	'let' '!' (Varid | Wildcard) Tensor Varid '=' expr 'in' expr;
+
 caseExpr: 'case' expr 'of' cases;
+
+linearCaseExpr: '|' 'case' expr 'of' linearCases;
 
 expr1
    : 'if' expr 'then' expr 'else' expr
@@ -50,8 +74,11 @@ expr1
 
 infixExpr
    : prefixExpr
+	 | tensorExpr
    | infixExpr (OpId | '`' alphaId '`') infixExpr
    ;
+
+tensorExpr: Bang simpleExpr Tensor infixExpr;
 
 prefixExpr: Bang? simpleExpr;
 
@@ -64,13 +91,19 @@ simpleExpr
 
 cases: caseClause (Sep? caseClause)*;
 
+linearCases: linearCaseClause (Sep? linearCaseClause)*;
+
 caseClause: pattern guard? '=>' expr;
+
+linearCaseClause: linearPattern '-*' expr;
 
 exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 
 //
 // -- Patterns
 //
+
+linearPattern: Patid '[' Varid ']';
 
 pattern: pattern1 ('|' pattern1)*;
 
@@ -122,13 +155,17 @@ binding: id ':' type;
 
 dcl: primitiveDcl;
 
-primitiveDcl: 'primitive' defDecl;
+primitiveDcl: 'primitive' primDecl;
 
 defDecl: defSig ':' type; // still require type checking
+
+primDecl: (defSig | linearSig) ':' type; // still require type checking
 
 def: defDef;
 
 defDef: defSig (':' type)/*?*/ '=' expr Sep?;
+
+linearSig: alphaId Varid*? '|' Varid;
 
 defSig: infixDefSig | alphaId Varid*;
 
@@ -164,6 +201,8 @@ translationUnit:
 Fixity: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
 Dashes: '--';
 Bang: '!';
+Tensor: '|*|';
+CoTensor: '|+|';
 Wildcard: '_';
 
 BooleanLiteral: 'True' | 'False';

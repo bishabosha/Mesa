@@ -23,7 +23,8 @@ object Names {
     case From(derived: Derived)
     case Comp(derived: Derived)
     case ComputationTag, IntegerTag, DecimalTag, EitherTag, VoidTag,
-      BooleanTag, StringTag, CharTag, Wildcard, EmptyName
+      BooleanTag, StringTag, CharTag, Wildcard, EmptyName, TensorTag,
+      CoTensorTag
   }
 
   val emptyString: String = "<empty>"
@@ -98,6 +99,8 @@ object Names {
       def (n: Name) show = n match {
         case Wildcard       => "_"
         case ComputationTag => "!"
+        case TensorTag      => "|*|"
+        case CoTensorTag    => "|+|"
         case IntegerTag     => "Integer"
         case DecimalTag     => "Decimal"
         case BooleanTag     => "Boolean"
@@ -115,6 +118,8 @@ object Names {
       def (s: String) readAs = s match {
         case "_"        => Wildcard
         case "!"        => ComputationTag
+        case "|*|"      => TensorTag
+        case "|+|"      => CoTensorTag
         case "Integer"  => IntegerTag
         case "Decimal"  => DecimalTag
         case "Boolean"  => BooleanTag

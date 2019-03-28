@@ -205,8 +205,41 @@ object Parsers {
                             given IdGen: Tree = {
     if defined(context.func) then
       fromFunc(context.func)
+    else if defined(context.linearFunc) then
+      fromLinearFunc(context.linearFunc)
     else
       fromInfixType(context.infixType)
+  }
+
+  private[this] def fromInfixType
+      (context: EECParser.InfixTypeContext) given IdGen: Tree = {
+    if defined(context.functorType) then
+      fromFunctorType(context.functorType)
+    else
+      fromInlineType(context.inlineType)
+  }
+
+  private[this] def fromInlineType
+      (context: EECParser.InlineTypeContext) given IdGen: Tree = {
+    val functors = context.functorType.map(fromFunctorType)
+    val name = {
+      if defined(context.Tensor) then
+        context.Tensor.getText.readAs
+      else
+        context.CoTensor.getText.readAs
+    }
+    val functor = Ident(name)(freshId(), uTpe)
+    InfixApplyType(functor, functors(0), functors(1))(uTpe)
+  }
+
+  private[this] def fromLinearFunc
+      (context: EECParser.LinearFuncContext) given IdGen: Tree = {
+    val infixes = {
+      context
+        .infixType
+        .map(fromInfixType)
+    }
+    LinearFunction(infixes(0), infixes(1))(freshId(), uTpe)
   }
 
   private[this] def fromFunc
@@ -220,8 +253,8 @@ object Parsers {
     rest.foldLeft(head)((acc, t) => Function(List(t), acc)(freshId(), uTpe))
   }
 
-  private[this] def fromInfixType
-      (context: EECParser.InfixTypeContext) given IdGen: Tree = {
+  private[this] def fromFunctorType
+      (context: EECParser.FunctorTypeContext) given IdGen: Tree = {
     if defined(context.simpleType) then
       fromSimpleType(context.simpleType)
     else
@@ -279,14 +312,31 @@ object Parsers {
                             given IdGen: Checked[Tree] = {
     if defined(context.lambda) then
       fromLambda(context.lambda)
+    else if defined(context.linearLambda) then
+      fromLinearLambda(context.linearLambda)
     else if defined(context.letExpr) then
       fromLetExpr(context.letExpr)
+    else if defined(context.letTensorExpr) then
+      fromLetTensorExpr(context.letTensorExpr)
     else if defined(context.caseExpr) then
       fromCaseExpr(context.caseExpr)
+    else if defined(context.linearCaseExpr) then
+      fromLinearCaseExpr(context.linearCaseExpr)
     else if defined(context.expr1) then
       fromExpr1(context.expr1)
+    else if defined(context.eval) then
+      fromEval(context.expr(0), context.eval)
     else
       fromExprSeqAsApply(context.expr)
+  }
+
+  private[this] def fromEval
+        (exprContext: EECParser.ExprContext, evalContext: EECParser.EvalContext) given IdGen: Checked[Tree] = {
+    import CompilerErrorOps._
+    for {
+      expr <- fromExpr(exprContext)
+      eval <- fromExpr(evalContext.expr)
+    } yield Eval(expr, eval)(uTpe)
   }
 
   private[this] def fromExprSeqAsApply
@@ -294,7 +344,7 @@ object Parsers {
     import CompilerErrorOps._
     for {
       exprs <- exprs.mapE(fromExpr)
-      Seq(expr, arg)  = exprs
+      Seq(expr, arg) = exprs
     } yield Apply(expr, arg.convert)(uTpe)
   }
 
@@ -304,6 +354,15 @@ object Parsers {
     for (body <- fromExpr(context.expr)) yield {
       val bindings = fromBindings(context.bindings)
       Function(bindings.convert, body)(freshId(), uTpe)
+    }
+  }
+
+  private[this] def fromLinearLambda
+      (context: EECParser.LinearLambdaContext) given IdGen: Checked[Tree] = {
+    import CompilerErrorOps._
+    for (body <- fromExpr(context.expr)) yield {
+      val binding = fromBinding(context.binding)
+      LinearFunction(binding, body)(freshId(), uTpe)
     }
   }
 
@@ -323,6 +382,24 @@ object Parsers {
     }
   }
 
+  private[this] def fromLetTensorExpr
+      (context: EECParser.LetTensorExprContext) given IdGen: Checked[Tree] = {
+    var varids = context.Varid.map(_.getText.readAs)
+    var x = {
+      if defined(context.Wildcard) then
+        context.Wildcard.getText.readAs
+      else
+        varids(0)
+    }
+    val z = varids.last
+    import CompilerErrorOps._
+    for (exprs <- context.expr.mapE(fromExpr)) yield {
+      val value         = exprs.get(0)
+      val continuation  = exprs.get(1)
+      LetTensor(x, z, value, continuation)(freshId(), uTpe)
+    }
+  }
+
   private[this] def fromCaseExpr
       (context: EECParser.CaseExprContext) given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
@@ -330,6 +407,15 @@ object Parsers {
       selector  <- fromExpr(context.expr)
       cases     <- fromCases(context.cases)
     } yield CaseExpr(selector, cases.convert)(uTpe)
+  }
+
+  private[this] def fromLinearCaseExpr
+      (context: EECParser.LinearCaseExprContext) given IdGen: Checked[Tree] = {
+    import CompilerErrorOps._
+    for {
+      selector  <- fromExpr(context.expr)
+      cases     <- fromLinearCases(context.linearCases)
+    } yield LinearCaseExpr(selector, cases.convert)(uTpe)
   }
 
   private[this] def fromIfElse
@@ -372,6 +458,8 @@ object Parsers {
       (context: EECParser.InfixExprContext) given IdGen: Checked[Tree] = {
     if defined(context.prefixExpr) then
       fromPrefixExpr(context.prefixExpr)
+    else if defined(context.tensorExpr) then
+      fromTensorExpr(context.tensorExpr)
     else
       fromInfixApplication(context)
   }
@@ -379,6 +467,15 @@ object Parsers {
   private[this] def wrapComputation(tree: Tree) given IdGen: Checked[Tree] = {
     val tag = Ident(ComputationTag)(freshId(), uTpe)
     Apply(tag, List(tree))(uTpe)
+  }
+
+  private[this] def fromTensorExpr
+      (context: EECParser.TensorExprContext) given IdGen: Checked[Tree] = {
+    import CompilerErrorOps._
+    for {
+      x <- fromSimpleExpr(context.simpleExpr)
+      z <- fromInfixExpr(context.infixExpr)
+    } yield Tensor(x, z)(uTpe)
   }
 
   private[this] def fromPrefixExpr
@@ -408,6 +505,13 @@ object Parsers {
       yield caseClauses.toList.convert
   }
 
+  private[this] def fromLinearCases
+      (context: EECParser.LinearCasesContext) given IdGen: Checked[Tree] = {
+    import CompilerErrorOps._
+    for (caseClauses <- context.linearCaseClause.mapE(fromLinearCaseClause))
+      yield caseClauses.toList.convert
+  }
+
   private[this] def fromCaseClause
       (context: EECParser.CaseClauseContext) given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
@@ -423,6 +527,15 @@ object Parsers {
     } yield CaseClause(pat, guard, body)(freshId(), uTpe)
   }
 
+  private[this] def fromLinearCaseClause
+      (context: EECParser.LinearCaseClauseContext) given IdGen: Checked[Tree] = {
+    import CompilerErrorOps._
+    for {
+      pat  <- fromLinearPattern(context.linearPattern)
+      body <- fromExpr(context.expr)
+    } yield LinearCaseClause(pat, body)(freshId(), uTpe)
+  }
+
   private[this] def fromExprsInParens
       (context: EECParser.ExprsInParensContext) given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
@@ -432,6 +545,15 @@ object Parsers {
       else
         Parens(expr.toList)(uTpe)
     }
+  }
+
+  private[this] def fromLinearPattern
+      (context: EECParser.LinearPatternContext) given IdGen: Tree = {
+    import CompilerErrorOps._
+    val functor = context.Patid.getText.readAs
+    val binding = context.Varid.getText.readAs
+    val arg     = Ident(binding)(freshId(), uTpe)
+    Unapply(functor, arg.convert)(uTpe)
   }
 
   private[this] def fromPattern
@@ -542,7 +664,29 @@ object Parsers {
 
   private[this] def fromPrimitiveDcl
       (context: EECParser.PrimitiveDclContext) given IdGen: Tree = {
-    fromDefDecl(context.defDecl).addModifiers(Set(Primitive))
+    fromPrimDcl(context.primDecl).addModifiers(Set(Primitive))
+  }
+
+  private[this] def fromPrimDcl
+      (context: EECParser.PrimDeclContext) given IdGen: Tree = {
+    val sig = {
+      if defined(context.defSig) then
+        fromDefSig(context.defSig)
+      else
+        fromLinearSig(context.linearSig)
+    }
+    val typ = fromType(context.`type`)
+    DefDef(Set(), sig, typ, EmptyTree)(uTpe)
+  }
+
+  private[this] def fromLinearSig
+      (context: EECParser.LinearSigContext) given IdGen: Tree = {
+    var name    = (fromAlphaId(context.alphaId).convert: Name)
+    val varids  = context.Varid.map(_.getText.readAs)
+    if varids.size == 1 then
+      PrimSig(name, Nil, varids(0))(freshId(), uTpe)
+    else
+      PrimSig(name, varids.init.toList, varids.last)(freshId(), uTpe)
   }
 
   private[this] def fromDefDecl

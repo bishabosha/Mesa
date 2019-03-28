@@ -34,6 +34,9 @@ object Types {
     case TypeRef(name: Name)
     case Variable(name: Name)
     case FunctionType(arg: Type, body: Type)
+    case LinearFunctionType(arg: Type, body: Type)
+    case TensorType(arg: Type, body: Type)
+    case CoTensorType(arg: Type, body: Type)
     case Product(args: List[Type])
     case AppliedType(typ: Type, args: List[Type])
     case WildcardType

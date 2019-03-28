@@ -1,12 +1,34 @@
 package eec.report.example
 
+primitive linearA: !A |*| B#
+primitive linearB: A# |+| B#
+primitive linearC: A# -* B#
+primitive InL | l : L# -* L# |+| R#
+primitive InR | r : R# -* L# |+| R#
+primitive f : A# -> (B# -* C#)
+primitive g : (A# -* B#) -> C#
+
+linearLambdaTest: A# -* () =
+  | (a: A#) -* ()
+
+tensorTest: !() |*| () =
+  !() |*| ()
+
+matchTest: () =
+  | case InL [()] of
+    InL [m] -* m
+    InR [n] -* n
+
+evalTest: () =
+  (| (a: ()) -* ())[()]
+
 primitive x + y : Integer -> Integer -> Integer
 primitive s1 ++ s2 : String -> String -> String
 primitive debug x : a -> String
 primitive putStrLn s : String -> !()
 primitive readInteger : !Integer
-primitive Left  x : l -> Either l r
-primitive Right x : r -> Either l r
+primitive Left  l : L -> Either L R
+primitive Right r : R -> Either L R
 primitive absurd v : Void -> a
 primitive a == b : a -> a -> Boolean
 

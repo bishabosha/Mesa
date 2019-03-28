@@ -20,12 +20,20 @@ object Printing {
       case PackageDef(pid: Ast, stats: List[Ast])
       case DefDef(modifiers: Set[Modifier], sig: Ast, tpeAs: Ast, body: Ast)
       case DefSig(name: Name, args: List[Name])
+      case PrimSig(name: Name, args: List[Name], linear: Name)
       case Apply(id: Ast, args: List[Ast])
+      case InfixApplyType(f: Ast, left: Ast, right: Ast)
+      case Eval(f: Ast, arg: Ast)
+      case Tensor(value: Ast, computation: Ast)
       case Function(args: List[Ast], body: Ast)
-      case Let(name: Name, value: Ast, continuation: Ast)
+      case LinearFunction(arg: Ast, body: Ast)
+      case Let(x: Name, value: Ast, continuation: Ast)
+      case LetTensor(x: Name, z: Name, value: Ast, continuation: Ast)
       case Literal(constant: Constant)
       case CaseExpr(selector: Ast, cases: List[Ast])
       case CaseClause(pat: Ast, guard: Ast, body: Ast)
+      case LinearCaseExpr(selector: Ast, cases: List[Ast])
+      case LinearCaseClause(pat: Ast, body: Ast)
       case Alternative(bodys: List[Ast])
       case Parens(exprs: List[Ast])
       case Bind(name: Name, body: Ast)
@@ -46,12 +54,29 @@ object Printing {
         case Tree.DefDef(modifiers, sig, tpeAs, body) =>
           DefDef(modifiers, toAst(sig), toAst(tpeAs), toAst(body))
 
-        case Tree.DefSig(name, args)   => DefSig(name, args)
-        case Tree.Apply(id, args)      => Apply(toAst(id), args.map(toAst))
-        case Tree.Function(args, body) => Function(args.map(toAst), toAst(body))
+        case Tree.DefSig(name, args)      => DefSig(name, args)
+        case Tree.PrimSig(name, arg, lin) => PrimSig(name, arg, lin)
+        case Tree.Apply(id, args)         => Apply(toAst(id), args.map(toAst))
+
+        case Tree.InfixApplyType(f, left, right) =>
+          InfixApplyType(toAst(f), toAst(left), toAst(right))
+
+        case Tree.Eval(f, arg) => Eval(toAst(f), toAst(arg))
+
+        case Tree.Tensor(value, computation) =>
+          Tensor(toAst(value), toAst(computation))
+
+        case Tree.Function(args, body) =>
+          Function(args.map(toAst), toAst(body))
+
+        case Tree.LinearFunction(arg, body) =>
+          LinearFunction(toAst(arg), toAst(body))
 
         case Tree.Let(name, value, continuation) =>
           Let(name, toAst(value), toAst(continuation))
+
+        case Tree.LetTensor(x, z, value, continuation) =>
+          LetTensor(x, z, toAst(value), toAst(continuation))
 
         case Tree.Literal(constant) => Literal(constant)
 
@@ -60,6 +85,12 @@ object Printing {
 
         case Tree.CaseClause(pat, guard, body) =>
           CaseClause(toAst(pat), toAst(guard), toAst(body))
+
+        case Tree.LinearCaseExpr(selector, cases) =>
+          LinearCaseExpr(toAst(selector), cases.map(toAst))
+
+        case Tree.LinearCaseClause(pat, body) =>
+          LinearCaseClause(toAst(pat), toAst(body))
 
         case Tree.Alternative(bodys)  => Alternative(bodys.map(toAst))
         case Tree.Parens(exprs)       => Parens(exprs.map(toAst))
