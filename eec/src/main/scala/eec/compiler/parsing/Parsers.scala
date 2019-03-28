@@ -61,7 +61,7 @@ object Parsers {
                 else
                   EmptyTree
                }
-    } yield PackageDef(pkgId, stats.convert)(freshId(), uTpe)
+    } yield PackageDef(pkgId, stats.convert)(uTpe)
   }
 
   private[this] class ParserSyntaxException(msg: String) extends Exception(msg)
@@ -87,7 +87,7 @@ object Parsers {
     if txt.endsWith("l") || txt.endsWith("L") then
       CompilerError.SyntaxError(s"unexpected Long literal `$txt`")
     else
-      Literal(BigIntConstant(BigInt(txt)))(freshId(), uTpe)
+      Literal(BigIntConstant(BigInt(txt)))(uTpe)
   }
 
   private[this] def fromFloatingPointLiteral
@@ -98,7 +98,7 @@ object Parsers {
     else if txt.endsWith("d") || txt.endsWith("D") then
       CompilerError.SyntaxError(s"unexpected Double literal `$txt`")
     else
-      Literal(BigDecConstant(BigDecimal(txt)))(freshId(), uTpe)
+      Literal(BigDecConstant(BigDecimal(txt)))(uTpe)
   }
 
   private[this] def fromBooleanLiteral
@@ -107,7 +107,7 @@ object Parsers {
       case "True" => true
       case _      => false
     }
-    Literal(BooleanConstant(bool))(freshId(), uTpe)
+    Literal(BooleanConstant(bool))(uTpe)
   }
 
   private[this] def charText(context: EECParser.LiteralContext): String = {
@@ -127,14 +127,14 @@ object Parsers {
       (context: EECParser.LiteralContext) given IdGen: Tree = {
     val charStr = charText(context)
     val char    = if charStr.length == 0 then 0 else charStr.charAt(0)
-    Literal(CharConstant(char))(freshId(), uTpe)
+    Literal(CharConstant(char))(uTpe)
   }
 
   private[this] def fromStringLiteral
       (context: EECParser.LiteralContext) given IdGen: Tree = {
     val text    = context.StringLiteral.getText
     val string  = formatString(text)
-    Literal(StringConstant(string))(freshId(), uTpe)
+    Literal(StringConstant(string))(uTpe)
   }
 
   private[this] def fromLiteral
@@ -234,7 +234,7 @@ object Parsers {
     if types.size == 1 then
       types(0)
     else
-      Parens(types.toList)(freshId(), uTpe)
+      Parens(types.toList)(uTpe)
   }
 
   private[this] def fromPrefixType
@@ -250,7 +250,7 @@ object Parsers {
     val simpleTypes = context.simpleType.map(fromSimpleType)
     val tag         = fromQualId(context.qualId)
     val args        = simpleTypes.toList
-    Apply(tag, args)(freshId(), uTpe)
+    Apply(tag, args)(uTpe)
   }
 
   private[this] def fromBangType
@@ -258,7 +258,7 @@ object Parsers {
     val simpleTypes = context.simpleType.map(fromSimpleType)
     val tag         = Ident(Name.ComputationTag)(freshId(), uTpe)
     val args        = simpleTypes.toList
-    Apply(tag, args)(freshId(), uTpe)
+    Apply(tag, args)(uTpe)
   }
 
   private[this] def fromSimpleType
@@ -295,7 +295,7 @@ object Parsers {
     for {
       exprs <- exprs.mapE(fromExpr)
       Seq(expr, arg)  = exprs
-    } yield Apply(expr, arg.convert)(freshId(), uTpe)
+    } yield Apply(expr, arg.convert)(uTpe)
   }
 
   private[this] def fromLambda
@@ -319,8 +319,7 @@ object Parsers {
     for (exprs <- context.expr.mapE(fromExpr)) yield {
       val value         = exprs.get(0)
       val continuation  = exprs.get(1)
-      val ident         = Ident(name)(freshId(), uTpe)
-      Let(ident, value, continuation)(freshId(), uTpe)
+      Let(name, value, continuation)(freshId(), uTpe)
     }
   }
 
@@ -330,19 +329,19 @@ object Parsers {
     for {
       selector  <- fromExpr(context.expr)
       cases     <- fromCases(context.cases)
-    } yield CaseExpr(selector, cases.convert)(freshId(), uTpe)
+    } yield CaseExpr(selector, cases.convert)(uTpe)
   }
 
   private[this] def fromIfElse
       (context: EECParser.Expr1Context)  given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     for (exprs <- context.expr.mapE(fromExpr)) yield {
-      val patTrue   = Literal(BooleanConstant(true))(freshId(), uTpe)
-      val patFalse  = Literal(BooleanConstant(false))(freshId(), uTpe)
+      val patTrue   = Literal(BooleanConstant(true))(uTpe)
+      val patFalse  = Literal(BooleanConstant(false))(uTpe)
       val caseTrue  = CaseClause(patTrue, EmptyTree, exprs(1))(freshId(), uTpe)
       val caseFalse = CaseClause(patFalse, EmptyTree, exprs(2))(freshId(), uTpe)
       val selector  = exprs(0)
-      CaseExpr(selector, List(caseTrue, caseFalse))(freshId(), uTpe)
+      CaseExpr(selector, List(caseTrue, caseFalse))(uTpe)
     }
   }
 
@@ -364,8 +363,8 @@ object Parsers {
         fromAlphaId(context.alphaId)
     }
     for (infixes <- context.infixExpr.mapE(fromInfixExpr)) yield {
-      val firstApply = Apply(id, List(infixes(0)))(freshId(), uTpe)
-      Apply(firstApply, List(infixes(1)))(freshId(), uTpe)
+      val firstApply = Apply(id, List(infixes(0)))(uTpe)
+      Apply(firstApply, List(infixes(1)))(uTpe)
     }
   }
 
@@ -379,7 +378,7 @@ object Parsers {
 
   private[this] def wrapComputation(tree: Tree) given IdGen: Checked[Tree] = {
     val tag = Ident(ComputationTag)(freshId(), uTpe)
-    Apply(tag, List(tree))(freshId(), uTpe)
+    Apply(tag, List(tree))(uTpe)
   }
 
   private[this] def fromPrefixExpr
@@ -431,7 +430,7 @@ object Parsers {
       if expr.size == 1 then
         expr(0)
       else
-        Parens(expr.toList)(freshId(), uTpe)
+        Parens(expr.toList)(uTpe)
     }
   }
 
@@ -442,7 +441,7 @@ object Parsers {
       if patterns.size == 1 then
         patterns(0)
       else
-        Alternative(patterns.toList)(freshId(), uTpe)
+        Alternative(patterns.toList)(uTpe)
     }
   }
 
@@ -456,7 +455,7 @@ object Parsers {
     val name = context.Varid.getText.readAs
     if defined(context.pattern3) then
       for (patt3 <- fromPattern3(context.pattern3))
-        yield Bind(name, patt3)(freshId(), uTpe)
+        yield Bind(name, patt3)(uTpe)
     else
       Ident(name)(freshId(), uTpe)
   }
@@ -484,11 +483,11 @@ object Parsers {
     import CompilerErrorOps._
     val functor = context.Patid.getText.readAs
     for (args <- context.pattern.mapE(fromPattern))
-      yield Unapply(functor, args.toList)(freshId(), uTpe)
+      yield Unapply(functor, args.toList)(uTpe)
   }
 
   private[this] def fromUnitPattern given IdGen: Tree =
-    Parens(Nil)(freshId(), uTpe)
+    Parens(Nil)(uTpe)
 
   private[this] def fromSimplePattern
       (context: EECParser.SimplePatternContext) given IdGen: Checked[Tree] = {
@@ -513,7 +512,7 @@ object Parsers {
       if patterns.size == 1 then
         patterns(0)
       else
-        Parens(patterns.toList)(freshId(), uTpe)
+        Parens(patterns.toList)(uTpe)
     }
   }
 
@@ -535,7 +534,7 @@ object Parsers {
       (context: EECParser.BindingContext) given IdGen: Tree = {
     val List(name)  = fromId(context.id).toNames
     val typ         = fromType(context.`type`)
-    Tagged(name, typ)(freshId(), uTpe)
+    Tagged(name, typ)(uTpe)
   }
 
   private[this] def fromDcl(context: EECParser.DclContext) given IdGen: Tree =
@@ -550,7 +549,7 @@ object Parsers {
       (context: EECParser.DefDeclContext) given IdGen: Tree = {
     val sig = fromDefSig(context.defSig)
     val typ = fromType(context.`type`)
-    DefDef(Set(), sig, typ, EmptyTree)(freshId(), uTpe)
+    DefDef(Set(), sig, typ, EmptyTree)(uTpe)
   }
 
   private[this] def fromDef
@@ -564,7 +563,7 @@ object Parsers {
       expr    <- fromExpr(context.expr)
       defSig  =  fromDefSig(context.defSig)
       typ     =  fromType(context.`type`)
-    } yield DefDef(Set(), defSig, typ, expr)(freshId(), uTpe)
+    } yield DefDef(Set(), defSig, typ, expr)(uTpe)
   }
 
   private[this] def fromDefSig
@@ -579,8 +578,7 @@ object Parsers {
       (context: EECParser.DefSigContext) given IdGen: Tree = {
     var name      = (fromAlphaId(context.alphaId).convert: Name)
     var varids    = context.Varid.map(_.getText.readAs).toList
-    val identArgs = varids.map(n => Ident(n)(freshId(), uTpe))
-    DefSig(name, identArgs)(freshId(), uTpe)
+    DefSig(name, varids)(freshId(), uTpe)
   }
 
   private[this] def fromInfixDefSig
@@ -594,10 +592,9 @@ object Parsers {
   }
 
   private[this] def infixArgs
-      (context: EECParser.InfixDefSigContext) given IdGen: List[Tree] = {
+      (context: EECParser.InfixDefSigContext) given IdGen: List[Name] = {
     context.Varid
       .map(_.getText.readAs)
-      .map(Ident(_)(freshId(), uTpe))
       .toList
   }
 
@@ -619,7 +616,6 @@ object Parsers {
       (context: EECParser.PrefixOpSigContext) given IdGen: Tree = {
     var args = context.Varid
       .map(_.getText.readAs)
-      .map(Ident(_)(freshId(), uTpe))
       .toList
     val name = context.OpId.getText.readAs
     DefSig(name, args)(freshId(), uTpe)

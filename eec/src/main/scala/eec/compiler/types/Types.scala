@@ -292,6 +292,8 @@ object Types {
       inner(true, tpe :: Nil)
     }
 
+    def (tpe: Type) isValueType = !tpe.isComputationType
+
     implied for Showable[Type] {
 
       def (tpe: Type) show: String = tpe.compute {

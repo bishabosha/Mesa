@@ -162,12 +162,12 @@ object Typers {
   }
 
   def typedTagged(arg: Name, tpeTree: Tree)
-                 (id: Id, pt: Type)
+                 (pt: Type)
                  given Context, Mode: Checked[Tree] = {
     for (tpeTree1 <- tpeTree.typedAsTyping(pt))
     yield {
       putType(arg -> tpeTree1.tpe)
-      Tagged(arg, tpeTree1)(id, tpeTree1.tpe)
+      Tagged(arg, tpeTree1)(tpeTree1.tpe)
     }
   }
 
@@ -185,10 +185,10 @@ object Typers {
   }
 
   def typedParens(ts: List[Tree])
-                 (id: Id, pt: Type)
+                 (pt: Type)
                  given Context, Mode: Checked[Tree] = {
     for (ts1 <- typeAsTuple(ts, pt))
-    yield Parens(ts1)(id, ts1.map(_.tpe).convert)
+    yield Parens(ts1)(ts1.map(_.tpe).convert)
   }
 
   private def typeAsDestructor(fTpe: Type, pt: Type): Checked[(List[Type], Type)] = {
@@ -219,7 +219,6 @@ object Typers {
   }
 
   def typedApplyType(functor: Tree, args: List[Tree])
-                    (id: Id)
                     given Context, Mode: Checked[Tree] = {
     for {
       functor1  <-  functor.typed(any)
@@ -227,18 +226,18 @@ object Typers {
       applied   <-  unifyConstructorToHkType(functor1, args1.map(_.tpe))
       funProto  <-  toFunctionType(args1.map(_.tpe) :+ applied)
       tpe       <-  checkFunctorWithProto(functor1, funProto)
-    } yield Apply(functor1, args1)(id, tpe)
+    } yield Apply(functor1, args1)(tpe)
   }
 
   def typedApplyTerm(fun: Tree, args: List[Tree])
-                    (id: Id, pt: Type)
+                    (pt: Type)
                     given Context, Mode: Checked[Tree] = {
     for {
       fun1      <-  fun.typed(any)
       args1     <-  args.mapE(_.typed(any))
       argsProto <-  args1.map(_.tpe).convert
       tpe       <-  checkFunWithProto(fun1, argsProto)(pt)
-    } yield Apply(fun1, args1)(id, tpe)
+    } yield Apply(fun1, args1)(tpe)
   }
 
   private def unwrapCompApply(
@@ -250,15 +249,13 @@ object Typers {
       TyperErrors.noBangLetValue(name, value)
   }
 
-  def typedLet(name: Name, nId: Id)
-              (value: Tree, cont: Tree)
+  def typedLet(name: Name, value: Tree, cont: Tree)
               (id: Id, pt: Type)
               given Context, Mode: Checked[Tree] = {
     for {
       lCtx    <-  lookIn(id)
       value1  <-  value.typed(any)
       value1U <-  unwrapCompApply(value1.tpe)(name, value)
-      letId1  <-  Ident(name)(nId, value1U)
       cont1   <-  checked {
                     implied for Context = lCtx
                     putType(name -> value1U)
@@ -267,7 +264,7 @@ object Typers {
                           _.tpe.isComputationType
                         }
                   }
-    } yield Let(letId1, value1, cont1)(id, cont1.tpe)
+    } yield Let(name, value1, cont1)(id, cont1.tpe)
   }
 
   def typeAsCaseClauses(ts: List[Tree], selTpe: Type)
@@ -280,13 +277,13 @@ object Typers {
   }
 
   def typedCaseExpr(selector: Tree, cases: List[Tree])
-                   (id: Id, pt: Type)
+                   (pt: Type)
                    given Context, Mode: Checked[Tree] = {
     for {
       selector1 <- selector.typed(any)
       cases1    <- typeAsCaseClauses(cases, selector1.tpe)(pt)
       tpe       <- cases1.unifiedTpe
-    } yield CaseExpr(selector1, cases1)(id, tpe)
+    } yield CaseExpr(selector1, cases1)(tpe)
   }
 
   def typedCaseClause(pat: Tree, guard: Tree, body: Tree, selTpe: Type)
@@ -303,7 +300,7 @@ object Typers {
   }
 
   def typedBind(name: Name, body: Tree)
-               (id: Id, pt: Type)
+               (pt: Type)
                given Context, Mode: Checked[Tree] = {
     for (body1 <- body.typed(pt))
     yield {
@@ -313,19 +310,19 @@ object Typers {
         TyperErrors.nameInPattAlt(name)
       } else {
         putType(name -> body1.tpe)
-        Bind(name, body1)(id, body1.tpe)
+        Bind(name, body1)(body1.tpe)
       }
     }
   }
 
   def typedAlternative(patterns: List[Tree])
-                      (id: Id, pt: Type)
+                      (pt: Type)
                       given Context, Mode: Checked[Tree] = {
     implied for Mode = Mode.PatAlt
     for {
       patterns1 <- patterns.mapE(_.typed(pt))
       tpe       <- patterns1.unifiedTpe
-    } yield Alternative(patterns1)(id, tpe)
+    } yield Alternative(patterns1)(tpe)
   }
 
   def getPrimitiveType(name: Name) given Context: Checked[Type] =
@@ -333,7 +330,7 @@ object Typers {
     else TyperErrors.nameNotConstructor(name)
 
   def typedUnapply(functor: Name, args: List[Tree])
-                  (id: Id, pt: Type)
+                  (pt: Type)
                   given Context, Mode: Checked[Tree] = {
     for {
       fCtx  <-  firstCtx(functor)
@@ -344,7 +341,7 @@ object Typers {
       pair  <-  typeAsDestructor(fTpe, pt)
       (fTpeArgs, tpe) = pair
       args1 <-  typeAsFunctorArgs(functor, args, fTpeArgs)
-    } yield Unapply(functor, args1)(id, tpe)
+    } yield Unapply(functor, args1)(tpe)
   }
 
   def typePackaging(tree: Tree)
@@ -381,7 +378,7 @@ object Typers {
   }
 
   def typedPackageDef(pid: Tree, stats: List[Tree])
-                     (id: Id, pt: Type)
+                     (pt: Type)
                      given Context, Mode: Checked[Tree] = {
     for {
       pair    <-  typePackaging(pid)
@@ -390,11 +387,11 @@ object Typers {
                     implied for Context = pkgCtx
                     stats.mapE(_.typed(any))
                   }
-    } yield PackageDef(pid1, stats1)(id, pid1.tpe)
+    } yield PackageDef(pid1, stats1)(pid1.tpe)
   }
 
-  def typedDefDef(modifiers: Set[Modifier], sig: Tree, tpeD: Tree, body: Tree)
-                 (id: Id, pt: Type)
+  def typedDefDef(modifiers: Set[Modifier], sig: Tree & Unique, tpeD: Tree, body: Tree)
+                 (pt: Type)
                  given Context, Mode: Checked[Tree] = {
     val typeTpeAs = {
       if modifiers.contains(Modifier.Primitive) then
@@ -407,7 +404,7 @@ object Typers {
       tpe     =   tpeD1.tpe
       sig1    <-  sig.typed(tpe)
       ret     =   toReturnType(sig1, tpe)
-      bodyCtx <-  lookIn(sig1.id)
+      bodyCtx <-  lookIn(sig.id)
       body1   <-  checked {
                     implied for Context = bodyCtx
                     body.typed(ret)
@@ -419,27 +416,25 @@ object Typers {
       if modifiers.contains(Modifier.Primitive) then {
         setPrimitive(name)
       }
-      DefDef(modifiers, sig1, tpeD1, body1)(id, tpe)
+      DefDef(modifiers, sig1, tpeD1, body1)(tpe)
     }
     commitId(sig.id)
     tpd
   }
 
-  def mapArgs(args: List[Tree], pts: List[Type])
-             given Context: Checked[List[Tree]] = {
-    args.flatMap(_.toNamePairs)
-        .zip(pts)
-        .mapE { zipped =>
-          val ((id, name), tpe) = zipped
-          for (nameCtx <- lookIn(id))
+  def mapArgs(args: List[Name], pts: List[Type])
+             given Context: Checked[List[Name]] = {
+    args.zip(pts)
+        .mapE { (name, tpe) =>
+          for (_ <- lookFor(name))
           yield {
             putType(name, tpe)
-            Ident(name)(id, tpe)
+            name
           }
         }
   }
 
-  def typedDefSig(name: Name, args: List[Tree])
+  def typedDefSig(name: Name, args: List[Name])
                  (id: Id, pt: Type)
                  given Context, Mode: Checked[Tree] = {
     val pts = toCurriedList(pt)
@@ -453,14 +448,10 @@ object Typers {
       }
   }
 
-  def typedSelectType(from: Tree, name: Name)
-                     (id: Id, pt: Type)
-                     given Context, Mode: Checked[Tree] =
+  def typedSelectType given Context, Mode: Checked[Tree] =
     TyperErrors.memberSelection
 
-  def typedSelectTerm(from: Tree, name: Name)
-                     (id: Id, pt: Type)
-                     given Context, Mode: Checked[Tree] =
+  def typedSelectTerm given Context, Mode: Checked[Tree] =
     TyperErrors.memberSelection
 
   def typedIdentType(name: Name)
@@ -498,19 +489,16 @@ object Typers {
                     (id: Id, pt: Type)
                     given Context, Mode: Checked[Tree] = {
     for {
-      fstCtx    <- firstCtx(name)
-      idRefTpe  <- checked {
-        implied for Context = fstCtx
-        getType(name)
-        // check that if its not a computation type, then its not in the stoup
-      }
+      fstCtx    <-  firstCtx(name)
+      idRefTpe  <-  checked {
+                      implied for Context = fstCtx
+                      getTypeIdent(name)
+                    }
     } yield Ident(name)(id, idRefTpe.freshVariables)
   }
 
-  def typedLiteral(constant: Constant)
-                  (id: Id)
-                  given Context, Mode: Checked[Tree] =
-    Literal(constant)(id, constantTpe(constant))
+  def typedLiteral(constant: Constant)given Context, Mode: Checked[Tree] =
+    Literal(constant)(constantTpe(constant))
 
   def check(typed: Tree)(pt: Type) given Context, Mode: Checked[Tree] = {
     inline def ignoreType(tree: Tree) = tree match {
@@ -526,37 +514,38 @@ object Typers {
   def (tree: Tree) typed(pt: Type) given Context, Mode: Checked[Tree] = {
     def inner(tree: Tree, pt: Type) = tree match {
       // Types
-      case Select(t,n)      if isType     => typedSelectType(t,n)(tree.id, pt)
-      case Ident(n)         if isType     => typedIdentType(n)(tree.id, pt)
-      case Apply(t,ts)      if isType     => typedApplyType(t,ts)(tree.id)
-      case Function(ts,t)   if isType     => typedFunctionType(ts,t)(tree.id, pt)
+      case _: Select          if isType     => typedSelectType
+      case u @ Ident(n)       if isType     => typedIdentType(n)(u.id,pt)
+      case Apply(t,ts)        if isType     => typedApplyType(t,ts)
+      case u @ Function(ts,t) if isType     => typedFunctionType(ts,t)(u.id, pt)
       // Patterns
-      case Ident(n)         if isPattern  => typedIdentPat(n)(tree.id, pt)
-      case Bind(n,t)        if isPattern  => typedBind(n,t)(tree.id, pt)
-      case Alternative(ts)  if isPattern  => typedAlternative(ts)(tree.id, pt)
-      case Unapply(f,ts)    if isPattern  => typedUnapply(f,ts)(tree.id, pt)
+      case u @ Ident(n)       if isPattern  => typedIdentPat(n)(u.id, pt)
+      case Bind(n,t)          if isPattern  => typedBind(n,t)(pt)
+      case Alternative(ts)    if isPattern  => typedAlternative(ts)(pt)
+      case Unapply(f,ts)      if isPattern  => typedUnapply(f,ts)(pt)
       // Terms
-      case PackageDef(t,ts) if isTerm     => typedPackageDef(t,ts)(tree.id, pt)
-      case Apply(t,ts)      if isTerm     => typedApplyTerm(t,ts)(tree.id, pt)
-      case DefDef(m,s,t,b)  if isTerm     => typedDefDef(m,s,t,b)(tree.id, pt)
-      case DefSig(n,ns)     if isTerm     => typedDefSig(n,ns)(tree.id, pt)
-      case Let(             // Let
-        i @ Ident(n),       // Let
-        v,                  // Let
-        c)                  if isTerm     => typedLet(n,i.id)(v,c)(tree.id, pt)
-      case Function(ts,t)   if isTerm     => typedFunctionTerm(ts,t)(tree.id, pt)
-      case Tagged(n,t)      if isTerm     => typedTagged(n,t)(tree.id, pt)
-      case CaseExpr(t,ts)   if isTerm     => typedCaseExpr(t,ts)(tree.id, pt)
-      case Select(t,n)      if isTerm     => typedSelectTerm(t,n)(tree.id, pt)
-      case Ident(n)         if isTerm     => typedIdentTerm(n)(tree.id, pt)
+      case PackageDef(t,ts)   if isTerm     => typedPackageDef(t,ts)(pt)
+      case Apply(t,ts)        if isTerm     => typedApplyTerm(t,ts)(pt)
+      case DefDef(
+        m,
+        s: DefSig,
+        t,
+        b)                    if isTerm     => typedDefDef(m,s,t,b)(pt)
+      case u @ DefSig(n,ns)   if isTerm     => typedDefSig(n,ns)(u.id, pt)
+      case u @ Let(n,v,c)     if isTerm     => typedLet(n,v,c)(u.id, pt)
+      case u @ Function(ts,t) if isTerm     => typedFunctionTerm(ts,t)(u.id, pt)
+      case Tagged(n,t)        if isTerm     => typedTagged(n,t)(pt)
+      case CaseExpr(t,ts)     if isTerm     => typedCaseExpr(t,ts)(pt)
+      case _: Select          if isTerm     => typedSelectTerm
+      case u @ Ident(n)       if isTerm     => typedIdentTerm(n)(u.id, pt)
       // Any
-      case Literal(c)                     => typedLiteral(c)(tree.id)
-      case Parens(ts)                     => typedParens(ts)(tree.id, pt)
+      case Literal(c)                       => typedLiteral(c)
+      case Parens(ts)                       => typedParens(ts)(pt)
       case t @ ( _: TreeSeq
                | _: CaseClause
-               |    EmptyTree)            => t
+               |    EmptyTree)              => t
       // Error
-      case _                              => TyperErrors.typingMissing(tree)
+      case _                                => TyperErrors.typingMissing(tree)
     }
     inner(tree, pt).map(check(_)(pt))
   }

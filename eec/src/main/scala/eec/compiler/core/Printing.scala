@@ -19,10 +19,10 @@ object Printing {
       case Ident(name: Name)
       case PackageDef(pid: Ast, stats: List[Ast])
       case DefDef(modifiers: Set[Modifier], sig: Ast, tpeAs: Ast, body: Ast)
-      case DefSig(name: Name, args: List[Ast])
+      case DefSig(name: Name, args: List[Name])
       case Apply(id: Ast, args: List[Ast])
       case Function(args: List[Ast], body: Ast)
-      case Let(name: Ast, value: Ast, continuation: Ast)
+      case Let(name: Name, value: Ast, continuation: Ast)
       case Literal(constant: Constant)
       case CaseExpr(selector: Ast, cases: List[Ast])
       case CaseClause(pat: Ast, guard: Ast, body: Ast)
@@ -46,12 +46,12 @@ object Printing {
         case Tree.DefDef(modifiers, sig, tpeAs, body) =>
           DefDef(modifiers, toAst(sig), toAst(tpeAs), toAst(body))
 
-        case Tree.DefSig(name, args)   => DefSig(name, args.map(toAst))
+        case Tree.DefSig(name, args)   => DefSig(name, args)
         case Tree.Apply(id, args)      => Apply(toAst(id), args.map(toAst))
         case Tree.Function(args, body) => Function(args.map(toAst), toAst(body))
 
         case Tree.Let(name, value, continuation) =>
-          Let(toAst(name), toAst(value), toAst(continuation))
+          Let(name, toAst(value), toAst(continuation))
 
         case Tree.Literal(constant) => Literal(constant)
 

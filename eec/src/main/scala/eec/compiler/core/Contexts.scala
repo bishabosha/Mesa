@@ -130,18 +130,11 @@ object Contexts {
 
   sealed trait Context (
     val scope: Scope,
-    var stoup: Option[Sym],
+    var stoup: Option[Name],
     val typeTable: TypeTable,
     val primTable: PrimTable,
     val localIdGen: IdGen,
-  ) {
-    def contains(name: Name) =
-      name != emptyString.readAs && {
-          stoup.filter(_.name == name)
-            .orElse(scope.collectFirst { case (Sym(_, `name`), _) => () })
-            .isDefined
-        }
-  }
+  )
 
   final class RootContext extends Context(
     new mutable.ArrayBuffer,
@@ -175,8 +168,9 @@ object Contexts {
 
     def firstCtx(name: Name) given Context: Checked[Context] = {
       @tailrec
-      def inner(ctx: Context): Checked[Context] = {
-        if ctx.contains(name) then
+      def inner(current: Context): Checked[Context] = {
+        implied for Context = current
+        if contains(name) then
           ctx
         else ctx match {
           case _: RootContext =>
@@ -188,6 +182,16 @@ object Contexts {
       inner(ctx)
     }
 
+    def inStoup(name: Name) given Context: Boolean = {
+      ctx.stoup.filter(_ == name).isDefined
+    }
+
+    def inScope(name: Name) given Context: Boolean = {
+      ctx.scope
+         .collectFirst { case (Sym(_, `name`), _) => () }
+         .isDefined
+    }
+
     // no changes required by stoup
     def lookIn(id: Id) given Context: Checked[Context] = {
       ctx.scope.collectFirst[Checked[Context]] {
@@ -197,51 +201,59 @@ object Contexts {
       }
     }
 
-    def contains(name: Name) given Context = ctx.contains(name)
+    def lookFor(name: Name) given Context: Checked[Unit] = {
+      if !inScope(name) then {
+        CompilerError.IllegalState(s"No variable in immediate scope found for name `${name.show}`")
+      } else {
+        ()
+      }
+    }
 
-    def enterFresh(id: Id, name: Name) given Context: Checked[Context] = {
-      enterImpl(id, name) { (id, name) =>
+    def contains(name: Name) given Context = {
+      name != emptyString.readAs && {
+        inStoup(name) || inScope(name)
+      }
+    }
+
+    def enterScope(id: Id, name: Name) given Context: Checked[Context] = {
+      guardContains(name) {
         val newCtx = new Fresh(ctx)
         ctx.scope += Sym(id, name) -> newCtx
         newCtx
       }
     }
 
-    def enterVariable(id: Id, name: Name) given Context: Checked[Unit] = {
-      enterImpl(id, name) { (id, name) =>
-        ctx.scope += Sym(id, name) -> new Fresh(ctx)
+    def enterVariable(name: Name) given Context: Checked[Unit] = {
+      guardContains(name) {
+        ctx.scope += Sym(noId, name) -> new Fresh(ctx)
         ()
       }
     }
 
-    def enterStoup(id: Id, name: Name) given Context: Checked[Unit] = {
-      enterImpl(id, name)((id, name) => ctx.stoup = Some(Sym(id, name)))
+    def enterStoup(name: Name) given Context: Checked[Unit] = {
+      guardContains(name)(ctx.stoup = Some(name))
     }
 
-    def enterImpl[O](id: Id, name: Name)(f: (Id, Name) => given Context => Checked[O]) given Context: Checked[O] = {
+    private def guardContains[O](name: Name)
+                                (f: given Context => Checked[O])
+                                given Context: Checked[O] = {
       if contains(name) then {
         CompilerError.UnexpectedType(
           s"Illegal shadowing in scope of name: ${name.show}")
       } else {
-        f(id, name)
+        f
       }
     }
 
     def commitId(id: Id) given Context: Unit = {
       val first = {
-        ctx.stoup.map(sym => (sym, sym.name))
-        .orElse {
-          ctx.scope.collectFirst {
-            case mapping @ (Sym(`id`, name), _) => (mapping, name)
-          }
+        ctx.scope.collectFirst {
+          case mapping @ (Sym(`id`, name), _) => (mapping, name)
         }
       }
-      for ((mapping: (Sym | (Sym, Context)), name) <- first) {
+      for ((mapping, name) <- first) {
         if !ctx.typeTable.contains(name) then {
-          mapping match {
-            case sym: Sym => ctx.stoup = None
-            case mapping: (Sym, Context) => ctx.scope -= mapping
-          }
+          ctx.scope -= mapping
         }
       }
     }
@@ -266,6 +278,23 @@ object Contexts {
         )
     }
 
+    def getTypeIdent(name: Name) given Context: Checked[Type] = {
+      for {
+        tpe     <- getType(name)
+        checked <- assertNotInStoupForValue(name, tpe)
+      } yield checked
+    }
+
+    def assertNotInStoupForValue(name: Name, tpe: Type)
+                          given Context: Checked[Type] = {
+      if tpe.isValueType && inStoup(name) then {
+        CompilerError.UnexpectedType(
+          s"name `${name.show}` of value type: `${tpe.show}` is not allowed in the linear context.")
+      } else {
+        tpe
+      }
+    }
+
     def (tpe: Type) freshVariables given Context: Type = {
       tpe.replaceVariables {
         _.updateDerivedStr(Synthetic(ctx.localIdGen.fresh(), _))
@@ -281,7 +310,7 @@ object Contexts {
       } else {
         implied for Context = root
         Names.bootstrapped.foreach { (name, tpe) =>
-          for (_ <- enterVariable(idGen.fresh(), name))
+          for (_ <- enterVariable(name))
             yield {
               putType(name -> tpe)
             }
@@ -319,6 +348,7 @@ object Contexts {
     import Scoping._
 
     enum Scoping derives Eql {
+      case Stoup(name: Scoping, tpe: Scoping)
       case ScopeDef(name: Scoping, tpe: Scoping, scope: Seq[Scoping])
       case ForName(name: String)
       case TypeDef(tpe: String)
@@ -328,20 +358,30 @@ object Contexts {
 
     def (ctx: Context) toScoping: Seq[Scoping] = {
 
-      def branch(c: Context): Seq[Scoping] = {
-        for {
-          pair <- c.scope.filter { pair =>
-                    val (Sym(_, name), context) = pair
-                    context.scope.nonEmpty || name != emptyString.readAs
-                  }
-          (sym, context)  = pair
-          tpeOpt          = c.typeTable.get(sym.name)
-          tpe             = tpeOpt.fold(EmptyType)(t => TypeDef(t.show))
-          name            = sym.name.show
-        } yield ScopeDef(ForName(name), tpe, context.toScoping)
+      def branch(ctx: Context): Seq[Scoping] = {
+        val stoupOpt = {
+          for {
+            name <- ctx.stoup
+            tpe  <- ctx.typeTable.get(name)
+          } yield Stoup(ForName(name.show), TypeDef(tpe.show))
+        }
+        val defs = {
+          for {
+            pair <- ctx.scope.filter { pair =>
+                      val (Sym(_, name), child) = pair
+                      child.scope.nonEmpty || name != emptyString.readAs
+                    }
+            (sym, child)  = pair
+            tpeOpt        = ctx.typeTable.get(sym.name)
+            tpe           = tpeOpt.fold(EmptyType)(t => TypeDef(t.show))
+            name          = sym.name.show
+          } yield ScopeDef(ForName(name), tpe, child.toScoping)
+        }
+        stoupOpt.toList ++ defs
       }
 
-      def (ctx: Fresh) hasMembers = ctx.scope.nonEmpty || ctx.typeTable.nonEmpty
+      def (ctx: Fresh) hasMembers =
+        ctx.scope.nonEmpty || ctx.typeTable.nonEmpty || ctx.stoup.isDefined
 
       ctx match {
         case ctx: RootContext =>

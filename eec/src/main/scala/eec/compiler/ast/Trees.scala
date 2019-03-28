@@ -17,25 +17,27 @@ import implied NameOps._
 object Trees {
   import Tree._
 
-  enum Tree(val id: Id, val tpe: Type) derives Eql {
-    case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Ident(name: Name)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case PackageDef(pid: Tree, stats: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
-    case DefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case DefSig(name: Name, args: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Apply(f: Tree, args: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Function(args: List[Tree], body: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Let(name: Tree, value: Tree, continuation: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Literal(constant: Constant)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case CaseExpr(selector: Tree, cases: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
-    case CaseClause(pat: Tree, guard: Tree, body: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Alternative(bodys: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Parens(exprs: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Bind(name: Name, body: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Unapply(name: Name, args: List[Tree])(id: Id, tpe: Type) extends Tree(id, tpe)
-    case Tagged(arg: Name, tpeAs: Tree)(id: Id, tpe: Type) extends Tree(id, tpe)
-    case TreeSeq(args: List[Tree]) extends Tree(Id.noId, Type.EmptyType)
-    case EmptyTree extends Tree(Id.noId, Type.EmptyType)
+  trait Unique(val id: Id)
+
+  enum Tree(val tpe: Type) derives Eql {
+    case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case Ident(name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case PackageDef(pid: Tree, stats: List[Tree])(tpe: Type) extends Tree(tpe)
+    case DefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)(tpe: Type) extends Tree(tpe)
+    case DefSig(name: Name, args: List[Name])(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case Apply(f: Tree, args: List[Tree])(tpe: Type) extends Tree(tpe)
+    case Function(args: List[Tree], body: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case Let(name: Name, value: Tree, continuation: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case Literal(constant: Constant)(tpe: Type) extends Tree(tpe)
+    case CaseExpr(selector: Tree, cases: List[Tree])(tpe: Type) extends Tree(tpe)
+    case CaseClause(pat: Tree, guard: Tree, body: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case Alternative(bodys: List[Tree])(tpe: Type) extends Tree(tpe)
+    case Parens(exprs: List[Tree])(tpe: Type) extends Tree(tpe)
+    case Bind(name: Name, body: Tree)(tpe: Type) extends Tree(tpe)
+    case Unapply(name: Name, args: List[Tree])(tpe: Type) extends Tree(tpe)
+    case Tagged(arg: Name, tpeAs: Tree)(tpe: Type) extends Tree(tpe)
+    case TreeSeq(args: List[Tree]) extends Tree(Type.EmptyType)
+    case EmptyTree extends Tree(Type.EmptyType)
   }
 
   object TreeOps {
@@ -95,7 +97,7 @@ object Trees {
 
     def (tree: Tree) addModifiers(mods: Set[Modifier]): Tree = tree match {
       case tree: DefDef =>
-        tree.copy(modifiers = (tree.modifiers ++ mods))(tree.id, tree.tpe)
+        tree.copy(modifiers = (tree.modifiers ++ mods))(tree.tpe)
 
       case _ => tree
     }
