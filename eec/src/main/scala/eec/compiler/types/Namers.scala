@@ -21,13 +21,13 @@ import implied TreeOps._
 object Namers {
   private[this] val anon: Name  = emptyString.readAs
 
-  def namedDefDef(name: Name, args: List[Name], sigId: Id)
+  def namedDefDef(sig: DefSig)
                  (tpeAs: Tree, body: Tree)
                  given Context, Mode: Checked[Unit] = {
-    enterScope(sigId, name).flatMap { ctx1 =>
+    enterScope(sig.id, sig.name).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
-        _ <- args.mapE(enterVariable)
+        _ <- sig.args.mapE(enterVariable)
         _ <- index(body)
       } yield ()
     }
@@ -160,9 +160,9 @@ object Namers {
     case Apply(t,ts)        if isTerm     => namedApplyTerm(t,ts)
     case DefDef(            // DefDef
       _,                    // DefDef
-      s @ DefSig(n, ns),    // DefDef
+      s: DefSig,            // DefDef
       t,                    // DefDef
-      b)                    if isTerm     => namedDefDef(n,ns,s.id)(t,b)
+      b)                    if isTerm     => namedDefDef(s)(t,b)
     case u @ Let(n,v,c)     if isTerm     => namedLet(n)(v,c)(u.id)
     case u @ Function(ts,t) if isTerm     => namedFunctionTerm(ts,t)(u.id)
     case CaseExpr(t,ts)     if isTerm     => namedCaseExpr(t,ts)

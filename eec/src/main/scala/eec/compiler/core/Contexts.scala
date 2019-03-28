@@ -23,7 +23,6 @@ object Contexts {
   import Mode._
   import Id._
   import IdGen._
-  // import Stoup._
   import Context._
 
   type Scope          = mutable.Buffer[(Sym, Context)]
@@ -83,42 +82,6 @@ object Contexts {
   object IdGen {
     def idGen given (gen: IdGen) = gen
   }
-
-  // enum Stoup {
-  //   case DependsOn(z: Sym)
-  //   case Blank
-  // }
-
-  // object Stoup {
-  //   def onStoupDepends[O](handler: given Stoup => O)
-  //                        given Context: O | Unit = ctx.stoup match {
-  //     case Blank =>
-
-  //     case d: DependsOn =>
-  //       implied for Stoup = ctx.stoup
-  //       handler
-  //   }
-  // }
-
-  // object StoupOps {
-  //   implied given Context for Showable[Stoup] {
-  //     def (stoup: Stoup) show = stoup match {
-  //       case Blank => "Γ | -"
-
-  //       case DependsOn(Sym(_, name)) =>
-  //         val tpe = for {
-  //           ctx <- firstCtx(name)
-  //           tpe <- checked {
-  //             implied for Context = ctx
-  //             getType(name)
-  //           }
-  //         } yield tpe
-  //         tpe.fold
-  //           { err => s"Γ | ${name.show}: <error: Not Found>" }
-  //           { tpe => s"Γ | ${name.show}: ${tpe.show}" }
-  //     }
-  //   }
-  // }
 
   case class Sym(id: Id, name: Name)
 
@@ -186,6 +149,20 @@ object Contexts {
       ctx.stoup.filter(_ == name).isDefined
     }
 
+    def inStoupDeep(name: Name) given Context: Boolean = {
+      @tailrec
+      def inner(current: Context): Boolean = {
+        implied for Context = current
+        if inStoup(name) then
+          true
+        else ctx match {
+          case _: RootContext => false
+          case ctx: Fresh     => inner(ctx.outer)
+        }
+      }
+      inner(ctx)
+    }
+
     def inScope(name: Name) given Context: Boolean = {
       ctx.scope
          .collectFirst { case (Sym(_, `name`), _) => () }
@@ -201,9 +178,10 @@ object Contexts {
       }
     }
 
-    def lookFor(name: Name) given Context: Checked[Unit] = {
+    def lookForInScope(name: Name) given Context: Checked[Unit] = {
       if !inScope(name) then {
-        CompilerError.IllegalState(s"No variable in immediate scope found for name `${name.show}`")
+        CompilerError.IllegalState(
+          s"No variable in immediate scope found for name `${name.show}`")
       } else {
         ()
       }
@@ -215,8 +193,14 @@ object Contexts {
       }
     }
 
+    def containsDeep(name: Name) given Context = {
+      name != emptyString.readAs && {
+        inStoupDeep(name) || inScope(name)
+      }
+    }
+
     def enterScope(id: Id, name: Name) given Context: Checked[Context] = {
-      guardContains(name) {
+      guardContainsDeep(name) {
         val newCtx = new Fresh(ctx)
         ctx.scope += Sym(id, name) -> newCtx
         newCtx
@@ -224,7 +208,7 @@ object Contexts {
     }
 
     def enterVariable(name: Name) given Context: Checked[Unit] = {
-      guardContains(name) {
+      guardContainsDeep(name) {
         ctx.scope += Sym(noId, name) -> new Fresh(ctx)
         ()
       }
@@ -236,8 +220,21 @@ object Contexts {
 
     private def guardContains[O](name: Name)
                                 (f: given Context => Checked[O])
-                                given Context: Checked[O] = {
-      if contains(name) then {
+                                given Context = {
+      guardContainsImpl(name)(contains)(f)
+    }
+
+    private def guardContainsDeep[O](name: Name)
+                                (f: given Context => Checked[O])
+                                given Context = {
+      guardContainsImpl(name)(containsDeep)(f)
+    }
+
+    private def guardContainsImpl[O](name: Name)
+                                    (check: Name => given Context => Boolean)
+                                    (f: given Context => Checked[O])
+                                    given Context: Checked[O] = {
+      if check(name) then {
         CompilerError.UnexpectedType(
           s"Illegal shadowing in scope of name: ${name.show}")
       } else {

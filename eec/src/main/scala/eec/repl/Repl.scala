@@ -108,7 +108,7 @@ object Repl {
         val yieldTyped = for {
           expr  <- f(s)
           _     <- indexAsExpr(expr)
-          typed <- expr.typedAsExpr(Type.WildcardType)
+          typed <- expr.typedWith(Type.WildcardType)
         } yield typed
 
         yieldTyped.fold
@@ -123,7 +123,7 @@ object Repl {
         val typed = for {
           exp <- parseStat(s)
           _   <- indexAsExpr(exp)
-          tpd <- exp.typedAsExpr(WildcardType)
+          tpd <- exp.typedWith(WildcardType)
         } yield tpd
 
         typed.fold

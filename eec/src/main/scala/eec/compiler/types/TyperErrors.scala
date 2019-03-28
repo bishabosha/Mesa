@@ -8,7 +8,6 @@ import types.Types._
 import types.Typers._
 import core.Names._
 import core.Contexts._
-// import Stoup._
 import Mode._
 import util.Convert
 import Convert._
@@ -17,7 +16,6 @@ import implied ModeOps._
 import implied TreeOps._
 import implied TypeOps._
 import implied NameOps._
-// import implied StoupOps._
 
 object TyperErrors {
 
@@ -120,9 +118,13 @@ object TyperErrors {
       s"${name.show} does not qualify to be a constructor.")
   }
 
-  // def stoupNotEmptyBang(tree: Tree) given Context, Stoup =
-  //   CompilerError.UnexpectedType(
-  //     s"Can not construct ! for argument `${tree.show}` as stoup is `${stoup.show}`")
+  def foundInStoup(name: Name) =
+    CompilerError.UnexpectedType(
+      s"Illegal dependency on linear context variable `${name.show}`.")
+
+  def notInStoup(name: Name) =
+    CompilerError.UnexpectedType(
+      s"Illegal missing variable `${name.show}` in linear context.")
 
   def memberSelection given Mode =
     CompilerError.SyntaxError(

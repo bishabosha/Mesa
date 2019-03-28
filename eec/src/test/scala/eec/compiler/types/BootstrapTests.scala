@@ -39,7 +39,7 @@ object BootstrapTests {
     for {
       exp <- f(str)
       _   <- indexAsExpr(exp)
-      tpd <- exp.typedAsExpr(pt)
+      tpd <- exp.typedWith(pt)
     } yield tpd
 
   def failIfTyped(tpd: Checked[Tree]): Unit = {
