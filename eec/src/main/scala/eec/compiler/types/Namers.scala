@@ -19,15 +19,26 @@ import implied NameOps._
 import implied TreeOps._
 
 object Namers {
-  private[this] val anon: Name  = emptyString.readAs
 
-  def namedDefDef(sig: DefSig)
+  private[this] val anon = EmptyName
+
+  def namedDefDef(sig: DefSig | PrimSig)
                  (tpeAs: Tree, body: Tree)
                  given Context, Mode: Checked[Unit] = {
-    enterScope(sig.id, sig.name).flatMap { ctx1 =>
+    val (name, args) = sig match {
+      case PrimSig(name, args, _) => (name, args)
+      case DefSig(name, args)     => (name, args)
+    }
+    enterScope(sig.id, name).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
-        _ <- sig.args.mapE(enterVariable)
+        _ <- args.mapE(enterVariable)
+        _ <- checked {
+          val stoupVar = sig.linearArg
+          if stoupVar != EmptyName then {
+            enterStoup(stoupVar)
+          }
+        }
         _ <- index(body)
       } yield ()
     }
@@ -40,6 +51,18 @@ object Namers {
       implied for Context = ctx1
       for {
         _ <-  args.map(_.convert: Name).mapE(enterVariable)
+        _ <-  index(body)
+      } yield ()
+    }
+  }
+
+  def namedLinearFunctionTerm(arg: Tree, body: Tree)
+                             (id: Id)
+                             given Context, Mode: Checked[Unit] = {
+    enterScope(id, anon).flatMap { ctx1 =>
+      implied for Context = ctx1
+      for {
+        _ <-  enterStoup(arg.convert)
         _ <-  index(body)
       } yield ()
     }
@@ -64,6 +87,14 @@ object Namers {
     for {
       _ <- index(fun)
       _ <- args.mapE(index)
+    } yield ()
+  }
+
+  def namedEvalTerm(fun: Tree, arg: Tree)
+                   given Context, Mode: Checked[Unit] = {
+    for {
+      _ <- index(fun)
+      _ <- index(arg)
     } yield ()
   }
 
@@ -105,6 +136,14 @@ object Namers {
     for {
       _ <- indexAsPattern(pat)
       _ <- index(guard) // idents here are normal refs to variables in this scope
+      _ <- index(body)
+    } yield ()
+  }
+
+  def namedLinearCaseClause(pat: Tree, body: Tree)
+                           given Context, Mode: Checked[Unit] = {
+    for {
+      _ <- indexAsPattern(pat)
       _ <- index(body)
     } yield ()
   }
@@ -151,29 +190,34 @@ object Namers {
 
   def index(tree: Tree) given Context, Mode: Checked[Unit] = tree match {
     /* Pattern Trees */
-    case Ident(n)           if isPattern  => namedIdentPat(n)
-    case Bind(n,t)          if isPattern  => namedBind(n,t)
-    case Alternative(ts)    if isPattern  => namedAlternative(ts)
-    case Unapply(_,ts)      if isPattern  => namedUnapply(ts)
+    case Ident(n)                 if isPattern  => namedIdentPat(n)
+    case Bind(n,t)                if isPattern  => namedBind(n,t)
+    case Alternative(ts)          if isPattern  => namedAlternative(ts)
+    case Unapply(_,ts)            if isPattern  => namedUnapply(ts)
     /* Term Trees */
-    case PackageDef(t,ts)   if isTerm     => namedPackageDef(t,ts)
-    case Apply(t,ts)        if isTerm     => namedApplyTerm(t,ts)
-    case DefDef(            // DefDef
-      _,                    // DefDef
-      s: DefSig,            // DefDef
-      t,                    // DefDef
-      b)                    if isTerm     => namedDefDef(s)(t,b)
-    case u @ Let(n,v,c)     if isTerm     => namedLet(n)(v,c)(u.id)
-    case u @ Function(ts,t) if isTerm     => namedFunctionTerm(ts,t)(u.id)
-    case CaseExpr(t,ts)     if isTerm     => namedCaseExpr(t,ts)
-    case CaseClause(p,g,b)  if isTerm     => namedCaseClause(p,g,b)
+    case PackageDef(t,ts)         if isTerm     => namedPackageDef(t,ts)
+    case Apply(t,ts)              if isTerm     => namedApplyTerm(t,ts)
+    case Eval(t,c)                if isTerm     => namedEvalTerm(t,c)
+    case DefDef(                  // DefDef
+      _,                          // DefDef
+      s: (DefSig | PrimSig),      // DefDef
+      t,                          // DefDef
+      b)                          if isTerm     => namedDefDef(s)(t,b)
+    case u @ Let(n,v,c)           if isTerm     => namedLet(n)(v,c)(u.id)
+    case u @ Function(ts,t)       if isTerm     => namedFunctionTerm(ts,t)(u.id)
+    case u @ LinearFunction(a,b)  if isTerm     => namedLinearFunctionTerm(a,b)(u.id)
+    case LinearCaseExpr(t,ts)     if isTerm     => namedCaseExpr(t,ts)
+    case CaseExpr(t,ts)           if isTerm     => namedCaseExpr(t,ts)
+    case CaseClause(p,g,b)        if isTerm     => namedCaseClause(p,g,b)
+    case LinearCaseClause(p,b)    if isTerm     => namedLinearCaseClause(p,b)
     /* any mode */
-    case Parens(ts)                       => namedParens(ts)
+    case Parens(ts)                             => namedParens(ts)
     case _: Literal
        | _: Ident
        | _: Select
-       | EmptyTree                        => // atomic
+       | _: Tensor
+       | EmptyTree                              => // atomic
     /* error case */
-    case _                                => NamerErrors.namingMissing(tree)
+    case _                                      => NamerErrors.namingMissing(tree)
   }
 }

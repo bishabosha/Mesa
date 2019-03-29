@@ -23,12 +23,44 @@ object Names {
     case From(derived: Derived)
     case Comp(derived: Derived)
     case ComputationTag, IntegerTag, DecimalTag, EitherTag, VoidTag,
-      BooleanTag, StringTag, CharTag, Wildcard, EmptyName, TensorTag,
+      BooleanTag, StringTag, CharTag, Wildcard, TensorTag,
       CoTensorTag
+    case EmptyName
   }
 
-  val emptyString: String = "<empty>"
-  val rootString: String  = "_root_"
+  val rootName: Name = "_root_".readAs
+
+  val tensorConstructor = {
+    FunctionType(
+      AppliedType(
+        TypeRef("!".readAs),
+        List(Variable("$A".readAs))
+      ),
+      FunctionType(
+        Variable("$B#".readAs),
+        TensorType(
+          AppliedType(
+            TypeRef("!".readAs),
+            List(Variable("$A".readAs))
+          ),
+          Variable("$B#".readAs)
+        )
+      )
+    )
+  }
+
+  val coTensorConstructor = {
+    FunctionType(
+      Variable("$A#".readAs),
+      FunctionType(
+        Variable("$B#".readAs),
+        CoTensorType(
+          Variable("$A#".readAs),
+          Variable("$B#".readAs)
+        )
+      )
+    )
+  }
 
   val bangConstructor = {
     FunctionType(
@@ -58,6 +90,8 @@ object Names {
 
   val bootstrapped = {
     List(
+      TensorTag       -> tensorConstructor,
+      CoTensorTag     -> coTensorConstructor,
       ComputationTag  -> bangConstructor,
       EitherTag       -> eitherConstructor,
       VoidTag         -> TypeRef(VoidTag),
@@ -83,6 +117,7 @@ object Names {
   }
 
   object NameOps {
+
     def (name: Name) promoteComp: Name = name match {
       case From(d)  => Comp(d)
       case _        => name
@@ -108,7 +143,7 @@ object Names {
         case CharTag        => "Char"
         case EitherTag      => "Either"
         case VoidTag        => "Void"
-        case EmptyName      => emptyString
+        case EmptyName      => "<empty>"
         case Comp(n)        => n.show
         case From(n)        => n.show
       }

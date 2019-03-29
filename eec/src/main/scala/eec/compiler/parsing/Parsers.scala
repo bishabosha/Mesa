@@ -689,13 +689,6 @@ object Parsers {
       PrimSig(name, varids.init.toList, varids.last)(freshId(), uTpe)
   }
 
-  private[this] def fromDefDecl
-      (context: EECParser.DefDeclContext) given IdGen: Tree = {
-    val sig = fromDefSig(context.defSig)
-    val typ = fromType(context.`type`)
-    DefDef(Set(), sig, typ, EmptyTree)(uTpe)
-  }
-
   private[this] def fromDef
       (context: EECParser.DefContext) given IdGen: Checked[Tree] =
     fromDefDef(context.defDef)

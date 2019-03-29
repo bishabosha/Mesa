@@ -32,7 +32,6 @@ object Typers {
   import Stoup._
   import StoupOps._
 
-  private val rootName    = rootString.readAs
   private[Typers] val any = WildcardType
 
   enum Stoup {
@@ -178,6 +177,22 @@ object Typers {
     }
   }
 
+  private def typedLinearFunctionTerm(arg: Tree, body: Tree)
+                                     (id: Id, pt: Type)
+                                     given Context, Mode, Stoup: Checked[Tree] = {
+    lookIn(id).flatMap { fCtx =>
+      implied for Context = fCtx
+      for {
+        arg1  <-  arg.typed(any)
+        body1 <-  checked {
+          implied for Stoup = DependsOn(arg.convert)
+          body.typed(any)
+        }
+        fTpe  <-  linearFunctionTypeTpe(arg1, body1)
+      } yield LinearFunction(arg1, body1)(id, fTpe)
+    }
+  }
+
   private def functionTypeTpe(args1: List[Tree], body1: Tree)
                              given Mode: Checked[Type] = {
     val argTpe  = args1.map(_.tpe).convert
@@ -188,6 +203,16 @@ object Typers {
       fType
   }
 
+  private def linearFunctionTypeTpe(arg1: Tree, body1: Tree)
+                             given Mode: Checked[Type] = {
+    if arg1.tpe.isValueType then
+      TyperErrors.noCompArg
+    else if body1.tpe.isValueType then
+      TyperErrors.noLinearCompCodomain
+    else
+      LinearFunctionType(arg1.tpe, body1.tpe)
+  }
+
   private def typedFunctionType(args: List[Tree], body: Tree)
                        (id: Id, pt: Type)
                        given Context, Mode, Stoup: Checked[Tree] = {
@@ -196,6 +221,16 @@ object Typers {
       body1 <- body.typed(any)
       fTpe  <- functionTypeTpe(args1, body1)
     } yield Function(args1, body1)(id, fTpe)
+  }
+
+  private def typedLinearFunctionType(arg: Tree, body: Tree)
+                                     (id: Id, pt: Type)
+                                     given Context, Mode, Stoup: Checked[Tree] = {
+    for {
+      arg1  <- arg.typed(any)
+      body1 <- body.typed(any)
+      fTpe  <- linearFunctionTypeTpe(arg1, body1)
+    } yield LinearFunction(arg1, body1)(id, fTpe)
   }
 
   private def typedTagged(arg: Name, tpeTree: Tree)
@@ -264,6 +299,19 @@ object Typers {
       funProto  <-  toFunctionType(args1.map(_.tpe) :+ applied)
       tpe       <-  checkFunctorWithProto(functor1, funProto)
     } yield Apply(functor1, args1)(tpe)
+  }
+
+  private def typedInfixApplyType(functor: Tree, a1: Tree, a2: Tree)
+                                 given Context, Mode, Stoup: Checked[Tree] = {
+    for {
+      functor1  <-  functor.typed(any)
+      a11       <-  a1.typed(any)
+      a21       <-  a2.typed(any)
+      args1     =   a11.tpe :: a21.tpe :: Nil
+      applied   <-  unifyConstructorToHkType(functor1, args1)
+      funProto  <-  toFunctionType(args1 :+ applied)
+      tpe       <-  checkFunctorWithProto(functor1, funProto)
+    } yield InfixApplyType(functor1, a11, a21)(tpe)
   }
 
   private def typedApplyTerm(fun: Tree, args: List[Tree])
@@ -444,15 +492,23 @@ object Typers {
         typedAsTyping
     }
     val tpd = for {
-      tpeD1   <-  typeTpeAs(tpeD)(any)
-      tpe     =   tpeD1.tpe
-      sig1    <-  sig.typed(tpe)
-      ret     =   toReturnType(sig1, tpe)
-      bodyCtx <-  lookIn(sig.id)
-      body1   <-  checked {
-                    implied for Context = bodyCtx
-                    body.typed(ret)
-                  }
+      tpeD1    <- typeTpeAs(tpeD)(any)
+      tpe      =  tpeD1.tpe
+      sig1     <- sig.typed(tpe)
+      ret      =  toReturnType(sig1, tpe)
+      bodyCtx  <- lookIn(sig.id)
+      newStoup = {
+        val linear = sig.linearArg
+        if linear != EmptyName then
+          DependsOn(linear)
+        else
+          stoup
+      }
+      body1 <- checked {
+        implied for Context = bodyCtx
+        implied for Stoup   = newStoup
+        body.typed(ret)
+      }
     } yield {
       val name     = (sig1.convert: Name)
       val freshTpe = resolveVariables(tpe)
@@ -467,29 +523,56 @@ object Typers {
   }
 
   private def mapArgs(args: List[Name], pts: List[Type])
-             given Context: Checked[List[Name]] = {
+                     given Context: Checked[Unit] = {
     args
       .zip(pts)
-      .mapE { (name, tpe) =>
+      .foldLeftE(()) { (_, pair) =>
+        val (name, tpe) = pair
         for (_ <- lookForInScope(name))
         yield {
           putType(name, tpe)
-          name
         }
       }
   }
 
+  private def mapLinearArg(arg: Name, tpe: Type)
+                          given Context: Checked[Unit] = tpe match {
+    case LinearFunctionType(argTpe, _) =>
+      for (_ <- lookForInStoup(arg))
+      yield {
+        putType(arg, argTpe)
+      }
+
+    case _ => TyperErrors.linearArgNotMatchType(arg)
+  }
+
   private def typedDefSig(name: Name, args: List[Name])
-                 (id: Id, pt: Type)
-                 given Context: Checked[Tree] = {
+                         (id: Id, pt: Type)
+                         given Context: Checked[Tree] = {
     val pts = toCurriedList(pt)
     if pts.length <= args.length then
       TyperErrors.declArgsNotMatchType(name)
     else
       lookIn(id).flatMap { bodyCtx =>
         implied for Context = bodyCtx
-        for (args1 <- mapArgs(args, pts))
-        yield DefSig(name, args1)(id, pt)
+        for (_ <- mapArgs(args, pts))
+        yield DefSig(name, args)(id, pt)
+      }
+  }
+
+  private def typedPrimSig(name: Name, args: List[Name], linear: Name)
+                          (id: Id, pt: Type)
+                          given Context: Checked[Tree] = {
+    val pts = toCurriedList(pt)
+    if pts.length <= args.length then
+      TyperErrors.declArgsNotMatchType(name)
+    else
+      lookIn(id).flatMap { bodyCtx =>
+        implied for Context = bodyCtx
+        for {
+          _ <- mapArgs(args, pts)
+          _ <- mapLinearArg(linear, pts.last)
+        } yield PrimSig(name, args, linear)(id, pt)
       }
   }
 
@@ -572,38 +655,42 @@ object Typers {
 
     def inner(tree: Tree, pt: Type) = tree match {
       // Types
-      case _: Select          if isType     => typedSelectType
-      case u @ Ident(n)       if isType     => typedIdentType(n)(u.id,pt)
-      case Apply(t,ts)        if isType     => typedApplyType(t,ts)
-      case u @ Function(ts,t) if isType     => typedFunctionType(ts,t)(u.id, pt)
+      case _: Select                if isType     => typedSelectType
+      case u @ Ident(n)             if isType     => typedIdentType(n)(u.id,pt)
+      case Apply(t,ts)              if isType     => typedApplyType(t,ts)
+      case InfixApplyType(f,a,b)    if isType     => typedInfixApplyType(f,a,b)
+      case u @ Function(ts,t)       if isType     => typedFunctionType(ts,t)(u.id, pt)
+      case u @ LinearFunction(a,b)  if isType     => typedLinearFunctionType(a,b)(u.id, pt)
       // Patterns
-      case u @ Ident(n)       if isPattern  => typedIdentPat(n)(u.id, pt)
-      case Bind(n,t)          if isPattern  => typedBind(n,t)(pt)
-      case Alternative(ts)    if isPattern  => typedAlternative(ts)(pt)
-      case Unapply(f,ts)      if isPattern  => typedUnapply(f,ts)(pt)
+      case u @ Ident(n)             if isPattern  => typedIdentPat(n)(u.id, pt)
+      case Bind(n,t)                if isPattern  => typedBind(n,t)(pt)
+      case Alternative(ts)          if isPattern  => typedAlternative(ts)(pt)
+      case Unapply(f,ts)            if isPattern  => typedUnapply(f,ts)(pt)
       // Terms
-      case PackageDef(t,ts)   if isTerm     => typedPackageDef(t,ts)(pt)
-      case Apply(t,ts)        if isTerm     => typedApplyTerm(t,ts)(pt)
+      case PackageDef(t,ts)         if isTerm     => typedPackageDef(t,ts)(pt)
+      case Apply(t,ts)              if isTerm     => typedApplyTerm(t,ts)(pt)
       case DefDef(
         m,
-        s: DefSig,
+        s: (DefSig | PrimSig),
         t,
-        b)                    if isTerm     => typedDefDef(m,s,t,b)(pt)
-      case u @ DefSig(n,ns)   if isTerm     => typedDefSig(n,ns)(u.id, pt)
-      case u @ Let(n,v,c)     if isTerm     => typedLet(n,v,c)(u.id, pt)
-      case u @ Function(ts,t) if isTerm     => typedFunctionTerm(ts,t)(u.id, pt)
-      case Tagged(n,t)        if isTerm     => typedTagged(n,t)(pt)
-      case CaseExpr(t,ts)     if isTerm     => typedCaseExpr(t,ts)(pt)
-      case _: Select          if isTerm     => typedSelectTerm
-      case u @ Ident(n)       if isTerm     => typedIdentTerm(n)(u.id, pt)
+        b)                          if isTerm     => typedDefDef(m,s,t,b)(pt)
+      case u @ DefSig(n,ns)         if isTerm     => typedDefSig(n,ns)(u.id, pt)
+      case u @ PrimSig(n,ns,l)      if isTerm     => typedPrimSig(n,ns,l)(u.id, pt)
+      case u @ Let(n,v,c)           if isTerm     => typedLet(n,v,c)(u.id, pt)
+      case u @ Function(ts,t)       if isTerm     => typedFunctionTerm(ts,t)(u.id, pt)
+      case u @ LinearFunction(a,b)  if isTerm     => typedLinearFunctionTerm(a,b)(u.id, pt)
+      case Tagged(n,t)              if isTerm     => typedTagged(n,t)(pt)
+      case CaseExpr(t,ts)           if isTerm     => typedCaseExpr(t,ts)(pt)
+      case _: Select                if isTerm     => typedSelectTerm
+      case u @ Ident(n)             if isTerm     => typedIdentTerm(n)(u.id, pt)
       // Any
-      case Literal(c)                       => typedLiteral(c)
-      case Parens(ts)                       => typedParens(ts)(pt)
+      case Literal(c)                             => typedLiteral(c)
+      case Parens(ts)                             => typedParens(ts)(pt)
       case t @ ( _: TreeSeq
                | _: CaseClause
-               |    EmptyTree)              => t
+               |    EmptyTree)                    => t
       // Error
-      case _                                => TyperErrors.typingMissing(tree)
+      case _                                      => TyperErrors.typingMissing(tree)
     }
     inner(tree, pt).map(check(_)(pt))
   }

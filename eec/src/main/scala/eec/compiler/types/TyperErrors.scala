@@ -88,6 +88,14 @@ object TyperErrors {
   def tpesNotUnifyTo(tpe: Type) =
     CompilerError.UnexpectedType(s"Types do not unify to ${tpe.show}")
 
+  def noCompArg =
+    CompilerError.UnexpectedType(
+      "Linear function does not have computational domain.")
+
+  def noLinearCompCodomain =
+    CompilerError.UnexpectedType(
+      "Linear function does not have computational co-domain.")
+
   def noCompCodomain =
     CompilerError.UnexpectedType(
       "Function does not have computational co-domain")
@@ -111,6 +119,11 @@ object TyperErrors {
   def declArgsNotMatchType(name: Name) = {
     CompilerError.UnexpectedType(
       s"Function declaration arguments do not match declared type for declaration ${name.show}.")
+  }
+
+  def linearArgNotMatchType(name: Name) = {
+    CompilerError.UnexpectedType(
+      s"No linear context found to bind function declaration argument ${name.show}.")
   }
 
   def nameNotConstructor(name: Name) = {

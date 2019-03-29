@@ -157,8 +157,6 @@ dcl: primitiveDcl;
 
 primitiveDcl: 'primitive' primDecl;
 
-defDecl: defSig ':' type; // still require type checking
-
 primDecl: (defSig | linearSig) ':' type; // still require type checking
 
 def: defDef;

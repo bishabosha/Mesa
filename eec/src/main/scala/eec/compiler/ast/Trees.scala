@@ -4,12 +4,14 @@ package ast
 
 import core._
 import Names._
+import Name._
 import Constants._
 import Contexts._
 import Modifiers._
 import types.Types._
 import annotation._
 import util.{Showable, |>, Convert}
+import Convert._
 
 import implied Printing.untyped.AstOps._
 import implied NameOps._
@@ -75,12 +77,19 @@ object Trees {
     implied uniqName for (Tree |> Name) {
       def apply(tree: Tree) = tree match {
         case DefSig(name, _)      => name
+        case PrimSig(name, _, _)  => name
         case DefDef(_, sig, _, _) => apply(sig)
         case Tagged(name, _)      => name
         case Bind(name, _)        => name
         case Ident(name)          => name
-        case _                    => emptyString.readAs
+        case _                    => EmptyName
       }
+    }
+
+    def (tree: Tree) linearArg: Name = tree match {
+      case PrimSig(_, _, linearArg) => linearArg
+      case LinearFunction(arg,_)    => arg.convert
+      case _                        => EmptyName
     }
 
     def (t: Tree) toNames: List[Name] = {

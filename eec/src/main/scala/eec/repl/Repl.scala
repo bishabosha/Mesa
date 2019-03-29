@@ -66,7 +66,7 @@ object Repl {
   }
 
   private[this] def newContext: Checked[(IdGen, Context)] = {
-    val rootCtx   = new RootContext
+    val rootCtx   = new RootContext()
     val rootIdGen = new IdGen
     implied for Context = rootCtx
     implied for IdGen = rootIdGen

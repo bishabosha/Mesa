@@ -8,8 +8,8 @@ primitive InR | r : R# -* L# |+| R#
 primitive f : A# -> (B# -* C#)
 primitive g : (A# -* B#) -> C#
 
-linearLambdaTest: A# -* () =
-  | (a: A#) -* ()
+linearLambdaTest: !A -* () =
+  | (a: !A) -* let !_ = a in ()
 
 tensorTest: !() |*| () =
   !() |*| ()

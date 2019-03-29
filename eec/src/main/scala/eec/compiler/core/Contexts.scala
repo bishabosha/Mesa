@@ -86,10 +86,10 @@ object Contexts {
   case class Sym(id: Id, name: Name)
 
   private val rootPkg =
-    PackageInfo(TypeRef(rootString.readAs), rootString.readAs)
+    PackageInfo(TypeRef(rootName), rootName)
 
   private val rootSym =
-    Sym(Id.rootId, rootString.readAs)
+    Sym(Id.rootId, rootName)
 
   sealed trait Context (
     val scope: Scope,
@@ -99,7 +99,7 @@ object Contexts {
     val localIdGen: IdGen,
   )
 
-  final class RootContext extends Context(
+  final class RootContext() extends Context(
     new mutable.ArrayBuffer,
     None,
     new mutable.AnyRefMap,
@@ -187,14 +187,23 @@ object Contexts {
       }
     }
 
+    def lookForInStoup(name: Name) given Context: Checked[Unit] = {
+      if !inStoup(name) then {
+        CompilerError.IllegalState(
+          s"No variable in immediate linear scope found for name `${name.show}`")
+      } else {
+        ()
+      }
+    }
+
     def contains(name: Name) given Context = {
-      name != emptyString.readAs && {
+      name != EmptyName && {
         inStoup(name) || inScope(name)
       }
     }
 
     def containsDeep(name: Name) given Context = {
-      name != emptyString.readAs && {
+      name != EmptyName && {
         inStoupDeep(name) || inScope(name)
       }
     }
@@ -265,7 +274,7 @@ object Contexts {
       ctx.typeTable += pair
 
     def getType(name: Name) given Context: Checked[Type] = {
-      if name == rootString.readAs && (ctx `eq` rootCtx) then
+      if name == rootName && (ctx `eq` rootCtx) then
         rootPkg
       else
         ctx.typeTable.getOrElse[Checked[Type]](
@@ -359,14 +368,17 @@ object Contexts {
         val stoupOpt = {
           for {
             name <- ctx.stoup
-            tpe  <- ctx.typeTable.get(name)
-          } yield Stoup(ForName(name.show), TypeDef(tpe.show))
+            tpe  = ctx.typeTable.get(name) match {
+              case Some(t) => TypeDef(t.show)
+              case _       => EmptyType
+            }
+          } yield Stoup(ForName(name.show), tpe)
         }
         val defs = {
           for {
             pair <- ctx.scope.filter { pair =>
                       val (Sym(_, name), child) = pair
-                      child.scope.nonEmpty || name != emptyString.readAs
+                      child.scope.nonEmpty || child.stoup.nonEmpty || name != EmptyName
                     }
             (sym, child)  = pair
             tpeOpt        = ctx.typeTable.get(sym.name)
