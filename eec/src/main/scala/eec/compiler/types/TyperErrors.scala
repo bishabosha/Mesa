@@ -19,12 +19,12 @@ import implied NameOps._
 
 object TyperErrors {
 
-  def functorNotMatchProto(functor: Tree, functorTyp1: Type, proto1: Type) = {
+  def functorNotMatchProto(functor: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
     val functorTyp1Str  = functorTyp1.show
     val proto1Str       = proto1.show
-    val functorNameStr  = uniqName(functor).show
+    val functorNameStr  = functor.show
     CompilerError.UnexpectedType(
-      s"Functor definition `$functorNameStr: ${functor.tpe.show}` does not match args. Expected `$functorTyp1Str` but was `$proto1Str` in application expr.")
+      s"Functor definition `$functorNameStr: ${fTpe.show}` does not match args. Expected `$functorTyp1Str` but was `$proto1Str` in type tree.")
   }
 
   def functionNotMatchProto(fun: Tree, arg1: Type, argProto: Type) = {
@@ -34,6 +34,17 @@ object TyperErrors {
     CompilerError.UnexpectedType(
       s"Function definition `$funNameStr: ${fun.tpe.show}` does not match args. Expected `$arg1Str` but was `$argProtoStr` in application expr.")
   }
+
+  def linearFunctionNotMatchProto(fun: Tree, arg1: Type, argProto: Type) = {
+    val argProtoStr = argProto.show
+    val arg1Str     = arg1.show
+    val funNameStr  = uniqName(fun).show
+    CompilerError.UnexpectedType(
+      s"Linear function definition `$funNameStr: ${fun.tpe.show}` does not match args. Expected `$arg1Str` but was `$argProtoStr` in evaluation expr.")
+  }
+
+  def emptyFunctorLinearCtx(fTpe: Type) =
+    CompilerError.UnexpectedType(s"Empty Linear Context for Functor Type ${fTpe.show}")
 
   def emptyFunctor(fTpe: Type) =
     CompilerError.UnexpectedType(s"Empty Functor Type ${fTpe.show}")
@@ -54,13 +65,12 @@ object TyperErrors {
   def argsNotMatchLength =
     CompilerError.UnexpectedType("arg lengths do not match")
 
+  def linearUnapplyArgLengthGT1 =
+    CompilerError.UnexpectedType("Linear case clause must have a single path.")
+
   def typecheckFail(typed: Tree, pt: Type) given Mode = {
-    val treeStr = typed.show
-    val modeStr = mode.show
-    val ptStr   = pt.show
-    val tpeStr  = typed.tpe.show
     CompilerError.UnexpectedType(
-      s"Check failed. Type $tpeStr != $ptStr in $modeStr:\n$treeStr")
+      s"Check failed. Type ${typed.tpe.show} != ${pt.show} in ${mode.show}:\n${typed.show}")
   }
 
   def hkArgsDoNotUnify(functor: Tree, args0: List[Type], args: List[Type]) = {
@@ -85,6 +95,9 @@ object TyperErrors {
   def noApplyNonFunctionType =
     CompilerError.IllegalState(s"Can not apply to non function type.")
 
+  def noEvalNonLinearFunctionType =
+    CompilerError.IllegalState(s"Can not eval a non linear function type.")
+
   def tpesNotUnifyTo(tpe: Type) =
     CompilerError.UnexpectedType(s"Types do not unify to ${tpe.show}")
 
@@ -96,13 +109,17 @@ object TyperErrors {
     CompilerError.UnexpectedType(
       "Linear function does not have computational co-domain.")
 
-  def noCompCodomain =
+  def noTensorCompCodomain =
     CompilerError.UnexpectedType(
-      "Function does not have computational co-domain")
+      "Linear tensor does not have computational second argument.")
 
   def noCompLetContinuation =
     CompilerError.UnexpectedType(
       "Let body does not have computation type.")
+
+  def noTensorLetValue(x: Name, z: Name, value: Tree) =
+    CompilerError.UnexpectedType(
+      s"Can not infer type of `!${x.show} |*| ${x.show} = ${value.show}` as of !_ |*| _ type.")
 
   def noBangLetValue(name: Name, value: Tree) =
     CompilerError.UnexpectedType(
@@ -110,7 +127,11 @@ object TyperErrors {
 
   def notCaseClase(unknown: Tree) =
     CompilerError.IllegalState(
-      s"$unknown is not Tree.CaseClause(_,_,_,_)")
+      s"$unknown is not Tree.CaseClause")
+
+  def notLinearCaseClase(unknown: Tree) =
+    CompilerError.IllegalState(
+      s"$unknown is not Tree.LinearCaseClause")
 
   def nameInPattAlt(name: Name) =
     CompilerError.IllegalState(
@@ -131,13 +152,9 @@ object TyperErrors {
       s"${name.show} does not qualify to be a constructor.")
   }
 
-  def foundInStoup(name: Name) =
+  def illegalStoupDependency(name: Name) =
     CompilerError.UnexpectedType(
       s"Illegal dependency on linear context variable `${name.show}`.")
-
-  def notInStoup(name: Name) =
-    CompilerError.UnexpectedType(
-      s"Illegal missing variable `${name.show}` in linear context.")
 
   def memberSelection given Mode =
     CompilerError.SyntaxError(

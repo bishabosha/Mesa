@@ -33,14 +33,45 @@ object BootstrapTests {
   def typeStat: String => Type => Contextual[IdReader[Checked[Tree]]] =
     typeCore(parseStat)
 
+  def failIfUnparsedOrTypedExpr: String => Type => Contextual[IdReader[Unit]] =
+    failIfUnparsedOrTyped(parseExpr)
+
+  def failIfUnparsedOrTypedStat: String => Type => Contextual[IdReader[Unit]] =
+    failIfUnparsedOrTyped(parseStat)
+
   private def typeCore(f: String => IdReader[Checked[Tree]])
                       (str: String)
-                      (pt: Type) given IdGen, Context =
+                      (pt: Type) given IdGen, Context: Checked[Tree] =
     for {
       exp <- f(str)
+      tpd <- typeAfterParse(pt)(exp)
+    } yield tpd
+
+  private def typeAfterParse(pt: Type)
+                            (exp: Tree)
+                            given IdGen, Context: Checked[Tree] =
+    for {
       _   <- indexAsExpr(exp)
       tpd <- exp.typedWith(pt)
     } yield tpd
+
+  def failIfUnparsedOrTyped(f: String => IdReader[Checked[Tree]])
+                           (str: String)
+                           (pt: Type) given IdGen, Context: Unit = {
+    f(str).fold
+      { err => fail(err.show) }
+      { tpd =>
+        failIfTyped(typeAfterParse(pt)(tpd))
+      }
+  }
+
+  def failIfParsed(f: String => IdReader[Checked[Tree]])
+                  (str: String)
+                  given IdGen: Unit = {
+    f(str).fold
+      { err => () }
+      { exp => fail(s"Parsed expr sucessfully:\n${exp.show}") }
+  }
 
   def failIfTyped(tpd: Checked[Tree]): Unit = {
     tpd.fold

@@ -35,10 +35,9 @@ object Types {
     case Variable(name: Name)
     case FunctionType(arg: Type, body: Type)
     case LinearFunctionType(arg: Type, body: Type)
-    case TensorType(arg: Type, body: Type)
-    case CoTensorType(arg: Type, body: Type)
     case Product(args: List[Type])
     case AppliedType(typ: Type, args: List[Type])
+    case InfixAppliedType(op: Type, a1: Type, a2: Type)
     case WildcardType
     case Untyped
     case EmptyType
@@ -49,11 +48,11 @@ object Types {
   private object TypeVariableOps {
     def apply(tpe: Type): TypeVariableOps = tpe
 
-    def (ops: TypeVariableOps) zipWith[O, That](subWith: Type)
+    def (ops: TypeVariableOps) zipWith[O, That](t: Type)
         (f: (Name, Type) => O)
         given (bf: CanBuild[O, That]): That = {
 
-      val b = ops.zipFold(subWith)(bf()) { (acc, arg, app) =>
+      val b = ops.zipFold(t)(bf()) { (acc, arg, app) =>
         arg match {
           case Variable(name) => acc += f(name, app)
           case _              => acc
@@ -107,15 +106,10 @@ object Types {
             val a1 :: a2 :: rest = stack
             LinearFunctionType(a1, a2) :: rest
 
-        case TensorType(arg, body) =>
+        case InfixAppliedType(tpe, a1, a2) =>
           stack =>
-            val a1 :: a2 :: rest = stack
-            TensorType(a1, a2) :: rest
-
-        case CoTensorType(arg, body) =>
-          stack =>
-            val a1 :: a2 :: rest = stack
-            CoTensorType(a1, a2) :: rest
+            val tpe :: a1 :: a2 :: rest = stack
+            InfixAppliedType(tpe, a1, a2) :: rest
 
         case AppliedType(f, args) =>
           stack =>
@@ -144,8 +138,7 @@ object Types {
             case AppliedType(t, tpes) => inner(f(z, tpe), t :: tpes ::: rest)
             case FunctionType(a1, b1) => inner(f(z, tpe), a1 :: b1 :: rest)
             case LinearFunctionType(a1, b1) => inner(f(z, tpe), a1 :: b1 :: rest)
-            case CoTensorType(a1, b1)  => inner(f(z, tpe), a1 :: b1 :: rest)
-            case TensorType(a1, b1)   => inner(f(z, tpe), a1 :: b1 :: rest)
+            case InfixAppliedType(op, a1, a2) => inner(f(z, tpe), op :: a1 :: a2 :: rest)
             case Product(tpes)        => inner(f(z, tpe), tpes ::: rest)
             case _                    => inner(f(z, tpe), rest)
           }
@@ -153,8 +146,8 @@ object Types {
       inner(z, tpe :: Nil)
     }
 
-    def (subFrom: Type) zipFold [O, That]
-        (subWith: Type)
+    def (t1: Type) zipFold [O, That]
+        (t2: Type)
         (z: O)
         (f: (O, Type, Type) => O): O = {
 
@@ -188,18 +181,11 @@ object Types {
                   a2 :: b2 :: appsRest
                 )
 
-              case (TensorType(a1, b1), TensorType(a2, b2)) =>
+              case (InfixAppliedType(op1, a1, a2), InfixAppliedType(op2, b1, b2)) =>
                 inner(
                   f(z, arg, app),
-                  a1 :: b1 :: argRest,
-                  a2 :: b2 :: appsRest
-                )
-
-              case (CoTensorType(a1, b1), CoTensorType(a2, b2)) =>
-                inner(
-                  f(z, arg, app),
-                  a1 :: b1 :: argRest,
-                  a2 :: b2 :: appsRest
+                  op1 :: a1 :: a2 :: argRest,
+                  op2 :: b1 :: b2 :: appsRest
                 )
 
               case (Product(tpes1), Product(tpes2)) =>
@@ -216,28 +202,42 @@ object Types {
         }
       }
 
-      if WildcardType == subWith || WildcardType == subFrom then z
-      else inner(z, subFrom :: Nil, subWith :: Nil)
+      if WildcardType == t2 || WildcardType == t1 then z
+      else inner(z, t1 :: Nil, t2 :: Nil)
     }
 
-    def canUnify(arg: Type, app: Type): Boolean = (arg, app) match {
-      case (Product(tpes1), Product(tpes2)) => tpes1.size == tpes2.size
-      case (Variable(_:Comp), _)            => app.isComputationType
+    def canUnify(arg: Type, app: Type) : Boolean = {
+      @tailrec
+      def inner(z: Boolean, args: List[Type], apps: List[Type]): Boolean = args match {
+        case Nil => z
 
-      case (AppliedType(_, args1), AppliedType(_, args2)) =>
-        args1.size == args2.size
+        case arg :: argRest => apps match {
+          case Nil => z
 
-      case ( _:FunctionType,       _:FunctionType       )
-      |    ( _:LinearFunctionType, _:LinearFunctionType )
-      |    ( _:TensorType,         _:TensorType         )
-      |    ( _:CoTensorType,       _:CoTensorType       )
-      |    ( _:TypeRef,            _:TypeRef            )
-      |    ( _:Variable
-           |   WildcardType,       _                    )
-      |    ( _:PackageInfo,        _:PackageInfo        )
-      |    (   EmptyType,            EmptyType          )
-      |    (   Untyped,              Untyped            ) => true
-      case _                                              => false
+          case app :: appsRest => (arg, app) match {
+            case (Product(tpes1), Product(tpes2)) => tpes1.size == tpes2.size
+            case (Variable(_:Comp), _)            => app.isComputationType
+
+            case (AppliedType(_, args1), AppliedType(_, args2)) =>
+              args1.size == args2.size
+
+            case ( _:FunctionType,       _:FunctionType       )
+            |    ( _:LinearFunctionType, _:LinearFunctionType )
+            |    ( _:TypeRef,            _:TypeRef            )
+            |    ( _:Variable
+                |    WildcardType,       _                    )
+            |    ( _:PackageInfo,        _:PackageInfo        )
+            |    (   EmptyType,            EmptyType          )
+            |    (   Untyped,              Untyped            ) => true
+
+            case (InfixAppliedType(op1,_,_), InfixAppliedType(op2,_,_)) =>
+              inner(z, op1 :: argRest, op2 :: appsRest)
+
+            case _ => false
+          }
+        }
+      }
+      inner(true, arg :: Nil, app :: Nil)
     }
 
     def (tpe: Type) =!= (other: Type): Boolean = {
@@ -269,10 +269,18 @@ object Types {
       inner(Nil, t).reverse
     }
 
-    def toReturnType(defSig: Tree, t: Type): Type =
+    def toBodyType(defSig: Tree, t: Type): Type =
       defSig match {
         case DefSig(_, args) =>
           toFunctionType(toCurriedList(t).drop(args.length))
+
+        case LinearSig(_, args, _) =>
+          val fArgs = toCurriedList(t).drop(args.length)
+          fArgs.reverse match {
+            case LinearFunctionType(arg1, body) :: Nil =>
+              body
+            case _ => toFunctionType(fArgs)
+          }
 
         case _ => EmptyType
       }
@@ -327,14 +335,14 @@ object Types {
 
         case tpe :: tpes => tpe match {
           case AppliedType(TypeRef(ComputationTag), List(_))
-          |    _: CoTensorType
-          |    _: TensorType
-          |    _: LinearFunctionType
+          |    InfixAppliedType(TypeRef(CoTensorTag),_,_)
+          |    InfixAppliedType(TypeRef(TensorTag),_,_)
           |    TypeRef(_: Comp)
-          |    Variable(_: Comp)             => true
-          case FunctionType(_, body)         => inner(acc, body :: tpes)
-          case Product(ts)                   => inner(acc, ts ::: tpes)
-          case _                             => false
+          |    TypeRef(VoidCompTag)
+          |    Variable(_: Comp)     => true
+          case FunctionType(_, body) => inner(acc, body :: tpes)
+          case Product(ts)           => inner(acc, ts ::: tpes)
+          case _                     => false
         }
       }
       inner(true, tpe :: Nil)
@@ -347,8 +355,7 @@ object Types {
       def (tpe: Type) show: String = tpe.compute {
         case FunctionType(arg, body)        => fromFunctionType(arg, body)
         case LinearFunctionType(arg, body)  => fromLinearFunctionType(arg, body)
-        case TensorType(arg, body)          => fromTensorType(arg, body)
-        case CoTensorType(arg, body)        => fromCoTensorType(arg, body)
+        case InfixAppliedType(op, a1, a2)   => fromInfixAppliedType(op,a1,a2)
         case AppliedType(f, args)           => fromAppliedType(f, args)
         case Product(tpes1)                 => fromProduct(tpes1)
         case TypeRef(t)                     => t.show :: _
@@ -367,7 +374,7 @@ object Types {
           case _                                       => a1
         }
         val a2Final = body match {
-          case _: (FunctionType | LinearFunctionType)  => s"($a2)"
+          case _: LinearFunctionType  => s"($a2)"
           case _                                       => a2
         }
         s"$a1Final -> $a2Final" :: rest
@@ -387,36 +394,20 @@ object Types {
         s"$a1Final -* $a2Final" :: rest
       }
 
-      private def fromTensorType(arg: Type, body: Type)
-                                (stack: Stack[String]) = {
-        val a1 :: a2 :: rest = stack
-        val a1Final = arg match {
-          case AppliedType(TypeRef(ComputationTag), List(_)) => a1
-          case _: (FunctionType | AppliedType | LinearFunctionType | CoTensorType | TensorType) => s"($a1)"
-          case _                                      => a1
+      private def fromInfixAppliedType(op: Type, a1: Type, a2: Type)
+                                      (stack: Stack[String]) = {
+        val op1 :: b1 :: b2 :: rest = stack
+        val b1Final = a1 match {
+          case AppliedType(TypeRef(ComputationTag), List(_)) => b1
+          case _: (FunctionType | AppliedType | LinearFunctionType | InfixAppliedType) => s"($b1)"
+          case _                                      => b1
         }
-        val a2Final = body match {
-          case AppliedType(TypeRef(ComputationTag), List(_)) => a2
-          case _: (FunctionType | AppliedType | LinearFunctionType | CoTensorType | TensorType) => s"($a1)"
-          case _                                      => a2
+        val b2Final = a2 match {
+          case AppliedType(TypeRef(ComputationTag), List(_)) => b2
+          case _: (FunctionType | AppliedType | LinearFunctionType | InfixAppliedType) => s"($b2)"
+          case _                                      => b2
         }
-        s"$a1Final |*| $a2Final" :: rest
-      }
-
-      private def fromCoTensorType(arg: Type, body: Type)
-                                (stack: Stack[String]) = {
-        val a1 :: a2 :: rest = stack
-        val a1Final = arg match {
-          case AppliedType(TypeRef(ComputationTag), List(_)) => a1
-          case _: (FunctionType | AppliedType | LinearFunctionType | CoTensorType | TensorType) => s"($a1)"
-          case _                                      => a1
-        }
-        val a2Final = body match {
-          case AppliedType(TypeRef(ComputationTag), List(_)) => a2
-          case _: (FunctionType | AppliedType | LinearFunctionType | CoTensorType | TensorType) => s"($a1)"
-          case _                                      => a2
-        }
-        s"$a1Final |+| $a2Final" :: rest
+        s"$b1Final $op1 $b2Final" :: rest
       }
 
       private def fromAppliedType(f: Type, args: List[Type])
@@ -425,7 +416,7 @@ object Types {
           tpes.zip(strs).map(check)
 
         def check(tpe: Type, str: String) = tpe match {
-          case _: (FunctionType | AppliedType | LinearFunctionType | CoTensorType | TensorType) =>
+          case _: (FunctionType | AppliedType | LinearFunctionType | InfixAppliedType) =>
             s"($str)"
           case _ =>
             str

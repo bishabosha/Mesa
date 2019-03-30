@@ -25,9 +25,9 @@ func: infixType ('->' infixType)+;
 
 linearFunc: infixType '-*' infixType;
 
-inlineType: functorType (CoTensor | Tensor) functorType;
+infixAppliedType: functorType (CoTensor | Tensor) functorType;
 
-infixType: functorType | inlineType;
+infixType: functorType | infixAppliedType;
 
 functorType: simpleType | prefixType;
 
@@ -100,10 +100,21 @@ linearCaseClause: linearPattern '-*' expr;
 exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 
 //
-// -- Patterns
+// -- Linear Patterns
 //
 
-linearPattern: Patid '[' Varid ']';
+linearPattern:
+	Varid
+	| Wildcard
+	| Patid '[' linearPattern ']'
+	| '(' linearPatterns? ')'
+	| '()';
+
+linearPatterns: linearPattern (',' linearPattern)*;
+
+//
+// -- Patterns
+//
 
 pattern: pattern1 ('|' pattern1)*;
 
@@ -161,9 +172,9 @@ primDecl: (defSig | linearSig) ':' type; // still require type checking
 
 def: defDef;
 
-defDef: defSig (':' type)/*?*/ '=' expr Sep?;
+defDef: (defSig | linearSig) (':' type)/*?*/ '=' expr Sep?;
 
-linearSig: alphaId Varid*? '|' Varid;
+linearSig: alphaId Varid*? '[' Varid ']';
 
 defSig: infixDefSig | alphaId Varid*;
 

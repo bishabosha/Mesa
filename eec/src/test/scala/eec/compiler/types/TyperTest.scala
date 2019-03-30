@@ -25,7 +25,7 @@ class TyperTest {
     "-0"  -> "Integer"
   )
 
-  @Test def failInteger() = noType(
+  @Test def failInteger() = noParse(
     "0l", // error: no Longs
     "0L"  // error: no Longs
   )
@@ -36,7 +36,7 @@ class TyperTest {
     "-273.15"                         -> "Decimal"  // 0 degrees Kelvin
   )
 
-  @Test def failDecimal() = noType(
+  @Test def failDecimal() = noParse(
     "3.14159f", // error: no Floats
     "3.14159F", // error: no Floats
     "3.14159d", // error: no Doubles
@@ -53,7 +53,7 @@ class TyperTest {
     """'\n'"""  -> "Char"
   )
 
-  @Test def failChar() = noType(
+  @Test def failChar() = noParse(
     "''",   // error: empty char
     "'ab'"  // error: char more than one char
   )
@@ -71,13 +71,25 @@ class TyperTest {
     "((),(),(),())" -> "((), (), (), ())"
   )
 
+  @Test def typecheckTensor() = typecheck(
+    "!() |*| ()" -> "!() |*| ()",
+  )
+
+  @Test def failTensor() = noType(
+    "!0 |*| 0", // error: 0 is not of computation type
+  )
+
+  @Test def failTensorParse() = noParse(
+    "0 |*| ()", // error: syntax error
+  )
+
   @Test def typecheckCompute() = typecheck(
     "!()"       -> "!()",
     "!((),())"  -> "!((), ())",
     "(!(),!())" -> "(!(), !())"
   )
 
-  @Test def noTypeCompute() = noType(
+  @Test def failCompute() = noType(
     """\(c: ! a b) => ()""",  // error: expected types [_] but got [a, b]
     "! () ()"                 // error: expected args [_: _] but got [(): (), (): ()]
   )
@@ -102,7 +114,7 @@ class TyperTest {
     """case () of
         _ if True => ()"""          -> "()",
     """case () of
-        () | () => ()"""            -> "()",
+        ( ) | () => ()"""           -> "()",
     """case "hello" of
         "" | _ => ()"""             -> "()",
     """case ((), ()) of
@@ -119,7 +131,13 @@ class TyperTest {
     """case ((), (), ()) of
         ((), (), ()) => ()"""       -> "()",
     """case ((), (), (), ()) of
-        ((), (), (), ()) => ()"""   -> "()"
+        ((), (), (), ()) => ()"""   -> "()",
+    """case Left () of
+        Left x => x;
+        Right _ => ()"""            -> "()",
+    """case Right () of
+        Right x => x;
+        Left _ => ()"""             -> "()",
   )
 
   @Test def failCase() = noType(
@@ -139,6 +157,29 @@ class TyperTest {
         1   => 0""" // error: mismatching cases
   )
 
+  @Test def typecheckLinearCase() = typecheck(
+    """| case InR [()] of
+        InR [m] -* m
+        InL [n] -* ()"""          -> "()",
+    """| case InR [InL [()]] of
+        InR [InL [m]] -* m"""     -> "()",
+    """| case ((), ()) of
+        (x, _) -* x"""            -> "()",
+    """| case ((),()) of
+        (x, ( )) -* x"""          -> "()",
+    """| case InR [((), ())] of
+        InR [(x, _)] -* x"""      -> "()",
+    """| case (InR [()], ()) of
+        (InR [x], _) -* x"""      -> "()",
+  )
+
+  @Test def failLinearCase() = noType(
+    """| case (0, ()) of
+        (x, _) -* x""",  // error: x: Integer not allowed in stoup
+    """| case ((), ()) of
+        (x, y) -* x"""   // error: can't put x and y together in stoup
+  )
+
   @Test def typecheckLambda() = typecheck(
     """\(t: ()) => ()"""                -> "() -> ()",
     """\(t: () -> ()) => ()"""          -> "(() -> ()) -> ()",
@@ -146,12 +187,6 @@ class TyperTest {
     """\(t: ((), ())) => ()"""          -> "((), ()) -> ()",
     """\(t: ((), (), (), ())) => ()"""  -> "((), (), (), ()) -> ()",
     """\(t: b#) => t"""                 -> "b# -> b#"
-  )
-
-  @Test def failLambda() = noType(
-    """\(f: () -> Char) => ()""", // error: (() -> Char) is not computation co-domain
-    """\(f: ()) => 0""", // error: (() -> Integer) is not computation co-domain
-    """\(f: (a -> b) -> c#) => ()""" // error: (a -> b) isnt computational codomain
   )
 
   @Test def typecheckApplication() = typecheck(
@@ -166,6 +201,22 @@ class TyperTest {
     """(\(f: ()) => ()) 0""" // error: expects () not Integer
   )
 
+  @Test def typecheckLinearLambda() = typecheck(
+    "| (a: A#) -* a" -> "A# -* A#",
+  )
+
+  @Test def failLinearLambda() = noType(
+    """| (f: A -> B#) -* \(x: !A) => let !y = x in f y""", // error: no dependency on f allowed
+    """| (a: A) -* !a""", // error: a is not of computation type, so cant be in stoup
+    """| (b: B#) -* !b""", // error: no dependency on b allowed
+    """| (a: A#) -* | (b: B#) -* ()""", // error: rhs is not computational codomain
+    """(| (a: ()) -* \(b: ()) => | (c: ()) -* a)[()]""" // error: no dependency on a allowed
+  )
+
+  @Test def typecheckEval() = typecheck(
+    "(| (a: ()) -* a)[()]" -> "()"
+  )
+
   @Test def typecheckLet() = typecheck(
     "let !x = !() in ()"  -> "()",
     "let !x = !0 in !x"   -> "!Integer"
@@ -173,8 +224,17 @@ class TyperTest {
 
   @Test def failLet() = noType(
     "let !x = () in ()",  // error: () is not ! type
-    "let !x = 0 in ()",   // error: 0 is not of ! type
     "let !x = !0 in 0"    // error: 0 is not of computation type
+  )
+
+  @Test def typecheckLetTensor() = typecheck(
+    """let !x |*| y = !() |*| () in
+        !x |*| y"""                 -> "!() |*| ()",
+  )
+
+  @Test def failLetTensor() = noType(
+    """let !x |*| y = () in
+        !x |*| y""", // error : () is not of tensor type
   )
 
   @Test def typecheckBind(): Unit = {
@@ -196,7 +256,15 @@ class TyperTest {
     initialCtx.flatMap { (idGen, ctx) =>
       implied for IdGen = idGen
       implied for Context = ctx
-      seq.toList.mapE(f => failIfTyped(typeExpr(f)(any)))
+      seq.toList.mapE(f => failIfUnparsedOrTypedExpr(f)(any))
+    }
+  }
+
+  def noParse(seq: String*): Unit = {
+    initialCtx.flatMap { (idGen, ctx) =>
+      implied for IdGen = idGen
+      implied for Context = ctx
+      seq.toList.mapE(f => failIfParsed(parseExpr)(f))
     }
   }
 }

@@ -1,76 +1,54 @@
 package eec.report.example
 
-primitive linearA: !A |*| B#
-primitive linearB: A# |+| B#
-primitive linearC: A# -* B#
-primitive InL | l : L# -* L# |+| R#
-primitive InR | r : R# -* L# |+| R#
-primitive f : A# -> (B# -* C#)
-primitive g : (A# -* B#) -> C#
-
-linearLambdaTest: !A -* () =
-  | (a: !A) -* let !_ = a in ()
-
-tensorTest: !() |*| () =
-  !() |*| ()
-
-matchTest: () =
-  | case InL [()] of
-    InL [m] -* m
-    InR [n] -* n
-
-evalTest: () =
-  (| (a: ()) -* ())[()]
-
 primitive x + y : Integer -> Integer -> Integer
 primitive s1 ++ s2 : String -> String -> String
 primitive debug x : a -> String
 primitive putStrLn s : String -> !()
 primitive readInteger : !Integer
-primitive Left  l : L -> Either L R
-primitive Right r : R -> Either L R
-primitive absurd v : Void -> a
 primitive a == b : a -> a -> Boolean
 
-{-
-primitive linear s : (A | B# ) -> !()
+primitive absurd v : Void -> A
+primitive Left  l : L -> Either L R
+primitive Right r : R -> Either L R
+primitive summon [v] : Void# -* A#
+primitive InL [l] : L# -* L# |+| R#
+primitive InR [r] : R# -* L# |+| R#
 
-primitive linear s : (A | B#) -> !()
-
-data Either# = Left# l
-            |  Right# r
-
-case# list of Cons#(x, xs) => x : xs
--}
-
-{- Example given in the EEC paper
-    - f,x are of computation types
-    - f is just a variable; variables are not linear
-    - x is just a variable; variables are not linear
-    - given term `lift g y`:
-      - passing g to lift depends linearly on nothing
-      - passing y to lift depends linearly on nothing
-      => is application lazy?
--}
-lift : (A -> B#) -> !A -> B# =
+liftD : (A -> B#) -> !A -> B# =
   \(f: A -> B#)(x: !A) => let !y = x in f y
 
-{- this example is not allowed:
-  `| (f: A -> B#) -* \(x: !A) => let !y = x in f y`
-  - `f y` must not depend linearly on anything,
-    however there is linear dependence on f
--}
+liftC : (A -> B) -> A -> !B =
+  \(f: A -> B)(x: A) => !(f x)
+
+evalAbsurd f: (Void -> ()) -> () = ()
+
+givenAbsurd: () = evalAbsurd absurd
+
+linearMatchInR: () =
+  | case InR [()] of
+    InR [m] -* m
+    InL [n] -* ()
+
+linearMatchTuple: () =
+  | case ((), ()) of
+    (x, _) -* x
+
+evalTest: () =
+  (| (a: ()) -* a)[()]
 
 ma >>= f : !A -> (A -> !B) -> !B =
-  (lift f) ma
+  (liftD f) ma
 
-fst p : (a, b) -> !a =
-  case p of (a, _) => !a
+f =<< ma : (A -> !B) -> !A -> !B =
+  ma >>= f
 
-snd p : (a, b) -> !b =
-  case p of (_, b) => !b
+fst p: (A, B) -> A =
+  case p of (a, _) => a
 
-foo : Boolean = (fst((0,"")), snd((0,""))) == (!0, !"")
+snd p: (A, B) -> B =
+  case p of (_, b) => b
+
+pairEq : Boolean = (fst (0,""), snd (0,"")) == (0,"")
 
 earthDiameter : Decimal = 12.742e+10
 
@@ -108,35 +86,27 @@ e : Char = 'e'
 
 unit : () = ()
 
-succ x : Integer -> !Integer =
-  !(x + 1)
+succ x : Integer -> Integer =
+  x + 1
 
-a `and` b : Boolean -> Boolean -> !Boolean =
-  if a then !b else !False
+a `and` b : Boolean -> Boolean -> Boolean =
+  if a then b else False
 
-a `or` b : Boolean -> Boolean -> !Boolean =
-  if a then !True else !b
+a `or` b : Boolean -> Boolean -> Boolean =
+  if a then True else b
 
-not b : Boolean -> !Boolean =
-  if True then !False else !True
+not b : Boolean -> Boolean =
+  if True then False else True
 
-isZero x : Integer -> !Boolean =
+isZero x : Integer -> Boolean =
   case x of
-    0 => !True
-    _ => !False
+    0 => True
+    _ => False
 
 main : !() =
   let !x    = readInteger in
-  let !zero = isZero x    in
-  if zero then
+  if isZero x then
     putStrLn "Entered Zero"
   else
-    let !y = readInteger >>= succ in
+    let !y = (liftC succ) =<< readInteger in
     putStrLn ("paired: " ++ (debug (x, y)))
-
-{- example expressions to try:
-    primitive fst p: (a, b) -> a
-    primitive snd p: (a, b) -> b
-    primitive x == y: a -> a -> Boolean
-    (fst((0,"")), snd((0,""))) == (0,"")
--}

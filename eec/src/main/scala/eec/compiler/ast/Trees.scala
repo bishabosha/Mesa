@@ -27,15 +27,15 @@ object Trees {
     case PackageDef(pid: Tree, stats: List[Tree])(tpe: Type) extends Tree(tpe)
     case DefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)(tpe: Type) extends Tree(tpe)
     case DefSig(name: Name, args: List[Name])(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
-    case PrimSig(name: Name, args: List[Name], linear: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case LinearSig(name: Name, args: List[Name], linear: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case Apply(f: Tree, args: List[Tree])(tpe: Type) extends Tree(tpe)
-    case InfixApplyType(f: Tree, left: Tree, right: Tree)(tpe: Type) extends Tree(tpe)
+    case InfixApply(f: Tree, left: Tree, right: Tree)(tpe: Type) extends Tree(tpe)
     case Eval(f: Tree, arg: Tree)(tpe: Type) extends Tree(tpe)
     case Tensor(value: Tree, computation: Tree)(tpe: Type) extends Tree(tpe)
     case Function(args: List[Tree], body: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case LinearFunction(arg: Tree, body: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case Let(x: Name, value: Tree, continuation: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
-    case LetTensor(x: Name, z: Name, value: Tree, continuation: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case LetTensor(x: Name, z: Name, s: Tree, continuation: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case Literal(constant: Constant)(tpe: Type) extends Tree(tpe)
     case CaseExpr(selector: Tree, cases: List[Tree])(tpe: Type) extends Tree(tpe)
     case CaseClause(pat: Tree, guard: Tree, body: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
@@ -76,20 +76,20 @@ object Trees {
 
     implied uniqName for (Tree |> Name) {
       def apply(tree: Tree) = tree match {
-        case DefSig(name, _)      => name
-        case PrimSig(name, _, _)  => name
-        case DefDef(_, sig, _, _) => apply(sig)
-        case Tagged(name, _)      => name
-        case Bind(name, _)        => name
-        case Ident(name)          => name
-        case _                    => EmptyName
+        case DefSig(name, _)        => name
+        case LinearSig(name, _, _)  => name
+        case DefDef(_, sig, _, _)   => apply(sig)
+        case Tagged(name, _)        => name
+        case Bind(name, _)          => name
+        case Ident(name)            => name
+        case _                      => EmptyName
       }
     }
 
     def (tree: Tree) linearArg: Name = tree match {
-      case PrimSig(_, _, linearArg) => linearArg
-      case LinearFunction(arg,_)    => arg.convert
-      case _                        => EmptyName
+      case LinearSig(_, _, linearArg) => linearArg
+      case LinearFunction(arg,_)      => arg.convert
+      case _                          => EmptyName
     }
 
     def (t: Tree) toNames: List[Name] = {

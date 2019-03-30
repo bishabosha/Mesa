@@ -23,7 +23,7 @@ object Names {
     case From(derived: Derived)
     case Comp(derived: Derived)
     case ComputationTag, IntegerTag, DecimalTag, EitherTag, VoidTag,
-      BooleanTag, StringTag, CharTag, Wildcard, TensorTag,
+      VoidCompTag, BooleanTag, StringTag, CharTag, Wildcard, TensorTag,
       CoTensorTag
     case EmptyName
   }
@@ -38,7 +38,8 @@ object Names {
       ),
       FunctionType(
         Variable("$B#".readAs),
-        TensorType(
+        InfixAppliedType(
+          TypeRef(TensorTag),
           AppliedType(
             TypeRef("!".readAs),
             List(Variable("$A".readAs))
@@ -54,7 +55,8 @@ object Names {
       Variable("$A#".readAs),
       FunctionType(
         Variable("$B#".readAs),
-        CoTensorType(
+        InfixAppliedType(
+          TypeRef(CoTensorTag),
           Variable("$A#".readAs),
           Variable("$B#".readAs)
         )
@@ -94,6 +96,7 @@ object Names {
       CoTensorTag     -> coTensorConstructor,
       ComputationTag  -> bangConstructor,
       EitherTag       -> eitherConstructor,
+      VoidCompTag     -> TypeRef(VoidCompTag),
       VoidTag         -> TypeRef(VoidTag),
       IntegerTag      -> TypeRef(IntegerTag),
       DecimalTag      -> TypeRef(DecimalTag),
@@ -117,6 +120,16 @@ object Names {
   }
 
   object NameOps {
+
+    def (name: Name) nonEmpty = name != EmptyName
+
+    def (name: Name) foldEmptyName[O](empty: => O)(f: Name => O) =
+      if name == EmptyName then empty
+      else f(name)
+
+    def (name: Name) foldWildcard[O](wildcard: => O)(f: Name => O) =
+      if name == Wildcard then wildcard
+      else f(name)
 
     def (name: Name) promoteComp: Name = name match {
       case From(d)  => Comp(d)
@@ -143,6 +156,7 @@ object Names {
         case CharTag        => "Char"
         case EitherTag      => "Either"
         case VoidTag        => "Void"
+        case VoidCompTag    => "Void#"
         case EmptyName      => "<empty>"
         case Comp(n)        => n.show
         case From(n)        => n.show
@@ -162,6 +176,7 @@ object Names {
         case "Char"     => CharTag
         case "Either"   => EitherTag
         case "Void"     => VoidTag
+        case "Void#"    => VoidCompTag
         case str        => From(infer[Readable[Derived]].readAs(str))
       }
     }

@@ -34,14 +34,17 @@ object Contexts {
   opaque type Id      = Long
 
   enum Mode derives Eql {
-    case PrimitiveType, Typing, Term, Pat, PatAlt
+    case PrimitiveType, Typing, Term, Pat, PatAlt, LinearPat
   }
 
   object Mode {
     inline def mode given (mode: Mode) = mode
 
+    def isLinear given Mode =
+      LinearPat == mode
+
     def isPattern given Mode =
-      Pat == mode || PatAlt == mode
+      Pat == mode || PatAlt == mode || LinearPat == mode
 
     def isType given Mode =
       Typing == mode || PrimitiveType == mode
@@ -53,8 +56,9 @@ object Contexts {
   object ModeOps {
     implied for Showable[Mode] {
       def (m: Mode) show: String = m match {
-        case Pat | PatAlt => "pattern"
-        case Term => "term"
+        case LinearPat              => "linear pattern"
+        case Pat | PatAlt           => "pattern"
+        case Term                   => "term"
         case PrimitiveType | Typing => "typing"
       }
     }
@@ -169,6 +173,20 @@ object Contexts {
          .isDefined
     }
 
+    def uniqueStoupVariable given Context: Checked[Name] = {
+      if ctx.scope.nonEmpty then {
+        CompilerError.UnexpectedType("Context contains non linear variables.")
+      } else {
+        val stoup = ctx.stoup
+        if stoup.flatMap(ctx.typeTable.get).isEmpty then {
+          CompilerError.UnexpectedType(
+            "Context does not contain a typed linear variable")
+        } else {
+          stoup.get
+        }
+      }
+    }
+
     // no changes required by stoup
     def lookIn(id: Id) given Context: Checked[Context] = {
       ctx.scope.collectFirst[Checked[Context]] {
@@ -197,13 +215,17 @@ object Contexts {
     }
 
     def contains(name: Name) given Context = {
-      name != EmptyName && {
+      name.nonEmpty && {
         inStoup(name) || inScope(name)
       }
     }
 
+    def containsForStoup(name: Name) given Context = {
+      contains(name) || ctx.stoup.nonEmpty
+    }
+
     def containsDeep(name: Name) given Context = {
-      name != EmptyName && {
+      name.nonEmpty && {
         inStoupDeep(name) || inScope(name)
       }
     }
@@ -224,28 +246,34 @@ object Contexts {
     }
 
     def enterStoup(name: Name) given Context: Checked[Unit] = {
-      guardContains(name)(ctx.stoup = Some(name))
+      guardContainsForStoup(name) {
+        ctx.stoup = Some(name)
+      }
     }
 
-    private def guardContains[O](name: Name)
+    private def guardContainsForStoup[O](name: Name)
                                 (f: given Context => Checked[O])
                                 given Context = {
-      guardContainsImpl(name)(contains)(f)
+      guardContainsImpl(name)(containsForStoup)(f){ n =>
+        s"Illegal attempt to put multiples variables in linear context with name: ${n.show}"
+      }
     }
 
     private def guardContainsDeep[O](name: Name)
                                 (f: given Context => Checked[O])
                                 given Context = {
-      guardContainsImpl(name)(containsDeep)(f)
+      guardContainsImpl(name)(containsDeep)(f) { n =>
+        s"Illegal shadowing in scope of name: ${n.show}"
+      }
     }
 
     private def guardContainsImpl[O](name: Name)
                                     (check: Name => given Context => Boolean)
                                     (f: given Context => Checked[O])
+                                    (msg: Name => String)
                                     given Context: Checked[O] = {
       if check(name) then {
-        CompilerError.UnexpectedType(
-          s"Illegal shadowing in scope of name: ${name.show}")
+        CompilerError.UnexpectedType(msg(name))
       } else {
         f
       }
@@ -378,7 +406,7 @@ object Contexts {
           for {
             pair <- ctx.scope.filter { pair =>
                       val (Sym(_, name), child) = pair
-                      child.scope.nonEmpty || child.stoup.nonEmpty || name != EmptyName
+                      child.scope.nonEmpty || child.stoup.nonEmpty || name.nonEmpty
                     }
             (sym, child)  = pair
             tpeOpt        = ctx.typeTable.get(sym.name)

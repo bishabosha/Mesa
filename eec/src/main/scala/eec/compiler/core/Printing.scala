@@ -20,15 +20,15 @@ object Printing {
       case PackageDef(pid: Ast, stats: List[Ast])
       case DefDef(modifiers: Set[Modifier], sig: Ast, tpeAs: Ast, body: Ast)
       case DefSig(name: Name, args: List[Name])
-      case PrimSig(name: Name, args: List[Name], linear: Name)
+      case LinearSig(name: Name, args: List[Name], linear: Name)
       case Apply(id: Ast, args: List[Ast])
-      case InfixApplyType(f: Ast, left: Ast, right: Ast)
+      case InfixApply(f: Ast, left: Ast, right: Ast)
       case Eval(f: Ast, arg: Ast)
       case Tensor(value: Ast, computation: Ast)
       case Function(args: List[Ast], body: Ast)
       case LinearFunction(arg: Ast, body: Ast)
       case Let(x: Name, value: Ast, continuation: Ast)
-      case LetTensor(x: Name, z: Name, value: Ast, continuation: Ast)
+      case LetTensor(x: Name, z: Name, s: Ast, t: Ast)
       case Literal(constant: Constant)
       case CaseExpr(selector: Ast, cases: List[Ast])
       case CaseClause(pat: Ast, guard: Ast, body: Ast)
@@ -54,12 +54,12 @@ object Printing {
         case Tree.DefDef(modifiers, sig, tpeAs, body) =>
           DefDef(modifiers, toAst(sig), toAst(tpeAs), toAst(body))
 
-        case Tree.DefSig(name, args)      => DefSig(name, args)
-        case Tree.PrimSig(name, arg, lin) => PrimSig(name, arg, lin)
-        case Tree.Apply(id, args)         => Apply(toAst(id), args.map(toAst))
+        case Tree.DefSig(name, args)        => DefSig(name, args)
+        case Tree.LinearSig(name, arg, lin) => LinearSig(name, arg, lin)
+        case Tree.Apply(id, args)           => Apply(toAst(id), args.map(toAst))
 
-        case Tree.InfixApplyType(f, left, right) =>
-          InfixApplyType(toAst(f), toAst(left), toAst(right))
+        case Tree.InfixApply(f, left, right) =>
+          InfixApply(toAst(f), toAst(left), toAst(right))
 
         case Tree.Eval(f, arg) => Eval(toAst(f), toAst(arg))
 
@@ -75,8 +75,8 @@ object Printing {
         case Tree.Let(name, value, continuation) =>
           Let(name, toAst(value), toAst(continuation))
 
-        case Tree.LetTensor(x, z, value, continuation) =>
-          LetTensor(x, z, toAst(value), toAst(continuation))
+        case Tree.LetTensor(x, z, s, t) =>
+          LetTensor(x, z, toAst(s), toAst(t))
 
         case Tree.Literal(constant) => Literal(constant)
 

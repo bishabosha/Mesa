@@ -24,6 +24,15 @@ class TopDefTest {
     "unit: () = ()" -> "()"
   )
 
+  @Test def typecheckLinearSig() = typecheck(
+    """InRproxy [r] : R# -* L# |+| R# = InR [r]"""
+  -> "R# -* L# |+| R#",
+    """InRproxy2 a [r] : A -> (R# -* L# |+| R#) = InR [r]"""
+  -> "A -> (R# -* L# |+| R#)",
+    """foo : L# |+| () = InRproxy2 0 [()]"""
+  -> "L# |+| ()"
+  )
+
   @Test def failRecursion() = noType(
     """fix f: (t -> !t) -> !t =
         let !x = f x in !x"""  // error: x in f x is undefined
@@ -77,6 +86,22 @@ class TopDefTest {
   ->"a -> !a"
   )
 
+  @Test def typecheckLinearLambdaEval() = typecheck(
+    """primitive f [a]: () -* A#"""
+  -> "() -* A#",
+    """evalTest: () -* A# =
+        | (u: ()) -* f[u]"""
+  -> "() -* A#"
+  )
+
+  @Test def typecheckLambdaApply() = typecheck(
+    """primitive f a : () -> A"""
+  -> "() -> A",
+    """applyTest: () -> A =
+        \(u: ()) => f u"""
+  -> "() -> A"
+  )
+
   @Test def failMatchVariable() =  noType(
     """f e: a -> !a = case e of Left x => !x""",  // error: Either l r is not a
     """g e: a -> !a = case e of (x, _) => !x""",  // error: Tuple is not a
@@ -120,7 +145,7 @@ class TopDefTest {
     initialCtx.flatMap { (idGen, ctx) =>
       implied for IdGen = idGen
       implied for Context = ctx
-      seq.foreach { f => failIfTyped(typeStat(f)(any)) }
+      seq.foreach { f => failIfUnparsedOrTypedStat(f)(any) }
     }
   }
 

@@ -10,6 +10,7 @@ import CompilerErrorOps._
 import core.Contexts._
 import core.Names._
 import Name._
+import NameOps._
 import Context._
 import Mode._
 import util.Convert
@@ -22,23 +23,18 @@ object Namers {
 
   private[this] val anon = EmptyName
 
-  def namedDefDef(sig: DefSig | PrimSig)
+  def namedDefDef(sig: DefSig | LinearSig)
                  (tpeAs: Tree, body: Tree)
                  given Context, Mode: Checked[Unit] = {
     val (name, args) = sig match {
-      case PrimSig(name, args, _) => (name, args)
+      case LinearSig(name, args, _) => (name, args)
       case DefSig(name, args)     => (name, args)
     }
     enterScope(sig.id, name).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
         _ <- args.mapE(enterVariable)
-        _ <- checked {
-          val stoupVar = sig.linearArg
-          if stoupVar != EmptyName then {
-            enterStoup(stoupVar)
-          }
-        }
+        _ <- sig.linearArg.foldEmptyName(())(enterStoup)
         _ <- index(body)
       } yield ()
     }
@@ -98,8 +94,7 @@ object Namers {
     } yield ()
   }
 
-  def namedLet(letName: Name)
-              (value: Tree, continuation: Tree)
+  def namedLet(letName: Name, value: Tree, continuation: Tree)
               (id: Id)
               given Context, Mode: Checked[Unit] = {
     for {
@@ -114,13 +109,29 @@ object Namers {
     } yield ()
   }
 
+  def namedLetTensor(x: Name, z: Name, s: Tree, t: Tree)
+                    (id: Id)
+                    given Context, Mode: Checked[Unit] = {
+    for {
+      _ <-  index(s)
+      _ <-  enterScope(id, anon).flatMap { ctx1 =>
+              implied for Context = ctx1
+              for {
+                _ <- enterVariable(x)
+                _ <- enterStoup(z)
+                _ <- index(t)
+              } yield ()
+            }
+    } yield ()
+  }
+
   def namedCaseExpr(selector: Tree, cases: List[Tree])
                    given Context, Mode: Checked[Unit] = {
     for {
       _ <-  index(selector)
       _ <-  cases.mapE { tree =>
               tree match {
-                case tree: CaseClause =>
+                case tree: (CaseClause | LinearCaseClause) =>
                   enterScope(tree.id, anon).flatMap { ctx1 =>
                     implied for Context = ctx1
                     index(tree)
@@ -143,20 +154,18 @@ object Namers {
   def namedLinearCaseClause(pat: Tree, body: Tree)
                            given Context, Mode: Checked[Unit] = {
     for {
-      _ <- indexAsPattern(pat)
+      _ <- indexAsLinearPattern(pat)
       _ <- index(body)
     } yield ()
   }
 
   def namedAlternative(alts: List[Tree]) given Context, Mode: Checked[Unit] = {
     implied for Mode = Mode.PatAlt
-    for (_ <- alts.mapE(index))
-    yield ()
+    alts.foldLeftE(())((_, t) => index(t))
   }
 
   def namedUnapply(args: List[Tree]) given Context, Mode: Checked[Unit] = {
-    for (_ <- args.mapE(index))
-    yield ()
+    args.foldLeftE(())((_, t) => index(t))
   }
 
   def namedBind(name: Name, pat: Tree)
@@ -168,18 +177,24 @@ object Namers {
   }
 
   def namedParens(args: List[Tree]) given Context, Mode: Checked[Unit] = {
-    for (_ <- args.mapE(index))
-    yield ()
+    args.foldLeftE(())((_, t) => index(t))
   }
 
   def namedIdentPat(name: Name) given Context, Mode: Checked[Unit] = {
-    if name != Wildcard then {
-      enterVariable(name)
-    }
+    name.foldWildcard(())(enterVariable)
+  }
+
+  def namedIdentLinearPat(name: Name) given Context, Mode: Checked[Unit] = {
+    name.foldWildcard(())(enterStoup)
   }
 
   def indexAsPattern(tree: Tree) given Context: Checked[Unit] = {
     implied for Mode = Mode.Pat
+    index(tree)
+  }
+
+  def indexAsLinearPattern(tree: Tree) given Context: Checked[Unit] = {
+    implied for Mode = Mode.LinearPat
     index(tree)
   }
 
@@ -189,6 +204,9 @@ object Namers {
   }
 
   def index(tree: Tree) given Context, Mode: Checked[Unit] = tree match {
+    /* Linear Pattern Trees */
+    case Ident(n)                 if isLinear   => namedIdentLinearPat(n)
+    case Unapply(_,ts)            if isLinear   => namedUnapply(ts)
     /* Pattern Trees */
     case Ident(n)                 if isPattern  => namedIdentPat(n)
     case Bind(n,t)                if isPattern  => namedBind(n,t)
@@ -200,10 +218,11 @@ object Namers {
     case Eval(t,c)                if isTerm     => namedEvalTerm(t,c)
     case DefDef(                  // DefDef
       _,                          // DefDef
-      s: (DefSig | PrimSig),      // DefDef
+      s: (DefSig | LinearSig),    // DefDef
       t,                          // DefDef
       b)                          if isTerm     => namedDefDef(s)(t,b)
-    case u @ Let(n,v,c)           if isTerm     => namedLet(n)(v,c)(u.id)
+    case u @ Let(n,v,c)           if isTerm     => namedLet(n,v,c)(u.id)
+    case u @ LetTensor(x,z,s,t)   if isTerm     => namedLetTensor(x,z,s,t)(u.id)
     case u @ Function(ts,t)       if isTerm     => namedFunctionTerm(ts,t)(u.id)
     case u @ LinearFunction(a,b)  if isTerm     => namedLinearFunctionTerm(a,b)(u.id)
     case LinearCaseExpr(t,ts)     if isTerm     => namedCaseExpr(t,ts)
