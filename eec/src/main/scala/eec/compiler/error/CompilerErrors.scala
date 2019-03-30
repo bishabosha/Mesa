@@ -25,6 +25,12 @@ object CompilerErrors {
 
     def checked[O](o: Checked[O]): Checked[O] = o
 
+    def (o: Checked[O]) onError [O]
+        (handler: CompilerError => Nothing): O = o match {
+      case err: CompilerError => handler(err)
+      case _                  => o.asInstanceOf[O]
+    }
+
     def (o: Checked[O]) fold [O, U]
         (e: CompilerError => U)
         (f: O => U): U = o match {

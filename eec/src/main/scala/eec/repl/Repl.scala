@@ -32,6 +32,7 @@ import implied CompilerErrorOps._
 import implied TypeOps._
 import implied NameOps._
 import implied AstOps._
+import implied TreeOps._
 
 object Repl {
 
@@ -129,7 +130,8 @@ object Repl {
         typed.fold
           { err => println(s"[ERROR] ${err.show}") }
           { tpd =>
-            val DefDef(_, DefSig(name, _), _, _) = tpd
+            val DefDef(_, sig, _, _) = tpd
+            val name: Name = sig.convert
             println(s"defined ${name.show} : ${tpd.tpe.show}")
           }
 

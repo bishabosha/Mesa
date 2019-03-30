@@ -793,8 +793,12 @@ object Typers {
     if mode == PatAlt && name != Wildcard then {
       TyperErrors.nameInPattAlt(name)
     } else {
-      name.foldWildcard(())(n => putType(n -> pt))
-      Ident(name)(id, pt)
+      for {
+        _ <- name.foldWildcard(()) { n =>
+          for (_ <- assertNotInStoupForValue(n, pt))
+          yield putType(n -> pt)
+        }
+      } yield Ident(name)(id, pt)
     }
   }
 

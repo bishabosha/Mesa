@@ -9,6 +9,8 @@ import error.CompilerErrors._
 import CompilerErrorOps._
 import core.Contexts._
 import core.Names._
+import core.Modifiers._
+import Modifier.Primitive
 import Name._
 import NameOps._
 import Context._
@@ -23,7 +25,7 @@ object Namers {
 
   private[this] val anon = EmptyName
 
-  def namedDefDef(sig: DefSig | LinearSig)
+  def namedDefDef(modifiers: Set[Modifier], sig: DefSig | LinearSig)
                  (tpeAs: Tree, body: Tree)
                  given Context, Mode: Checked[Unit] = {
     val (name, args) = sig match {
@@ -34,10 +36,22 @@ object Namers {
       implied for Context = ctx1
       for {
         _ <- args.mapE(enterVariable)
-        _ <- sig.linearArg.foldEmptyName(())(enterStoup)
+        _ <- sig.linearArg.foldEmptyName(())(enterLinearArgDef(modifiers))
         _ <- index(body)
       } yield ()
     }
+  }
+
+  def enterLinearArgDef(mods: Set[Modifier])(linearArg: Name) given Context: Checked[Unit] = {
+    val enterArg = {
+      val isPrimitive = mods.contains(Primitive)
+      val isWildcard  = linearArg == Wildcard
+      (isPrimitive && !isWildcard) || !isPrimitive
+    }
+    if enterArg then
+      enterStoup(linearArg)
+    else
+      ()
   }
 
   def namedFunctionTerm(args: List[Tree], body: Tree)
@@ -176,17 +190,14 @@ object Namers {
     } yield ()
   }
 
-  def namedParens(args: List[Tree]) given Context, Mode: Checked[Unit] = {
+  def namedParens(args: List[Tree]) given Context, Mode: Checked[Unit] =
     args.foldLeftE(())((_, t) => index(t))
-  }
 
-  def namedIdentPat(name: Name) given Context, Mode: Checked[Unit] = {
-    name.foldWildcard(())(enterVariable)
-  }
+  def namedIdentPat(name: Name) given Context, Mode: Checked[Unit] =
+    enterVariable(name)
 
-  def namedIdentLinearPat(name: Name) given Context, Mode: Checked[Unit] = {
+  def namedIdentLinearPat(name: Name) given Context, Mode: Checked[Unit] =
     name.foldWildcard(())(enterStoup)
-  }
 
   def indexAsPattern(tree: Tree) given Context: Checked[Unit] = {
     implied for Mode = Mode.Pat
@@ -217,10 +228,10 @@ object Namers {
     case Apply(t,ts)              if isTerm     => namedApplyTerm(t,ts)
     case Eval(t,c)                if isTerm     => namedEvalTerm(t,c)
     case DefDef(                  // DefDef
-      _,                          // DefDef
+      m,                          // DefDef
       s: (DefSig | LinearSig),    // DefDef
       t,                          // DefDef
-      b)                          if isTerm     => namedDefDef(s)(t,b)
+      b)                          if isTerm     => namedDefDef(m,s)(t,b)
     case u @ Let(n,v,c)           if isTerm     => namedLet(n,v,c)(u.id)
     case u @ LetTensor(x,z,s,t)   if isTerm     => namedLetTensor(x,z,s,t)(u.id)
     case u @ Function(ts,t)       if isTerm     => namedFunctionTerm(ts,t)(u.id)

@@ -2,10 +2,11 @@ package eec.report.example
 
 primitive x + y : Integer -> Integer -> Integer
 primitive s1 ++ s2 : String -> String -> String
-primitive debug x : a -> String
+primitive debug x : A -> String
 primitive putStrLn s : String -> !()
 primitive readInteger : !Integer
-primitive a == b : a -> a -> Boolean
+primitive a == b : A -> A -> Boolean
+primitive eval [a] : A# -* ()
 
 primitive absurd v : Void -> A
 primitive Left  l : L -> Either L R
@@ -20,18 +21,28 @@ liftD : (A -> B#) -> !A -> B# =
 liftC : (A -> B) -> A -> !B =
   \(f: A -> B)(x: A) => !(f x)
 
+const x _ : A -> B -> A =
+  x
+
 evalAbsurd f: (Void -> ()) -> () = ()
 
 givenAbsurd: () = evalAbsurd absurd
+
+safeDuplication [a] : A# -* () =
+  | case (a, a) of
+    (q, _) -* eval [q]
+    (_, r) -* eval [r]
 
 linearMatchInR: () =
   | case InR [()] of
     InR [m] -* m
     InL [n] -* ()
 
-linearMatchTuple: () =
-  | case ((), ()) of
-    (x, _) -* x
+stateMake v [s] : V -> (S# -* !V |*| S#) =
+  !v |*| s
+
+contMake a [f] : A -> ((A -> R#) -* R#) =
+  f a
 
 evalTest: () =
   (| (a: ()) -* a)[()]

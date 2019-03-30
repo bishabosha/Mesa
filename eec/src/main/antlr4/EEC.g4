@@ -158,7 +158,7 @@ bindings
 
 bindingsTagged: ('(' binding ')')+;
 
-binding: id ':' type;
+binding: (id | Wildcard) ':' type;
 
 //
 // -- Declarations and Definitions
@@ -174,23 +174,19 @@ def: defDef;
 
 defDef: (defSig | linearSig) (':' type)/*?*/ '=' expr Sep?;
 
-linearSig: alphaId Varid*? '[' Varid ']';
+linearSig: alphaId paramName*? '[' paramName ']';
 
-defSig: infixDefSig | alphaId Varid*;
+defSig: infixDefSig | alphaId paramName*;
 
 infixDefSig:
-	Varid (OpId | '`' alphaId '`') Varid
+	paramName (OpId | '`' alphaId '`') paramName
 	| prefixOpSig;
 
-prefixOpSig: '(' OpId ')' Varid Varid;
+prefixOpSig: '(' OpId ')' paramName paramName;
 
-//fixity: Fixity IntegerLiteral operator (',' operator)*;
+paramName: Wildcard | Varid;
 
 packageInfo: 'package' qualId;
-
-//topStatSeq: topStat (Sep? topStat)*;
-
-//topStat: fixity;
 
 statSeq: stat (Sep? stat)*;
 
@@ -201,13 +197,12 @@ statAsTop: stat EOF;
 exprAsTop: expr EOF;
 
 translationUnit:
-	Sep* packageInfo Sep* /*(topStatSeq Sep?)? */ (statSeq Sep*)? EOF;
+	Sep* packageInfo Sep* (statSeq Sep*)? EOF;
 
 //
 // Lexer Defs
 //
 
-Fixity: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
 Dashes: '--';
 Bang: '!';
 Tensor: '|*|';

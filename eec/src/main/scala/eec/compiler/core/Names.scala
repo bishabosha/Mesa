@@ -123,11 +123,11 @@ object Names {
 
     def (name: Name) nonEmpty = name != EmptyName
 
-    def (name: Name) foldEmptyName[O](empty: => O)(f: Name => O) =
+    def (name: Name) foldEmptyName[O, U](empty: => O)(f: Name => U): O | U =
       if name == EmptyName then empty
       else f(name)
 
-    def (name: Name) foldWildcard[O](wildcard: => O)(f: Name => O) =
+    def (name: Name) foldWildcard[O, U](wildcard: => O)(f: Name => U): O | U =
       if name == Wildcard then wildcard
       else f(name)
 
@@ -145,30 +145,30 @@ object Names {
 
     implied for Showable[Name] {
       def (n: Name) show = n match {
-        case Wildcard       => "_"
+        case Comp(n)        => n.show
+        case From(n)        => n.show
         case ComputationTag => "!"
         case TensorTag      => "|*|"
         case CoTensorTag    => "|+|"
+        case EitherTag      => "Either"
+        case VoidTag        => "Void"
+        case VoidCompTag    => "Void#"
         case IntegerTag     => "Integer"
         case DecimalTag     => "Decimal"
         case BooleanTag     => "Boolean"
         case StringTag      => "String"
         case CharTag        => "Char"
-        case EitherTag      => "Either"
-        case VoidTag        => "Void"
-        case VoidCompTag    => "Void#"
+        case Wildcard       => "_"
         case EmptyName      => "<empty>"
-        case Comp(n)        => n.show
-        case From(n)        => n.show
       }
     }
 
     implied for Readable[Name] {
-      def (s: String) readAs = s match {
-        case "_"        => Wildcard
+      def (str: String) readAs = str match {
         case "!"        => ComputationTag
         case "|*|"      => TensorTag
         case "|+|"      => CoTensorTag
+        case "_"        => Wildcard
         case "Integer"  => IntegerTag
         case "Decimal"  => DecimalTag
         case "Boolean"  => BooleanTag
@@ -177,7 +177,7 @@ object Names {
         case "Either"   => EitherTag
         case "Void"     => VoidTag
         case "Void#"    => VoidCompTag
-        case str        => From(infer[Readable[Derived]].readAs(str))
+        case _          => From(infer[Readable[Derived]].readAs(str))
       }
     }
   }

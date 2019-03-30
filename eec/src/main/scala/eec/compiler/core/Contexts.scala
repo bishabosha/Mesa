@@ -197,7 +197,7 @@ object Contexts {
     }
 
     def lookForInScope(name: Name) given Context: Checked[Unit] = {
-      if !inScope(name) then {
+      if name != Wildcard && !inScope(name) then {
         CompilerError.IllegalState(
           s"No variable in immediate scope found for name `${name.show}`")
       } else {
@@ -206,7 +206,7 @@ object Contexts {
     }
 
     def lookForInStoup(name: Name) given Context: Checked[Unit] = {
-      if !inStoup(name) then {
+      if name != Wildcard && !inStoup(name) then {
         CompilerError.IllegalState(
           s"No variable in immediate linear scope found for name `${name.show}`")
       } else {
@@ -239,21 +239,28 @@ object Contexts {
     }
 
     def enterVariable(name: Name) given Context: Checked[Unit] = {
-      guardContainsDeep(name) {
-        ctx.scope += Sym(noId, name) -> new Fresh(ctx)
-        ()
+      name.foldWildcard(()) {
+        guardContainsDeep(_) {
+          ctx.scope += Sym(noId, name) -> new Fresh(ctx)
+          ()
+        }
       }
     }
 
     def enterStoup(name: Name) given Context: Checked[Unit] = {
       guardContainsForStoup(name) {
-        ctx.stoup = Some(name)
+        name.foldWildcard
+          { CompilerError.UnexpectedType(
+            "Illegal anonymous variable in stoup.") }
+          { name =>
+            ctx.stoup = Some(name)
+          }
       }
     }
 
     private def guardContainsForStoup[O](name: Name)
-                                (f: given Context => Checked[O])
-                                given Context = {
+                                        (f: given Context => Checked[O])
+                                        given Context = {
       guardContainsImpl(name)(containsForStoup)(f){ n =>
         s"Illegal attempt to put multiples variables in linear context with name: ${n.show}"
       }

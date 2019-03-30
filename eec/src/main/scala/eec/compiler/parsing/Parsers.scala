@@ -376,7 +376,7 @@ object Parsers {
       if defined(context.Varid) then
         context.Varid.getText.readAs
       else
-        context.Wildcard.getText.readAs
+        Wildcard
     }
     for (exprs <- context.expr.mapE(fromExpr)) yield {
       val value         = exprs.get(0)
@@ -390,7 +390,7 @@ object Parsers {
     var varids = context.Varid.map(_.getText.readAs)
     var x = {
       if defined(context.Wildcard) then
-        context.Wildcard.getText.readAs
+        Wildcard
       else
         varids(0)
     }
@@ -677,8 +677,13 @@ object Parsers {
 
   private[this] def fromBinding
       (context: EECParser.BindingContext) given IdGen: Tree = {
-    val List(name)  = fromId(context.id).toNames
-    val typ         = fromType(context.`type`)
+    val name: Name  = {
+      if defined(context.id) then
+        fromId(context.id).convert
+      else
+        Wildcard
+    }
+    val typ = fromType(context.`type`)
     Tagged(name, typ)(uTpe)
   }
 
@@ -690,8 +695,8 @@ object Parsers {
     fromPrimDcl(context.primDecl).addModifiers(Set(Primitive))
   }
 
-  private[this] def fromPrimDcl
-      (context: EECParser.PrimDeclContext) given IdGen: Tree = {
+  private[this] def fromPrimDcl(context: EECParser.PrimDeclContext)
+                               given IdGen: Tree = {
     val sig = {
       if defined(context.defSig) then
         fromDefSig(context.defSig)
@@ -702,15 +707,19 @@ object Parsers {
     DefDef(Set(), sig, typ, EmptyTree)(uTpe)
   }
 
-  private[this] def fromLinearSig
-      (context: EECParser.LinearSigContext) given IdGen: Tree = {
-    var name    = (fromAlphaId(context.alphaId).convert: Name)
-    val varids  = context.Varid.map(_.getText.readAs)
-    if varids.size == 1 then
-      LinearSig(name, Nil, varids(0))(freshId(), uTpe)
+  private[this] def fromLinearSig(context: EECParser.LinearSigContext)
+                                 given IdGen: Tree = {
+    var name     = (fromAlphaId(context.alphaId).convert: Name)
+    val paramids = context.paramName.map(fromParamName)
+    if paramids.size == 1 then
+      LinearSig(name, Nil, paramids(0))(freshId(), uTpe)
     else
-      LinearSig(name, varids.init.toList, varids.last)(freshId(), uTpe)
+      LinearSig(name, paramids.init.toList, paramids.last)(freshId(), uTpe)
   }
+
+  private[this] def fromParamName(context: EECParser.ParamNameContext): Name =
+    if defined(context.Wildcard) then Wildcard
+    else context.Varid.getText.readAs
 
   private[this] def fromDef
       (context: EECParser.DefContext) given IdGen: Checked[Tree] =
@@ -742,8 +751,8 @@ object Parsers {
   private[this] def fromPrefixDefSig
       (context: EECParser.DefSigContext) given IdGen: Tree = {
     var name      = (fromAlphaId(context.alphaId).convert: Name)
-    var varids    = context.Varid.map(_.getText.readAs).toList
-    DefSig(name, varids)(freshId(), uTpe)
+    var paramids  = context.paramName.map(fromParamName).toList
+    DefSig(name, paramids)(freshId(), uTpe)
   }
 
   private[this] def fromInfixDefSig
@@ -756,32 +765,23 @@ object Parsers {
       fromInfixAlphaSig(context)
   }
 
-  private[this] def infixArgs
-      (context: EECParser.InfixDefSigContext) given IdGen: List[Name] = {
-    context.Varid
-      .map(_.getText.readAs)
-      .toList
-  }
-
   private[this] def fromInfixOpSig
       (context: EECParser.InfixDefSigContext) given IdGen: Tree = {
-    var args = infixArgs(context)
+    var args = context.paramName.map(fromParamName).toList
     var name = context.OpId.getText.readAs
     DefSig(name, args)(freshId(), uTpe)
   }
 
   private[this] def fromInfixAlphaSig
       (context: EECParser.InfixDefSigContext) given IdGen: Tree = {
-    var args  = infixArgs(context)
+    var args  = context.paramName.map(fromParamName).toList
     val name  = (fromAlphaId(context.alphaId).convert: Name)
     DefSig(name, args)(freshId(), uTpe)
   }
 
   private[this] def fromPrefixOpSig
       (context: EECParser.PrefixOpSigContext) given IdGen: Tree = {
-    var args = context.Varid
-      .map(_.getText.readAs)
-      .toList
+    var args = context.paramName.map(fromParamName).toList
     val name = context.OpId.getText.readAs
     DefSig(name, args)(freshId(), uTpe)
   }

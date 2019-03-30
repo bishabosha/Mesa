@@ -206,11 +206,10 @@ class TyperTest {
   )
 
   @Test def failLinearLambda() = noType(
-    """| (f: A -> B#) -* \(x: !A) => let !y = x in f y""", // error: no dependency on f allowed
     """| (a: A) -* !a""", // error: a is not of computation type, so cant be in stoup
     """| (b: B#) -* !b""", // error: no dependency on b allowed
     """| (a: A#) -* | (b: B#) -* ()""", // error: rhs is not computational codomain
-    """(| (a: ()) -* \(b: ()) => | (c: ()) -* a)[()]""" // error: no dependency on a allowed
+    """(| (a: ()) -* \(b: ()) => | (c: ()) -* a)""" // error: no dependency on a allowed
   )
 
   @Test def typecheckEval() = typecheck(
@@ -219,12 +218,13 @@ class TyperTest {
 
   @Test def typecheckLet() = typecheck(
     "let !x = !() in ()"  -> "()",
-    "let !x = !0 in !x"   -> "!Integer"
+    "let !x = !0 in !x"   -> "!Integer",
   )
 
   @Test def failLet() = noType(
     "let !x = () in ()",  // error: () is not ! type
-    "let !x = !0 in 0"    // error: 0 is not of computation type
+    "let !x = !0 in 0",   // error: 0 is not of computation type
+    "| (u: ()) -* let !_ = !() in u", // error: no dependency on u allowed
   )
 
   @Test def typecheckLetTensor() = typecheck(
@@ -245,26 +245,23 @@ class TyperTest {
   }
 
   def typecheck(seq: (String, String)*): Unit = {
-    initialCtx.flatMap { (idGen, ctx) =>
-      implied for IdGen = idGen
-      implied for Context = ctx
-      seq.toList.mapE((f, s) => checkTpe(typeExpr(f)(any), s))
-    }
+    val (idGen, ctx)    = initialCtx
+    implied for IdGen   = idGen
+    implied for Context = ctx
+    seq.toList.foreach { (f, s) => checkTpe(typeExpr(f)(any), s) }
   }
 
   def noType(seq: String*): Unit = {
-    initialCtx.flatMap { (idGen, ctx) =>
-      implied for IdGen = idGen
-      implied for Context = ctx
-      seq.toList.mapE(f => failIfUnparsedOrTypedExpr(f)(any))
-    }
+    val (idGen, ctx)    = initialCtx
+    implied for IdGen   = idGen
+    implied for Context = ctx
+    seq.toList.foreach { f => failIfUnparsedOrTypedExpr(f)(any) }
   }
 
   def noParse(seq: String*): Unit = {
-    initialCtx.flatMap { (idGen, ctx) =>
-      implied for IdGen = idGen
-      implied for Context = ctx
-      seq.toList.mapE(f => failIfParsed(parseExpr)(f))
-    }
+    val (idGen, ctx)    = initialCtx
+    implied for IdGen   = idGen
+    implied for Context = ctx
+    seq.toList.foreach { f => failIfParsed(parseExpr)(f) }
   }
 }

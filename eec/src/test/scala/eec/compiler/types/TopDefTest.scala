@@ -24,13 +24,22 @@ class TopDefTest {
     "unit: () = ()" -> "()"
   )
 
+  @Test def typecheckWildcard() = typecheck(
+    "const x _: A -> B -> A = x" -> "A -> B -> A"
+  )
+
   @Test def typecheckLinearSig() = typecheck(
-    """InRproxy [r] : R# -* L# |+| R# = InR [r]"""
-  -> "R# -* L# |+| R#",
-    """InRproxy2 a [r] : A -> (R# -* L# |+| R#) = InR [r]"""
+    """InRproxy _ [r] : A -> (R# -* L# |+| R#) = InR [r]"""
   -> "A -> (R# -* L# |+| R#)",
-    """foo : L# |+| () = InRproxy2 0 [()]"""
-  -> "L# |+| ()"
+    """foo : L# |+| () =
+        InRproxy 0 [()]"""
+  -> "L# |+| ()",
+    """primitive ok _ [_] : A -> (() -* ())"""
+  -> "A -> (() -* ())"
+  )
+
+  @Test def failLinearSig() = noType(
+    """linearFail _ [_] : A -> (() -* ()) = ()""" // error: cant put wildcard in stoup for non primitive
   )
 
   @Test def failRecursion() = noType(
@@ -64,6 +73,16 @@ class TopDefTest {
     """ma >>= f: !t -> (t -> !u) -> !u =
         (lift f) ma"""
   ->"!t -> (t -> !u) -> !u"
+  )
+
+  @Test def linearNonDuplication() = typecheck(
+    """primitive consume [a] : A# -* ()"""
+  -> "A# -* ()",
+    """safeDuplication [a] : A# -* () =
+        | case (a, a) of
+          (q, _) -* consume [q]
+          (_, r) -* consume [r]"""
+  -> "A# -* ()"
   )
 
   @Test def typecheckMatchEither() = typecheck(
@@ -134,26 +153,23 @@ class TopDefTest {
   )
 
   private def typecheck(seq: (String, String)*): Unit = {
-    initialCtx.flatMap { (idGen, ctx) =>
-      implied for IdGen = idGen
-      implied for Context = ctx
-      seq.toList.mapE((f, s) => checkTpe(typeStat(f)(any), s))
-    }
+    val (idGen, ctx)    = initialCtx
+    implied for IdGen   = idGen
+    implied for Context = ctx
+    seq.foreach { (f, s) => checkTpe(typeStat(f)(any), s) }
   }
 
   private def noType(seq: String*): Unit = {
-    initialCtx.flatMap { (idGen, ctx) =>
-      implied for IdGen = idGen
-      implied for Context = ctx
-      seq.foreach { f => failIfUnparsedOrTypedStat(f)(any) }
-    }
+    val (idGen, ctx)    = initialCtx
+    implied for IdGen   = idGen
+    implied for Context = ctx
+    seq.foreach { f => failIfUnparsedOrTypedStat(f)(any) }
   }
 
   private def someNoType(seq: String*): Unit = {
-    initialCtx.flatMap { (idGen, ctx) =>
-      implied for IdGen = idGen
-      implied for Context = ctx
-      failIfAllTyped(seq.mapE { f => typeStat(f)(any) })
-    }
+    val (idGen, ctx)    = initialCtx
+    implied for IdGen   = idGen
+    implied for Context = ctx
+    failIfAllTyped(seq.mapE { f => typeStat(f)(any) })
   }
 }

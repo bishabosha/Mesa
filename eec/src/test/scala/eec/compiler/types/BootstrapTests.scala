@@ -98,21 +98,23 @@ object BootstrapTests {
   }
 
   def checkTpe(parsed: Checked[Tree], checkTpe: String): Unit = {
-      parsed.fold
-        { err => fail(err.show) }
-        { tpd => assertEquals(checkTpe, tpd.tpe.show) }
-    }
+    parsed.fold
+      { err => fail(err.show) }
+      { tpd => assertEquals(checkTpe, tpd.tpe.show) }
+  }
 
-  def initialCtx: Checked[(IdGen, Context)] = {
+  def initialCtx: (IdGen, Context) = {
 
     val idGen = new IdGen
     val ctx   = new RootContext()
     implied for Context = ctx
     implied for IdGen   = idGen
 
-    for {
+    val pair = for {
       _ <- Context.enterBootstrapped
       _ <- compiler.preludeDefs.mapE(typeStat(_)(any))
     } yield (idGen, ctx)
+
+    pair.onError { err => fail(s"[INIT] ${err.show}"); ??? }
   }
 }
