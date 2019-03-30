@@ -29,17 +29,18 @@ class TopDefTest {
   )
 
   @Test def typecheckLinearSig() = typecheck(
-    """InRproxy _ [r] : A -> (R# -* L# |+| R#) = InR [r]"""
+    """InRproxy _ [r] : A -> (R# -* L# |+| R#) =
+        InR [r]"""
   -> "A -> (R# -* L# |+| R#)",
     """foo : L# |+| () =
         InRproxy 0 [()]"""
   -> "L# |+| ()",
-    """primitive ok _ [_] : A -> (() -* ())"""
-  -> "A -> (() -* ())"
+    """primitive ok _ [_] : () -> (() -* ())"""
+  -> "() -> (() -* ())"
   )
 
   @Test def failLinearSig() = noType(
-    """linearFail _ [_] : A -> (() -* ()) = ()""" // error: cant put wildcard in stoup for non primitive
+    """linearFail _ [_] : () -> (() -* ()) = ()""" // error: cant put wildcard in stoup for non primitive
   )
 
   @Test def failRecursion() = noType(
@@ -67,42 +68,22 @@ class TopDefTest {
   )
 
   @Test def typecheckLiftBind() = typecheck(
-    """lift f: (a -> b#) -> !a -> b# =
-        \(c: !a) => let !x = c in f x"""
+    """lift f x: (a -> b#) -> !a -> b# =
+        let !y = x in f y"""
   ->"(a -> b#) -> !a -> b#",
     """ma >>= f: !t -> (t -> !u) -> !u =
-        (lift f) ma"""
+        lift f ma"""
   ->"!t -> (t -> !u) -> !u"
   )
 
   @Test def linearNonDuplication() = typecheck(
-    """primitive consume [a] : A# -* ()"""
+    """primitive consume : A# -* ()"""
   -> "A# -* ()",
     """safeDuplication [a] : A# -* () =
         | case (a, a) of
           (q, _) -* consume [q]
           (_, r) -* consume [r]"""
   -> "A# -* ()"
-  )
-
-  @Test def typecheckMatchEither() = typecheck(
-    """cat2 e lu ru: Either x y -> (x -> !u) -> (y -> !u) -> !u =
-        case e of
-          Left  a => lu a;
-          Right b => ru b"""
-  ->"Either x y -> (x -> !u) -> (y -> !u) -> !u",
-    """catTup e lu ru: Either (x, y) z -> (x -> y -> !u) -> (z -> !u) -> !u =
-        case e of
-          Left  (a, b)  => lu a b;
-          Right c       => ru c"""
-  ->"Either (x, y) z -> (x -> y -> !u) -> (z -> !u) -> !u"
-  )
-
-  @Test def typecheckMatchVariable() = typecheck(
-    """f e: a -> !a =
-        case e of
-          x => !x"""
-  ->"a -> !a"
   )
 
   @Test def typecheckLinearLambdaEval() = typecheck(

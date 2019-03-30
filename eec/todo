@@ -46,3 +46,9 @@ computation type, as in (ii)."
 
 data Triple =
   Left A | Middle B | End C
+
+for linear pattern match on tuples - keep track of linear variables,
+  - e.g. if it duplicates linear arg then is it possible to duplicate by
+    projection
+  - I currently think not because `| (a: A#) -* | case (a,a) of p -* p`
+    has not projected, so still lazy and computations not evaluated

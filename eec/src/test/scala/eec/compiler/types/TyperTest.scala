@@ -68,7 +68,6 @@ class TyperTest {
     "(())"          -> "()",
     "((),())"       -> "((), ())",
     "((),(),())"    -> "((), (), ())",
-    "((),(),(),())" -> "((), (), (), ())"
   )
 
   @Test def typecheckTensor() = typecheck(
@@ -80,23 +79,23 @@ class TyperTest {
   )
 
   @Test def failTensorParse() = noParse(
-    "0 |*| ()", // error: syntax error
+    "0 |*| ()", // error: syntax error, expecting !
   )
 
   @Test def typecheckCompute() = typecheck(
     "!()"       -> "!()",
     "!((),())"  -> "!((), ())",
-    "(!(),!())" -> "(!(), !())"
+    "(!(),!())" -> "(!(), !())",
   )
 
   @Test def failCompute() = noType(
-    """\(c: ! a b) => ()""",  // error: expected types [_] but got [a, b]
-    "! () ()"                 // error: expected args [_: _] but got [(): (), (): ()]
+    """\(_: ! a b) => ()""", // error: expected types [_] but got [a, b]
+    """! () ()""", // error: expected args [_: _] but got [(): (), (): ()]
+    """| (x: A#) -* !x""", // error: `!t` can't depend on linear variable
   )
 
   @Test def typecheckIf() = typecheck(
-    "if True then () else ()" -> "()",
-    """\(a: Boolean) (b: Boolean) => if a then !b else !False""" -> "Boolean -> Boolean -> !Boolean"
+    "if True then () else ()" -> "()"
   )
 
   @Test def failIf() = noType(
@@ -115,52 +114,37 @@ class TyperTest {
         _ if True => ()"""          -> "()",
     """case () of
         ( ) | () => ()"""           -> "()",
-    """case "hello" of
-        "" | _ => ()"""             -> "()",
-    """case ((), ()) of
-        ((), ())  => ()
-        _         => ()"""          -> "()",
     """case ((), ()) of
         (_, a) => a"""              -> "()",
     """case ((), ((), ())) of
         (_, (_, a)) => a"""         -> "()",
     """case ((), ((), ())) of
         (a, (_, b)) => (a, b)"""    -> "((), ())",
-    """case ((), ((), ())) of
-        (_, (_, _)) => ()"""        -> "()",
     """case ((), (), ()) of
-        ((), (), ()) => ()"""       -> "()",
-    """case ((), (), (), ()) of
-        ((), (), (), ()) => ()"""   -> "()",
+        (_, _, _) => ()"""          -> "()",
     """case Left () of
-        Left x => x;
+        Left  x => x;
         Right _ => ()"""            -> "()",
     """case Right () of
         Right x => x;
-        Left _ => ()"""             -> "()",
+        Left  _ => ()"""            -> "()",
   )
 
   @Test def failCase() = noType(
     """case () of
-        (a | _) => ()""", // error: name in alternative
+        a | _ => ()""", // error: name in alternative
     """case () of
-        ()  => 1
-        ()  => False""", // error: disjoint bodies
+        () => 1
+        () => False""", // error: disjoint bodies
     """case () of
-        "abc" => ()""", // error: pattern doesn't match selector
+        "" => ()""", // error: pattern has different type to selector
     """case ((), ((), ())) of
-        (((), ()), ()) => 0""", // error: pattern doesn't match selector
+        (((), ()), ()) => 0""", // error: pattern has different type to selector
     """case ((), ((), ())) of
-        ((_, _), _) => 0""", // error: pattern doesn't match selector
-    """case "hello" of
-        ""  => 0
-        1   => 0""" // error: mismatching cases
+        ((_, _), _) => 0""", // error: pattern has different type to selector
   )
 
   @Test def typecheckLinearCase() = typecheck(
-    """| case InR [()] of
-        InR [m] -* m
-        InL [n] -* ()"""          -> "()",
     """| case InR [InL [()]] of
         InR [InL [m]] -* m"""     -> "()",
     """| case ((), ()) of
@@ -175,24 +159,25 @@ class TyperTest {
 
   @Test def failLinearCase() = noType(
     """| case (0, ()) of
-        (x, _) -* x""",  // error: x: Integer not allowed in stoup
+        (x, _) -* x""",  // error: `x: Integer` not allowed in stoup
     """| case ((), ()) of
-        (x, y) -* x"""   // error: can't put x and y together in stoup
+        (x, y) -* x""",   // error: can't put x and y together in stoup
+    """| case InL [()] of
+        InL [n] -* ()""", // error: no dependency on n
   )
 
   @Test def typecheckLambda() = typecheck(
     """\(t: ()) => ()"""                -> "() -> ()",
-    """\(t: () -> ()) => ()"""          -> "(() -> ()) -> ()",
-    """\(t: ()) (u: ()) => ()"""        -> "() -> () -> ()",
-    """\(t: ((), ())) => ()"""          -> "((), ()) -> ()",
-    """\(t: ((), (), (), ())) => ()"""  -> "((), (), (), ()) -> ()",
-    """\(t: b#) => t"""                 -> "b# -> b#"
+    """\(_: ()) => ()"""                -> "() -> ()",
+    """\(t: ()) => t"""                 -> "() -> ()",
+    """\(_: () -> ()) => ()"""          -> "(() -> ()) -> ()",
+    """\(_: () -* ()) => ()"""          -> "(() -* ()) -> ()",
+    """\(_: ()) (_: ()) => ()"""        -> "() -> () -> ()",
+    """\(a: ()) (b: ()) => (a,b)"""     -> "() -> () -> ((), ())",
   )
 
   @Test def typecheckApplication() = typecheck(
-    """(\(t: ()) (u: ()) (v: ()) => ()) ()"""       -> "() -> () -> ()",
-    """(\(t: ()) (u: ()) (v: ()) => ()) () ()"""    -> "() -> ()",
-    """(\(t: ()) (u: ()) (v: ()) => ()) () () ()""" -> "()",
+    """(\(_: ()) (_: ()) (_: ()) => ()) () () ()""" -> "()",
     """\(f: () -> ()) => f ()"""                    -> "(() -> ()) -> ()",
     """\(t: () -> ()) => \(c: ()) => t c"""         -> "(() -> ()) -> () -> ()"
   )
@@ -206,14 +191,16 @@ class TyperTest {
   )
 
   @Test def failLinearLambda() = noType(
-    """| (a: A) -* !a""", // error: a is not of computation type, so cant be in stoup
-    """| (b: B#) -* !b""", // error: no dependency on b allowed
-    """| (a: A#) -* | (b: B#) -* ()""", // error: rhs is not computational codomain
-    """(| (a: ()) -* \(b: ()) => | (c: ()) -* a)""" // error: no dependency on a allowed
+    """| (a: A)  -* ()""", // error: a is not of computation type, so cant be in stoup
+    """| (b: B#) -* ()""", // error: `()` has no dependency on b
+    """| (c: C#) -* !c""", // error: no dependency on c allowed
+    """| (a: A#) -* | (b: B#) -* b""", // error: rhs is not computational codomain
+    """(| (a: ()) -* \(b: ()) => | (c: ()) -* a)""", // error: no dependency on a allowed
+    """| (_: A#) -* ()""", // error: Illegal wildcard var name in stoup
   )
 
   @Test def typecheckEval() = typecheck(
-    "(| (a: ()) -* a)[()]" -> "()"
+    "(| (u: ()) -* u)[()]" -> "()"
   )
 
   @Test def typecheckLet() = typecheck(
@@ -236,13 +223,6 @@ class TyperTest {
     """let !x |*| y = () in
         !x |*| y""", // error : () is not of tensor type
   )
-
-  @Test def typecheckBind(): Unit = {
-    typecheck(
-      """\(ma: !a) (f: a -> !b) => let !a = ma in f a"""      -> "!a -> (a -> !b) -> !b",
-      """\(ma: !a) => \(f: a -> !b) => let !a = ma in f a"""  -> "!a -> (a -> !b) -> !b",
-      """\(a: !a) (f: a -> !b) => let !a = a in f a"""        -> "!a -> (a -> !b) -> !b")
-  }
 
   def typecheck(seq: (String, String)*): Unit = {
     val (idGen, ctx)    = initialCtx

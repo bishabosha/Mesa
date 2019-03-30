@@ -15,11 +15,11 @@ primitive summon [v] : Void# -* A#
 primitive InL [l] : L# -* L# |+| R#
 primitive InR [r] : R# -* L# |+| R#
 
-liftD : (A -> B#) -> !A -> B# =
-  \(f: A -> B#)(x: !A) => let !y = x in f y
+liftD f x : (A -> B#) -> !A -> B# =
+  let !y = x in f y
 
-liftC : (A -> B) -> A -> !B =
-  \(f: A -> B)(x: A) => !(f x)
+liftC f x : (A -> B) -> A -> !B =
+  !(f x)
 
 const x _ : A -> B -> A =
   x
@@ -32,6 +32,11 @@ safeDuplication [a] : A# -* () =
   | case (a, a) of
     (q, _) -* eval [q]
     (_, r) -* eval [r]
+
+safeDuplication2 l x: (A# -* ()) -> A# -> () =
+  | case (l[x], l[x]) of
+    (q, _) -* q
+    (_, r) -* r
 
 linearMatchInR: () =
   | case InR [()] of
@@ -48,7 +53,7 @@ evalTest: () =
   (| (a: ()) -* a)[()]
 
 ma >>= f : !A -> (A -> !B) -> !B =
-  (liftD f) ma
+  liftD f ma
 
 f =<< ma : (A -> !B) -> !A -> !B =
   ma >>= f
