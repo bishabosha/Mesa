@@ -174,8 +174,8 @@ object Contexts {
     }
 
     def uniqueStoupVariable given Context: Checked[Name] = {
-      if ctx.scope.nonEmpty then {
-        CompilerError.UnexpectedType("Context contains non linear variables.")
+      if scopeContainsNames then {
+        CompilerError.UnexpectedType(s"Context contains non linear variables.")
       } else {
         val stoup = ctx.stoup
         if stoup.flatMap(ctx.typeTable.get).isEmpty then {
@@ -185,6 +185,12 @@ object Contexts {
           stoup.get
         }
       }
+    }
+
+    def scopeContainsNames given Context: Boolean = {
+      ctx.scope.collectFirst[Checked[Context]] {
+        case (Sym(_, name), c) if name.nonEmpty => c
+      }.isDefined
     }
 
     // no changes required by stoup
@@ -262,7 +268,7 @@ object Contexts {
                                         (f: given Context => Checked[O])
                                         given Context = {
       guardContainsImpl(name)(containsForStoup)(f){ n =>
-        s"Illegal attempt to put multiples variables in linear context with name: ${n.show}"
+        s"Illegal attempt to put multiple variables in linear context with name: ${n.show}"
       }
     }
 

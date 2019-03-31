@@ -27,6 +27,9 @@ object BootstrapTests {
 
   private val any = Type.WildcardType
 
+  def (str: String) -|: (other: String) = other -> str
+  def (str: String) :|- (other: String) = str -> other
+
   def typeExpr: String => Type => Contextual[IdReader[Checked[Tree]]] =
     typeCore(parseExpr)
 

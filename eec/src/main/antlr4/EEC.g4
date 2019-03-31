@@ -25,7 +25,7 @@ func: infixType ('->' infixType)+;
 
 linearFunc: infixType '-*' infixType;
 
-infixAppliedType: functorType (CoTensor | Tensor) functorType;
+infixAppliedType: functorType (CoTensor | Tensor) infixType;
 
 infixType: functorType | infixAppliedType;
 

@@ -335,11 +335,13 @@ object Types {
 
         case tpe :: tpes => tpe match {
           case AppliedType(TypeRef(ComputationTag), List(_))
-          |    InfixAppliedType(TypeRef(CoTensorTag),_,_)
-          |    InfixAppliedType(TypeRef(TensorTag),_,_)
-          |    TypeRef(_: Comp)
-          |    TypeRef(VoidCompTag)
+          |    InfixAppliedType(TypeRef(TensorTag | CoTensorTag),_,_)
+          |    TypeRef(_: Comp | VoidCompTag)
           |    Variable(_: Comp)     => true
+
+          case AppliedType(TypeRef(EitherTag), List(a, b)) =>
+            inner(acc, a :: b :: tpes)
+
           case FunctionType(_, body) => inner(acc, body :: tpes)
           case Product(ts)           => inner(acc, ts ::: tpes)
           case _                     => false
@@ -404,7 +406,7 @@ object Types {
         }
         val b2Final = a2 match {
           case AppliedType(TypeRef(ComputationTag), List(_)) => b2
-          case _: (FunctionType | AppliedType | LinearFunctionType | InfixAppliedType) => s"($b2)"
+          case _: (FunctionType | AppliedType | LinearFunctionType) => s"($b2)"
           case _                                      => b2
         }
         s"$b1Final $op1 $b2Final" :: rest

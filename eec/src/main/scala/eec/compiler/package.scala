@@ -7,5 +7,5 @@ val preludeDefs = List(
   "primitive Right  r   : R -> Either L R",
   "primitive summon [v] : Void# -* A#",
   "primitive InL    [l] : L# -* L# |+| R#",
-  "primitive InR    [r] : R# -* L# |+| R#"
+  "primitive InR    [r] : R# -* L# |+| R#",
 )
