@@ -158,6 +158,10 @@ class TyperTest {
           ((_, _), _) => 0 """, // error: pattern has different type to selector
   )
 
+  @Test def typecheckCoTensor() = typecheck(
+    """ InR [InL [()]] """ :|- "<L#:2> |+| () |+| <R#:4>",
+  )
+
   @Test def typecheckLinearCase() = typecheck(
     """ | case InR [InL [()]] of
           InR [InL [m]] -* m """     :|- "()",
