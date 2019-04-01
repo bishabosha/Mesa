@@ -1,10 +1,11 @@
-val dottyVersion = "0.12.0-RC1"
+val dottyVersion = "0.13.0-RC1"
+// val dottyVersion = dottyLatestNightlyBuild.get
 
 enablePlugins(Antlr4Plugin)
 
-antlr4PackageName in Antlr4 := Some("eec.compiler.ast")
+antlr4PackageName in Antlr4 := Some("eec.compiler.parsing")
 antlr4GenListener in Antlr4 := false // default: true
-antlr4GenVisitor in Antlr4 := true // default: false
+antlr4GenVisitor in Antlr4  := false // default: false
 
 lazy val root = project
   .in(file("."))
@@ -25,8 +26,5 @@ lazy val root = project
     libraryDependencies ++= Seq(
       "org.antlr" % "antlr4-runtime" % "4.7.1",
       "org.antlr" % "stringtemplate" % "4.0.2"
-    ),
-
-    // libraryDependencies += ("org.scalaz" %% "scalaz-zio" % "0.5.1").withDottyCompat(scalaVersion.value)
-
+    )
   )

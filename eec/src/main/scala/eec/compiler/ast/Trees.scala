@@ -2,79 +2,150 @@ package eec
 package compiler
 package ast
 
-import Trees._
-import Tree._
+import core._
 import Names._
+import Name._
 import Constants._
+import Contexts._
 import Modifiers._
+import types.Types._
+import annotation._
+import util.{Showable, |>, Convert}
+import Convert._
+
+import implied Printing.untyped.AstOps._
+import implied NameOps._
 
 object Trees {
+  import Tree._
 
-  sealed trait ValDefTree extends Tree
-  sealed trait RefTree extends ExprTree with TypeTree
-  sealed trait TypeTree extends Tree
-  sealed trait ExprTree extends Tree
-  sealed trait SigTree extends Tree
-  sealed trait MemberDefTree extends Tree
-  sealed trait PatTree extends Tree
+  trait Unique(val id: Id)
 
-  enum Tree {
-    case Select(tree: Tree, name: Name) extends RefTree
-    case Ident(name: Name) extends RefTree with PatTree
-    case PackageDef(pid: RefTree, stats: List[Tree])
-    case Def(modifiers: Set[Modifier], sig: SigTree, typ: TypeTree, value: ExprTree) extends MemberDefTree
-    case DefSig(name: Name, args: List[Name]) extends SigTree
-    case FunctionType(arg: TypeTree, body: TypeTree) extends TypeTree
-    case TypeApply(id: RefTree, args: List[TypeTree]) extends TypeTree
-    case Function(args: List[ValDefTree], body: ExprTree) extends ExprTree
-    case Let(name: Name, value: ExprTree, continuation: ExprTree) extends ExprTree
-    case IfThenElse(cond: ExprTree, ifTrue: ExprTree, orElse: ExprTree) extends ExprTree
-    case Apply(lhs: ExprTree, arg: ExprTree) extends ExprTree
-    case Literal(constant: Constant) extends ExprTree with PatTree
-    case CaseExpr(value: ExprTree, cases: List[CaseClause]) extends ExprTree
-    case CaseClauses(cases: List[CaseClause])
-    case CaseClause(pat: PatTree, guard: ExprTree, body: ExprTree)
-    case Alternative(bodys: List[PatTree]) extends PatTree
-    case Bind(name: Name, body: PatTree) extends PatTree
-    case Unapply(id: RefTree, args: List[PatTree]) extends PatTree
-    case Bindings(args: List[ValDefTree]) extends ValDefTree
-    case Tagged(arg: Name, tpe: TypeTree) extends ValDefTree
-    case EmptyTree extends TypeTree with ExprTree with MemberDefTree with SigTree with RefTree with ValDefTree with PatTree
-  }
-
-  val emptyIdent = new Ident(Name.Empty)
-  val wildcardIdent = new Ident(Name.Wildcard)
-
-  object ValDefTreeOps {
-    def (tree: ValDefTree) toList: List[ValDefTree] = tree match {
-      case EmptyTree => Nil
-      case Bindings(args) => args
-      case t: Tagged => t :: Nil
-    }
-
-    def (trees: List[ValDefTree]) toTree: ValDefTree = trees match {
-      case Nil => EmptyTree
-      case (t: Tagged) :: Nil => t
-      case ts => new Bindings(ts)
-    }
+  enum Tree(val tpe: Type) derives Eql {
+    case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case Ident(name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case PackageDef(pid: Tree, stats: List[Tree])(tpe: Type) extends Tree(tpe)
+    case DefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)(tpe: Type) extends Tree(tpe)
+    case DefSig(name: Name, args: List[Name])(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case LinearSig(name: Name, args: List[Name], linear: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case Apply(f: Tree, args: List[Tree])(tpe: Type) extends Tree(tpe)
+    case InfixApply(f: Tree, left: Tree, right: Tree)(tpe: Type) extends Tree(tpe)
+    case Eval(f: Tree, arg: Tree)(tpe: Type) extends Tree(tpe)
+    case Tensor(value: Tree, computation: Tree)(tpe: Type) extends Tree(tpe)
+    case Function(args: List[Tree], body: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case LinearFunction(arg: Tree, body: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case Let(x: Name, value: Tree, continuation: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case LetTensor(x: Name, z: Name, s: Tree, continuation: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case Literal(constant: Constant)(tpe: Type) extends Tree(tpe)
+    case CaseExpr(selector: Tree, cases: List[Tree])(tpe: Type) extends Tree(tpe)
+    case CaseClause(pat: Tree, guard: Tree, body: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case LinearCaseExpr(selector: Tree, cases: List[Tree])(tpe: Type) extends Tree(tpe)
+    case LinearCaseClause(pat: Tree, body: Tree)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
+    case Alternative(bodys: List[Tree])(tpe: Type) extends Tree(tpe)
+    case Parens(exprs: List[Tree])(tpe: Type) extends Tree(tpe)
+    case Bind(name: Name, body: Tree)(tpe: Type) extends Tree(tpe)
+    case Unapply(name: Name, args: List[Tree])(tpe: Type) extends Tree(tpe)
+    case Tagged(arg: Name, tpeAs: Tree)(tpe: Type) extends Tree(tpe)
+    case TreeSeq(args: List[Tree]) extends Tree(Type.EmptyType)
+    case EmptyTree extends Tree(Type.EmptyType)
   }
 
   object TreeOps {
 
-    def (tree: Tree) toList: List[Tree] = tree match {
-      case EmptyTree => Nil
-      case PackageDef(`emptyIdent`, stats) => stats
-      case t => t :: Nil
+    implied for Showable[Tree] {
+      def (t: Tree) show = toAst(t).toString
     }
 
-    def (trees: List[Tree]) toTree: Tree = trees match {
-      case Nil => EmptyTree
-      case t => PackageDef(emptyIdent, t)
-    }
-
-    def (tree: MemberDefTree) addModifiers(mods: Set[Modifier]): MemberDefTree =
-      tree match {
-        case d: Def => d.copy(modifiers = (d.modifiers ++ mods))
+    implied for (Tree |> List[Tree]) {
+      def apply(t: Tree) = t match {
+        case EmptyTree          => Nil
+        case TreeSeq(args)      => args
+        case Parens(args)       => args
+        case Alternative(args)  => args
+        case t                  => t :: Nil
       }
+    }
+
+    implied for (List[Tree] |> Tree) {
+      def apply(ts: List[Tree]) = ts match {
+        case Nil      => EmptyTree
+        case t :: Nil => t
+        case ts       => TreeSeq(ts)
+      }
+    }
+
+    implied uniqName for (Tree |> Name) {
+      def apply(tree: Tree) = tree match {
+        case DefSig(name, _)        => name
+        case LinearSig(name, _, _)  => name
+        case DefDef(_, sig, _, _)   => apply(sig)
+        case Tagged(name, _)        => name
+        case Bind(name, _)          => name
+        case Ident(name)            => name
+        case _                      => EmptyName
+      }
+    }
+
+    def (tree: Tree) linearArg: Name = tree match {
+      case LinearSig(_, _, linearArg) => linearArg
+      case LinearFunction(arg,_)      => arg.convert
+      case _                          => EmptyName
+    }
+
+    def (t: Tree) toNames: List[Name] = {
+      @tailrec
+      def toNames(acc: List[Name], t: Tree): List[Name] = t match {
+        case Ident(name)        => name :: acc
+        case Select(tree, name) => toNames(name :: acc, tree)
+        case _                  => acc
+      }
+      toNames(Nil, t)
+    }
+
+    def (t: Tree) toNamePairs: List[(Id, Name)] = {
+      @tailrec
+      def toPairs(acc: List[(Id, Name)], t: Tree): List[(Id, Name)] = t match {
+        case t @ Ident(name)        => (t.id, name) :: acc
+        case t @ Select(tree, name) => toPairs((t.id, name) :: acc, tree)
+        case _                      => acc
+      }
+      toPairs(Nil, t)
+    }
+
+    def (tree: Tree) addModifiers(mods: Set[Modifier]): Tree = tree match {
+      case tree: DefDef =>
+        tree.copy(modifiers = (tree.modifiers ++ mods))(tree.tpe)
+
+      case _ => tree
+    }
+
+    def (tree: Tree) withTpe(tpe: Type): Tree = tree match {
+      case tree: Select => tree.copy()(tree.id, tpe)
+      case tree: Ident => tree.copy()(tree.id, tpe)
+      case tree: PackageDef => tree.copy()(tpe)
+      case tree: DefDef => tree.copy()(tpe)
+      case tree: DefSig => tree.copy()(tree.id, tpe)
+      case tree: LinearSig => tree.copy()(tree.id, tpe)
+      case tree: Apply => tree.copy()(tpe)
+      case tree: InfixApply => tree.copy()(tpe)
+      case tree: Eval => tree.copy()(tpe)
+      case tree: Tensor => tree.copy()(tpe)
+      case tree: Function => tree.copy()(tree.id, tpe)
+      case tree: LinearFunction => tree.copy()(tree.id, tpe)
+      case tree: Let => tree.copy()(tree.id, tpe)
+      case tree: LetTensor => tree.copy()(tree.id, tpe)
+      case tree: Literal => tree.copy()(tpe)
+      case tree: CaseExpr => tree.copy()(tpe)
+      case tree: CaseClause => tree.copy()(tree.id, tpe)
+      case tree: LinearCaseExpr => tree.copy()(tpe)
+      case tree: LinearCaseClause => tree.copy()(tree.id, tpe)
+      case tree: Alternative => tree.copy()(tpe)
+      case tree: Parens => tree.copy()(tpe)
+      case tree: Bind => tree.copy()(tpe)
+      case tree: Unapply => tree.copy()(tpe)
+      case tree: Tagged => tree.copy()(tpe)
+
+      case _ => tree
+    }
   }
 }

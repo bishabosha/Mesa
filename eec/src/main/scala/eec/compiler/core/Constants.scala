@@ -1,9 +1,7 @@
-package eec
-package compiler
-package ast
+package eec.compiler.core
 
 object Constants {
-  enum Constant {
+  enum Constant derives Eql {
     case StringConstant(str: String)
     case CharConstant(chr: Char)
     // case IntConstant(i: Int)

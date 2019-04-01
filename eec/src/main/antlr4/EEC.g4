@@ -7,6 +7,8 @@ literal:
 	| CharacterLiteral
 	| StringLiteral;
 
+rassocOpId: RassocOpId | CoTensor | Tensor;
+
 id: alphaId | OpId;
 
 alphaId: Patid | Varid;
@@ -15,46 +17,70 @@ qualId: id ('.' id)*;
 
 stableId: id | id '.' id;
 
-//operator: Bang | OpId;
-
 //
 // -- Types
 //
 
-type: infixType '->' type | infixType;
+type: infixType | func | linearFunc;
 
-infixType: prefixType | productType;
+func: infixType ('->' infixType)+;
 
-productType: '(' type ',' type ')' | '()';
+linearFunc: infixType '|-' infixType;
 
-prefixType: simpleType | Bang type;
+infixAppliedType: functorType rassocOpId infixType;
 
-simpleType: qualId | '(' type ')';
+infixType: functorType | infixAppliedType;
 
-ascription: ':' type;
+functorType: simpleType | prefixType;
+
+productType: '(' type (',' type)* ')' | '()';
+
+prefixType: (Bang | qualId) simpleType+;
+
+simpleType: CompId | qualId | productType;
 
 //
 // -- Expressions
 //
 
-expr: lambda | letExpr | caseExpr | expr1;
+expr:
+	lambda
+	| linearLambda
+	| letExpr
+	| letTensorExpr
+	| caseExpr
+	| linearCaseExpr
+	| expr1
+	| expr expr
+	| expr eval;
+
+eval: '[' expr ']';
 
 lambda: '\\' bindings '=>' expr;
 
+linearLambda: '|' '(' binding ')' '|-' expr;
+
 letExpr: 'let' '!' (Varid | Wildcard) '=' expr 'in' expr;
+
+letTensorExpr:
+	'let' '!' (Varid | Wildcard) Tensor Varid '=' expr 'in' expr;
 
 caseExpr: 'case' expr 'of' cases;
 
+linearCaseExpr: 'case' '[' expr ']' 'of' linearCases;
+
 expr1
    : 'if' expr 'then' expr 'else' expr
-//   | infixExpr ascription
    | infixExpr
    ;
 
 infixExpr
    : prefixExpr
+	 | tensorExpr
    | infixExpr (OpId | '`' alphaId '`') infixExpr
    ;
+
+tensorExpr: Bang simpleExpr Tensor infixExpr;
 
 prefixExpr: Bang? simpleExpr;
 
@@ -62,18 +88,31 @@ simpleExpr
    : literal
    | stableId
 //   | simpleExpr1 '.' Id  // nice for records
-//   | '_'
    | exprsInParens
-   | simpleExpr argumentExpr
    ;
 
 cases: caseClause (Sep? caseClause)*;
 
+linearCases: linearCaseClause (Sep? linearCaseClause)*;
+
 caseClause: pattern guard? '=>' expr;
 
-exprsInParens: '(' (expr (',' expr)?)? ')' | '()';
+linearCaseClause: linearPattern '|-' expr;
 
-argumentExpr: '()' | '(' expr? ')';
+exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
+
+//
+// -- Linear Patterns
+//
+
+linearPattern:
+	Varid
+	| Wildcard
+	| Patid '[' linearPattern ']'
+	| '(' linearPatterns? ')'
+	| '()';
+
+linearPatterns: linearPattern (',' linearPattern)*;
 
 //
 // -- Patterns
@@ -82,8 +121,6 @@ argumentExpr: '()' | '(' expr? ')';
 pattern: pattern1 ('|' pattern1)*;
 
 pattern1
-//   : Varid ':' typePat
-//   | '_' ':' typePat
    : pattern2
    ;
 
@@ -98,14 +135,13 @@ simplePattern
    : Wildcard
    | Varid
    | literal
-   | '!' simplePattern
-//   | stableId ('(' patterns? ')')?
+   | Patid pattern+
 //   | stableId '(' (patterns? ',')? (Varid '@')? '_' '*' ')'
-   | '(' upToPairPatten? ')'
+   | '(' patterns? ')'
    | '()'
    ;
 
-upToPairPatten: pattern (',' pattern)?;
+patterns: pattern (',' pattern)*;
 
 guard: 'if' infixExpr;
 
@@ -122,9 +158,9 @@ bindings
 //   : id (',' id)*
 //   ;
 
-bindingsTagged: binding (',' binding)*;
+bindingsTagged: ('(' binding ')')+;
 
-binding: id ':' type;
+binding: (id | Wildcard) ':' type;
 
 //
 // -- Declarations and Definitions
@@ -132,67 +168,71 @@ binding: id ':' type;
 
 dcl: primitiveDcl;
 
-primitiveDcl: 'primitive' defDecl;
+primitiveDcl: 'primitive' primDecl;
 
-defDecl: defSig ':' type; // still require type checking
+primDecl: (defSig | linearSig) ':' type; // still require type checking
 
 def: defDef;
 
-defDef: defSig (':' type)/*?*/ '=' expr Sep?;
+defDef: (defSig | linearSig) (':' type)/*?*/ '=' expr Sep?;
 
-defSig: infixDefSig | Varid Varid*;
+linearSig: alphaId paramName*? '[' paramName ']';
+
+defSig: infixDefSig | alphaId paramName*;
 
 infixDefSig:
-	Varid (OpId | '`' Varid '`') Varid
+	paramName (OpId | '`' alphaId '`') paramName
 	| prefixOpSig;
 
+prefixOpSig: '(' OpId ')' paramName paramName;
 
-prefixOpSig: '(' OpId ')' Varid Varid;
-
-
-//fixity: Fixity IntegerLiteral operator (',' operator)*;
+paramName: Wildcard | Varid;
 
 packageInfo: 'package' qualId;
-
-//topStatSeq: topStat (Sep? topStat)*;
-
-//topStat: fixity;
 
 statSeq: stat (Sep? stat)*;
 
 stat: def | dcl;
 
+statAsTop: stat EOF;
+
+exprAsTop: expr EOF;
+
 translationUnit:
-	Sep? packageInfo Sep? /*(topStatSeq Sep?)? */ (statSeq Sep?)?;
+	Sep* packageInfo Sep* (statSeq Sep*)? EOF;
 
 //
 // Lexer Defs
 //
 
-Fixity: 'infix' | 'infixl' | 'infixr' | 'prefix' | 'postfix';
 Dashes: '--';
 Bang: '!';
+Tensor: '*:';
+CoTensor: '+:';
 Wildcard: '_';
 
 BooleanLiteral: 'True' | 'False';
 
+CompId: (Varid | Patid) '#';
 Patid: Upper Idrest;
 Varid: Lower Idrest;
+RassocOpId: OpId ':';
 OpId: Op;
 
 CharacterLiteral: '\'' (PrintableChar | CharEscapeSeq) '\'';
 
-IntegerLiteral: '-'? (DecimalNumeral /*| HexNumeral*/) ('L' | 'l')?;
+IntegerLiteral:
+	'-'? (DecimalNumeral /*| HexNumeral*/) ('L' | 'l')?;
 
 StringLiteral:
 	'"' StringElement* '"'
 	| '"""' MultiLineChars '"""';
 
 FloatingPointLiteral:
-	Digit+ '.' Digit+ ExponentPart? FloatType?
+	'-'? (Digit+ '.' Digit+ ExponentPart? FloatType?
 	| '.' Digit+ ExponentPart? FloatType?
 	| Digit+ ExponentPart FloatType?
-	| Digit+ ExponentPart? FloatType;
+	| Digit+ ExponentPart? FloatType);
 
 fragment CharNoBackQuoteOrNewline:
 	'\u0020' .. '\u0026'
@@ -791,6 +831,6 @@ NEWLINE: NL+ -> skip;
 
 WS: WhiteSpace+ -> skip;
 
-COMMENT: '{-|' .*? '-}' Sep? -> skip;
+COMMENT: '{-' .*? '-}' Sep? -> skip;
 
 LINE_COMMENT: Dashes (~[\r\n])* Sep? -> skip;
