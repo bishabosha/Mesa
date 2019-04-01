@@ -286,7 +286,7 @@ object Parsers {
   private[this] def fromBangType
         (context: EECParser.PrefixTypeContext) given IdGen: Tree = {
     val simpleTypes = context.simpleType.map(fromSimpleType)
-    val tag         = Ident(Name.ComputationTag)(freshId(), uTpe)
+    val tag         = Ident(Name.BangTag)(freshId(), uTpe)
     val args        = simpleTypes.toList
     Apply(tag, args)(uTpe)
   }
@@ -463,10 +463,11 @@ object Parsers {
       fromInfixApplication(context)
   }
 
-  private[this] def wrapComputation(tree: Tree) given IdGen: Checked[Tree] = {
-    val tag = Ident(ComputationTag)(freshId(), uTpe)
-    Apply(tag, List(tree))(uTpe)
-  }
+  private[this] def wrapBang(tree: Tree): Checked[Tree] =
+    Bang(tree)(uTpe)
+
+  private[this] def wrapWhyNot(tree: Tree): Checked[Tree] =
+    WhyNot(tree)(uTpe)
 
   private[this] def fromTensorExpr
       (context: EECParser.TensorExprContext) given IdGen: Checked[Tree] = {
@@ -482,7 +483,9 @@ object Parsers {
     import CompilerErrorOps._
     val simpleExpr = fromSimpleExpr(context.simpleExpr)
     if defined(context.Bang) then
-      simpleExpr.map(wrapComputation)
+      simpleExpr.map(wrapBang)
+    else if defined(context.WhyNot) then
+      simpleExpr.map(wrapWhyNot)
     else
       simpleExpr
   }

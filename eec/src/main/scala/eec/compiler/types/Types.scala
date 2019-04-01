@@ -36,92 +36,92 @@ object Types {
   }
 
   object Bootstraps {
-    val BooleanType     = TypeRef(BooleanTag)
-    val DecimalType     = TypeRef(DecimalTag)
-    val IntegerType     = TypeRef(IntegerTag)
-    val CharType        = TypeRef(CharTag)
-    val StringType      = TypeRef(StringTag)
-    val ComputationType = TypeRef(ComputationTag)
-    val TensorType      = TypeRef(TensorTag)
-    val CoTensorType    = TypeRef(CoTensorTag)
-    val EitherType      = TypeRef(EitherTag)
-    val VoidType        = TypeRef(VoidTag)
-    val VoidCompType    = TypeRef(VoidCompTag)
-  }
+    val BooleanType   = TypeRef(BooleanTag)
+    val DecimalType   = TypeRef(DecimalTag)
+    val IntegerType   = TypeRef(IntegerTag)
+    val CharType      = TypeRef(CharTag)
+    val StringType    = TypeRef(StringTag)
+    val BangType      = TypeRef(BangTag)
+    val TensorType    = TypeRef(TensorTag)
+    val CoTensorType  = TypeRef(CoTensorTag)
+    val EitherType    = TypeRef(EitherTag)
+    val VoidType      = TypeRef(VoidTag)
+    val VoidCompType  = TypeRef(VoidCompTag)
 
-  private[this] val tensorConstructor = {
-    FunctionType(
-      AppliedType(
-        Bootstraps.ComputationType,
-        List(Variable("$A".readAs))
-      ),
+    val TensorConstructor = {
       FunctionType(
-        Variable("$B#".readAs),
-        InfixAppliedType(
-          Bootstraps.TensorType,
-          AppliedType(
-            Bootstraps.ComputationType,
-            List(Variable("$A".readAs))
-          ),
-          Variable("$B#".readAs)
-        )
-      )
-    )
-  }
-
-  private[this] val coTensorConstructor = {
-    FunctionType(
-      Variable("$A#".readAs),
-      FunctionType(
-        Variable("$B#".readAs),
-        InfixAppliedType(
-          Bootstraps.CoTensorType,
-          Variable("$A#".readAs),
-          Variable("$B#".readAs)
-        )
-      )
-    )
-  }
-
-  private[this] val bangConstructor = {
-    FunctionType(
-      Variable("$v".readAs),
-      AppliedType(
-        Bootstraps.ComputationType,
-        List(Variable("$v".readAs))
-      )
-    )
-  }
-
-  private[this] val eitherConstructor = {
-    FunctionType(
-      Variable("$l".readAs),
-      FunctionType(
-        Variable("$r".readAs),
         AppliedType(
-          Bootstraps.EitherType,
-          List(
-            Variable("$l".readAs),
-            Variable("$r".readAs)
+          Bootstraps.BangType,
+          List(Variable("$A".readAs))
+        ),
+        FunctionType(
+          Variable("$B#".readAs),
+          InfixAppliedType(
+            Bootstraps.TensorType,
+            AppliedType(
+              Bootstraps.BangType,
+              List(Variable("$A".readAs))
+            ),
+            Variable("$B#".readAs)
           )
         )
       )
-    )
+    }
+
+    val CoTensorConstructor = {
+      FunctionType(
+        Variable("$A#".readAs),
+        FunctionType(
+          Variable("$B#".readAs),
+          InfixAppliedType(
+            Bootstraps.CoTensorType,
+            Variable("$A#".readAs),
+            Variable("$B#".readAs)
+          )
+        )
+      )
+    }
+
+    val BangConstructor = {
+      FunctionType(
+        Variable("$v".readAs),
+        AppliedType(
+          Bootstraps.BangType,
+          List(Variable("$v".readAs))
+        )
+      )
+    }
+
+    val EitherConstructor = {
+      FunctionType(
+        Variable("$l".readAs),
+        FunctionType(
+          Variable("$r".readAs),
+          AppliedType(
+            Bootstraps.EitherType,
+            List(
+              Variable("$l".readAs),
+              Variable("$r".readAs)
+            )
+          )
+        )
+      )
+    }
   }
 
   val bootstrapped = {
     Vector(
-      TensorTag       -> tensorConstructor,
-      CoTensorTag     -> coTensorConstructor,
-      ComputationTag  -> bangConstructor,
-      EitherTag       -> eitherConstructor,
-      VoidCompTag     -> Bootstraps.VoidCompType,
-      VoidTag         -> Bootstraps.VoidType,
-      IntegerTag      -> Bootstraps.IntegerType,
-      DecimalTag      -> Bootstraps.DecimalType,
-      BooleanTag      -> Bootstraps.BooleanType,
-      StringTag       -> Bootstraps.StringType,
-      CharTag         -> Bootstraps.CharType
+      TensorTag     -> Bootstraps.TensorConstructor,
+      CoTensorTag   -> Bootstraps.CoTensorConstructor,
+      BangTag       -> Bootstraps.BangConstructor,
+      EitherTag     -> Bootstraps.EitherConstructor,
+      VoidCompTag   -> Bootstraps.VoidCompType,
+      VoidTag       -> Bootstraps.VoidType,
+      IntegerTag    -> Bootstraps.IntegerType,
+      DecimalTag    -> Bootstraps.DecimalType,
+      BooleanTag    -> Bootstraps.BooleanType,
+      StringTag     -> Bootstraps.StringType,
+      CharTag       -> Bootstraps.CharType
     )
   }
 
@@ -435,7 +435,7 @@ object Types {
         case Nil => acc
 
         case tpe :: tpes => tpe match {
-          case AppliedType(TypeRef(ComputationTag), List(_))
+          case AppliedType(TypeRef(BangTag), List(_))
           |    InfixAppliedType(TypeRef(TensorTag | CoTensorTag),_,_)
           |    TypeRef(_: Comp | VoidCompTag)
           |    Variable(_: Comp)     => true
@@ -501,7 +501,7 @@ object Types {
                                       (stack: Stack[String]) = {
         val op1 :: b1 :: b2 :: rest = stack
         val b1Final = a1 match {
-          case AppliedType(TypeRef(ComputationTag), List(_)) => b1
+          case AppliedType(TypeRef(BangTag), List(_)) => b1
 
           case _: (FunctionType | AppliedType | LinearFunctionType
           | InfixAppliedType) =>
@@ -510,7 +510,7 @@ object Types {
           case _ => b1
         }
         val b2Final = a2 match {
-          case AppliedType(TypeRef(ComputationTag), List(_)) => b2
+          case AppliedType(TypeRef(BangTag), List(_)) => b2
           case _: (FunctionType | AppliedType | LinearFunctionType) => s"($b2)"
           case InfixAppliedType(op1,_,_) if op1 != op => s"($b2)"
           case _                                      => b2
@@ -537,7 +537,7 @@ object Types {
             functor
           } else {
             val init =
-              if f == Bootstraps.ComputationType && args.length == 1 then functor
+              if f == Bootstraps.BangType && args.length == 1 then functor
               else s"$functor "
             checkAll(args, removed).mkString(init, " ", "")
           }

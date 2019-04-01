@@ -334,7 +334,7 @@ object Contexts {
     }
 
     def assertNotInStoupForValue(name: Name, tpe: Type)
-                          given Context: Checked[Type] = {
+                                given Context: Checked[Type] = {
       if tpe.isValueType && inStoup(name) then {
         CompilerError.UnexpectedType(
           s"name `${name.show}` of value type: `${tpe.show}` is not allowed in the linear context.")

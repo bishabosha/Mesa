@@ -82,7 +82,7 @@ infixExpr
 
 tensorExpr: Bang simpleExpr Tensor infixExpr;
 
-prefixExpr: Bang? simpleExpr;
+prefixExpr: (Bang | WhyNot)? simpleExpr;
 
 simpleExpr
    : literal
@@ -209,6 +209,7 @@ Dashes: '--';
 Bang: '!';
 Tensor: '*:';
 CoTensor: '+:';
+WhyNot: '?';
 Wildcard: '_';
 
 BooleanLiteral: 'True' | 'False';

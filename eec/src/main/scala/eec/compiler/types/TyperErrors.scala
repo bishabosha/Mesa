@@ -122,7 +122,7 @@ object TyperErrors {
 
   def noTensorLetValue(x: Name, z: Name, value: Tree) =
     CompilerError.UnexpectedType(
-      s"Can not infer type of `!${x.show} |*| ${x.show} = ${value.show}` as of !_ |*| _ type.")
+      s"Can not infer type of `!${x.show} *: ${x.show} = ${value.show}` as of !_ *: _ type.")
 
   def noBangLetValue(name: Name, value: Tree) =
     CompilerError.UnexpectedType(
@@ -157,7 +157,23 @@ object TyperErrors {
 
   def illegalStoupDependency(name: Name) =
     CompilerError.UnexpectedType(
-      s"Illegal dependency on linear context variable `${name.show}`.")
+      s"Reference to on linear variable `${name.show}` not in scope.")
+
+  def illegalStoupBang(name: Name) =
+    CompilerError.UnexpectedType(
+      s"linear variable `${name.show}` can not be in scope when evaluating ! terms.")
+
+  def illegalStoupLinearLambda(name: Name) =
+    CompilerError.UnexpectedType(
+      s"linear variable `${name.show}` can not be in scope when evaluating linear lambda terms.")
+
+  def illegalStoupValueIdent(z: Name, name: Name, tpe: Type) =
+    CompilerError.UnexpectedType(
+      s"linear variable `${z.show}` can not be in scope when evaluating variable `${name.show}: ${tpe.show}` of value type.")
+
+  def illegalStoupValueLiteral(name: Name) =
+    CompilerError.UnexpectedType(
+      s"linear variable `${name.show}` can not be in scope when evaluating a constant literal.")
 
   def memberSelection given Mode =
     CompilerError.SyntaxError(

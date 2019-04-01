@@ -32,7 +32,6 @@ import implied TreeOps._
 
 object Typers {
   import Stoup._
-  import StoupOps._
 
   private[Typers] val any = WildcardType
 
@@ -43,27 +42,6 @@ object Typers {
 
   object Stoup {
     def stoup given (stoup: Stoup): Stoup = stoup
-  }
-
-  object StoupOps {
-
-    implied given Context for Showable[Stoup] {
-      def (stoup: Stoup) show = stoup match {
-        case Blank => "Γ | -"
-
-        case DependsOn(name) =>
-          val tpe = for {
-            ctx <- firstCtx(name)
-            tpe <- checked {
-              implied for Context = ctx
-              getType(name)
-            }
-          } yield tpe
-          tpe.fold
-            { err => s"Γ | ${name.show}: <error: Not Found>" }
-            { tpe => s"Γ | ${name.show}: ${tpe.show}" }
-      }
-    }
   }
 
   def (tree: Tree) typedWith(pt: Type) given Context: Checked[Tree] = {
@@ -227,8 +205,8 @@ object Typers {
                                      given Context, Mode, Stoup: Checked[Tree] = {
     lookIn(id).flatMap { fCtx =>
       implied for Context = fCtx
-      implied for Stoup   = Blank
       for {
+        _     <- assertStoupEmpty(Err.illegalStoupLinearLambda)
         arg1  <- arg.typed(any)
         body1 <- checked {
           implied for Stoup = DependsOn(arg.convert)
@@ -280,9 +258,34 @@ object Typers {
     if comp1.tpe.isValueType then {
       Err.noTensorCompCodomain(comp1)
     } else {
-      val bangTpe = AppliedType(Bootstraps.ComputationType, List(value1.tpe))
+      val bangTpe = AppliedType(Bootstraps.BangType, List(value1.tpe))
       InfixAppliedType(Bootstraps.TensorType, bangTpe, comp1.tpe)
     }
+  }
+
+  private def bangTermTpe(value1: Tree): Checked[Type] = {
+    AppliedType(Bootstraps.BangType, List(value1.tpe))
+  }
+
+  private def typedBangTerm(t: Tree)
+                           (pt: Type)
+                           given Context, Mode, Stoup: Checked[Tree] = {
+    for {
+      _   <- assertStoupEmpty(Err.illegalStoupBang)
+      t1  <- t.typed(any)
+      tpe <- bangTermTpe(t1)
+    } yield Bang(t1)(tpe)
+  }
+
+  private def typedWhyNotTerm(t: Tree)
+                             (pt: Type)
+                             given Context, Mode, Stoup: Checked[Tree] = {
+    for {
+      t1  <- checked {
+        implied for Stoup = Blank
+        t.typed(Bootstraps.VoidType)
+      }
+    } yield WhyNot(t1)(pt)
   }
 
   private def typedTensorTerm(t: Tree, u: Tree)
@@ -430,7 +433,7 @@ object Typers {
   private def unwrapCompApply(tpe: Type)
                              (x: Name, t: Tree): Checked[Type] = tpe match {
     case AppliedType(
-      TypeRef(ComputationTag),
+      TypeRef(BangTag),
       List(t)
     ) => t
 
@@ -442,7 +445,7 @@ object Typers {
     tpe match {
       case InfixAppliedType(
         TypeRef(TensorTag),
-        AppliedType(TypeRef(ComputationTag), List(x)),
+        AppliedType(TypeRef(BangTag), List(x)),
         z
       ) => (x, z)
 
@@ -803,16 +806,17 @@ object Typers {
   }
 
   private def typedIdentTerm(name: Name)
-                    (id: Id, pt: Type)
-                    given Context, Mode, Stoup: Checked[Tree] = {
+                            (id: Id, pt: Type)
+                            given Context, Mode, Stoup: Checked[Tree] = {
     for {
       fstCtx   <- firstCtx(name)
       idRefTpe <- checked {
         implied for Context = fstCtx
         for {
           _        <- assertStoupCondition(name)
-          idRefTpe <- getTypeIdent(name)
-        } yield idRefTpe
+          tpe      <- getType(name)
+          _        <- assertStoupIdentTpe(tpe, name)
+        } yield tpe: Type
       }
     } yield Ident(name)(id, idRefTpe.freshVariables)
   }
@@ -829,8 +833,24 @@ object Typers {
     }
   }
 
-  private def typedLiteral(constant: Constant): Checked[Tree] =
-    Literal(constant)(constantTpe(constant))
+  private def assertStoupIdentTpe(tpe: Type, name: Name) given Stoup: Checked[Unit] = {
+    if tpe.isValueType then
+      assertStoupEmpty(Err.illegalStoupValueIdent(_, name, tpe))
+    else
+      ()
+  }
+
+  private def assertStoupEmpty(msg: Name => CompilerError)
+                              given Stoup: Checked[Unit] = stoup match {
+    case Blank => ()
+    case DependsOn(z) => msg(z)
+  }
+
+  private def typedLiteral(constant: Constant) given Stoup: Checked[Tree] = {
+    for {
+      _ <- assertStoupEmpty(Err.illegalStoupValueLiteral)
+    } yield Literal(constant)(constantTpe(constant))
+  }
 
   private def check(typed: Tree)(pt: Type) given Mode: Checked[Tree] = {
     inline def ignoreType(tree: Tree) = tree match {
@@ -882,6 +902,8 @@ object Typers {
       case u @ LetTensor(x,z,v,t)   if isTerm     => typedLetTensor(x,z,v,t)(u.id, pt)
       case u @ Function(ts,t)       if isTerm     => typedFunctionTerm(ts,t)(u.id, pt)
       case u @ LinearFunction(a,b)  if isTerm     => typedLinearFunctionTerm(a,b)(u.id, pt)
+      case WhyNot(t)                if isTerm     => typedWhyNotTerm(t)(pt)
+      case Bang(t)                  if isTerm     => typedBangTerm(t)(pt)
       case Tensor(t,u)              if isTerm     => typedTensorTerm(t,u)(pt)
       case Tagged(n,t)              if isTerm     => typedTagged(n,t)(pt)
       case CaseExpr(t,ts)           if isTerm     => typedCaseExpr(t,ts)(pt)

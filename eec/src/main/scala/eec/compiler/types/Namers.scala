@@ -246,6 +246,8 @@ object Namers {
        | _: Ident
        | _: Select
        | _: Tensor
+       | _: Bang
+       | _: WhyNot
        | EmptyTree                              => // atomic
     /* error case */
     case _                                      => NamerErrors.namingMissing(tree)

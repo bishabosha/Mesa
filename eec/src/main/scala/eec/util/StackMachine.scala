@@ -10,8 +10,6 @@ object StackMachine {
   type Stack     [T] = List[T]
   type Statement [T] = Stack[T] => Stack[T]
 
-  opaque type Compiler[I,T] = I => Statement[T]
-
   opaque type Program[T] = List[Statement[T]]
 
   object Program {
