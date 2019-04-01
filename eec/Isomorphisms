@@ -8,10 +8,10 @@ primitive InL [l]     : L# |- L# +: R#
 primitive InR [r]     : R# |- L# +: R#
 
 fstL [p]: (A#, B#) |- A# =
-  | case p of (a, _) |- a
+  case [p] of (a, _) |- a
 
 sndL [p]: (A#, B#) |- B# =
-  | case p of (_, b) |- b
+  case [p] of (_, b) |- b
 
 fst p: (A, B) -> A =
   case p of (a, _) => a
@@ -67,7 +67,7 @@ isomorphism_7a f : (A# +: B# |- C#) -> (A# |- C#, B# |- C#) =
   (| (a: A#) |- f [InL [a]], | (b: B#) |- f [InR [b]])
 
 isomorphism_7b p [e] : (A# |- C#, B# |- C#) -> (A# +: B# |- C#) =
-  | case e of
+  case [e] of
     InL [a] |- fst p [a]
     InR [b] |- snd p [b]
 
@@ -88,12 +88,12 @@ isomorphism_9b : Void# |- !A *: Void# =
 
 isomorphism_10a [t] : !A *: (B# +: C#) |- (!A *: B#) +: (!A *: C#) =
   let !a *: e = t in
-  | case e of
+  case [e] of
     InL [b] |- InL [!a *: b]
     InR [c] |- InR [!a *: c]
 
 isomorphism_10b [e] : (!A *: B#) +: (!A *: C#) |- !A *: (B# +: C#) =
-  | case e of
+  case [e] of
     InL [t] |-
       let !a *: b = t in
       !a *: (InL [b])
@@ -130,7 +130,7 @@ isomorphism_14a [t] : !(Either A B) |- !A +: !B =
     Right b => InR [!b];
 
 isomorphism_14b [e] : !A +: !B |- !(Either A B) =
-  | case e of
+  case [e] of
     InL [t] |-
       let !a = t in
       !(Left a)
@@ -152,7 +152,7 @@ isomorphism_16a [t] : !(Either A B) *: C# |- (!A *: C#) +: (!B *: C#) =
     Right b => InR [!b *: c];
 
 isomorphism_16b [e] : (!A *: C#) +: (!B *: C#) |- !(Either A B) *: C# =
-  | case e of
+  case [e] of
     InL [t] |-
       let !a *: c = t in
       !(Left a) *: c

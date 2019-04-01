@@ -67,7 +67,7 @@ letTensorExpr:
 
 caseExpr: 'case' expr 'of' cases;
 
-linearCaseExpr: '|' 'case' expr 'of' linearCases;
+linearCaseExpr: 'case' '[' expr ']' 'of' linearCases;
 
 expr1
    : 'if' expr 'then' expr 'else' expr

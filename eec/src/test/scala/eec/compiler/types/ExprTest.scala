@@ -154,29 +154,29 @@ class ExprTest {
   )
 
   @Test def typecheckLinearCase() = typecheck(
-    """ | case InR [InL [()]] of
+    """ case [InR [InL [()]]] of
           InR [InL [m]] |- m """     :|- "()",
 
-    """ | case ((), ()) of
+    """ case [((), ())] of
           (x, _) |- x """            :|- "()",
 
-    """ | case ((),()) of
+    """ case [((),())] of
           (x, ( )) |- x """          :|- "()",
 
-    """ | case InR [((), ())] of
+    """ case [InR [((), ())]] of
           InR [(x, _)] |- x """      :|- "()",
 
-    """ | case (InR [()], ()) of
+    """ case [(InR [()], ())] of
           (InR [x], _) |- x """      :|- "()",
 
-    """ | case InL [()] of
+    """ case [InL [()]] of
           InL [n] |- () """          :|- "()",
   )
 
   @Test def failLinearCase() = noType(
-    """| case (0, ()) of
+    """case [(0, ())] of
         (x, _) |- x""",  // error: `x: Integer` not allowed in stoup
-    """| case ((), ()) of
+    """case [((), ())] of
         (x, y) |- x""",   // error: can't put x and y together in stoup
   )
 
