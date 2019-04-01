@@ -94,7 +94,8 @@ object Parsers {
       Literal(BigIntConstant(BigInt(txt)))(uTpe)
   }
 
-  private def fromFloatingPointLiteral(context: LiteralContext): Checked[Tree] = {
+  private def fromFloatingPointLiteral(
+      context: LiteralContext): Checked[Tree] = {
     val txt = context.FloatingPointLiteral.getText
     if txt.endsWith("f") || txt.endsWith("F") then
       CompilerError.SyntaxError(s"unexpected Float literal `$txt`")
@@ -222,8 +223,11 @@ object Parsers {
       functor1 <- fromFunctorType(context.functorType)
       iat      <- fromInfixType(context.infixType)
     } yield iat match {
-      case InfixApply(Ident(other),_,_) if other != name && !context.infixType.getText.startsWith("(") =>
-        CompilerError.SyntaxError(s"Non associative rhs `${other.show}` to infix type `${name.show}`")
+      case InfixApply(Ident(other),_,_)
+        if other != name && !context.infixType.getText.startsWith("(") =>
+          CompilerError.SyntaxError(
+            s"Non associative rhs `${other.show}` to infix type `${name.show}`")
+
       case _ =>
         InfixApply(functor, functor1, iat)(uTpe)
     }
@@ -255,7 +259,8 @@ object Parsers {
     }
   }
 
-  private def fromFunctorType(context: FunctorTypeContext) given IdGen: Checked[Tree] = {
+  private def fromFunctorType(context: FunctorTypeContext)
+                             given IdGen: Checked[Tree] = {
     if defined(context.simpleType) then
       fromSimpleType(context.simpleType)
     else
@@ -269,14 +274,16 @@ object Parsers {
     yield parensFromBuffer(types)
   }
 
-  private def fromPrefixType(context: PrefixTypeContext) given IdGen: Checked[Tree] = {
+  private def fromPrefixType(context: PrefixTypeContext)
+                            given IdGen: Checked[Tree] = {
     if defined(context.Bang) then
       fromBangType(context)
     else
       fromFunctorType(context)
   }
 
-  private def fromFunctorType(context: PrefixTypeContext) given IdGen: Checked[Tree] = {
+  private def fromFunctorType(context: PrefixTypeContext)
+                             given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     for (simpleTypes <- context.simpleType.mapE(fromSimpleType)) yield {
       val tag         = fromQualId(context.qualId)
@@ -285,7 +292,8 @@ object Parsers {
     }
   }
 
-  private def fromBangType(context: PrefixTypeContext) given IdGen: Checked[Tree] = {
+  private def fromBangType(context: PrefixTypeContext)
+                          given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     val tag         = Ident(Name.BangTag)(freshId(), uTpe)
     for (simpleTypes <- context.simpleType.mapE(fromSimpleType)) yield {
@@ -363,7 +371,8 @@ object Parsers {
     } yield LinearFunction(binding, body)(freshId(), uTpe)
   }
 
-  private def fromLetExpr(context: LetExprContext) given IdGen: Checked[Tree] = {
+  private def fromLetExpr(context: LetExprContext)
+                         given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     var name = {
       if defined(context.Varid) then
@@ -585,7 +594,8 @@ object Parsers {
     }
   }
 
-  private def fromPattern1(context: Pattern1Context) given IdGen: Checked[Tree] =
+  private def fromPattern1(context: Pattern1Context)
+                          given IdGen: Checked[Tree] =
     fromPattern2(context.pattern2)
 
   private def fromBind(context: Pattern2Context) given IdGen: Checked[Tree] = {
@@ -599,17 +609,20 @@ object Parsers {
     }
   }
 
-  private def fromPattern2(context: Pattern2Context) given IdGen: Checked[Tree] = {
+  private def fromPattern2(context: Pattern2Context)
+                          given IdGen: Checked[Tree] = {
     if defined(context.Varid) then
       fromBind(context)
     else
       fromPattern3(context.pattern3)
   }
 
-  private def fromPattern3(context: Pattern3Context) given IdGen: Checked[Tree] =
+  private def fromPattern3(context: Pattern3Context)
+                          given IdGen: Checked[Tree] =
     fromSimplePattern(context.simplePattern)
 
-  private def fromVaridPattern(context: SimplePatternContext) given IdGen: Tree = {
+  private def fromVaridPattern(context: SimplePatternContext)
+                              given IdGen: Tree = {
     val name = context.Varid.getText.readAs
     Ident(name)(freshId(), uTpe)
   }
@@ -638,7 +651,8 @@ object Parsers {
       fromPatterns(context.patterns)
   }
 
-  private def fromPatterns(context: PatternsContext) given IdGen: Checked[Tree] = {
+  private def fromPatterns(context: PatternsContext)
+                          given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     for (patterns <- context.pattern.mapE(fromPattern))
     yield parensFromBuffer(patterns)
@@ -651,7 +665,8 @@ object Parsers {
   private def fromGuard(context: GuardContext) given IdGen: Checked[Tree] =
     fromInfixExpr(context.infixExpr)
 
-  private def fromBindings(context: BindingsContext) given IdGen: Checked[Tree] =
+  private def fromBindings(context: BindingsContext)
+                          given IdGen: Checked[Tree] =
     fromBindingsTagged(context.bindingsTagged)
 
   private def fromBindingsTagged(context: BindingsTaggedContext)
@@ -661,7 +676,8 @@ object Parsers {
     yield bindings.toList.convert
   }
 
-  private def fromBinding(context: BindingContext) given IdGen: Checked[Tree] = {
+  private def fromBinding(context: BindingContext)
+                         given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     val name: Name  = {
       if defined(context.id) then
@@ -676,12 +692,14 @@ object Parsers {
   private def fromDcl(context: DclContext) given IdGen: Checked[Tree] =
     fromPrimitiveDcl(context.primitiveDcl)
 
-  private def fromPrimitiveDcl(context: PrimitiveDclContext) given IdGen: Checked[Tree] = {
+  private def fromPrimitiveDcl(context: PrimitiveDclContext)
+                              given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     fromPrimDcl(context.primDecl).map(_.addModifiers(Set(Primitive)))
   }
 
-  private def fromPrimDcl(context: PrimDeclContext) given IdGen: Checked[Tree] = {
+  private def fromPrimDcl(context: PrimDeclContext)
+                         given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     val sig = {
       if defined(context.defSig) then
@@ -751,7 +769,8 @@ object Parsers {
     DefSig(name, args)(freshId(), uTpe)
   }
 
-  private def fromInfixAlphaSig(context: InfixDefSigContext) given IdGen: Tree = {
+  private def fromInfixAlphaSig(context: InfixDefSigContext)
+                               given IdGen: Tree = {
     var args  = context.paramName.map(fromParamName).toList
     val name  = (fromAlphaId(context.alphaId).convert: Name)
     DefSig(name, args)(freshId(), uTpe)
@@ -766,7 +785,8 @@ object Parsers {
   private def fromPackageInfo(context: PackageInfoContext) given IdGen: Tree =
     fromQualId(context.qualId)
 
-  private def fromStatSeq(context: StatSeqContext) given IdGen: Checked[Tree] = {
+  private def fromStatSeq(context: StatSeqContext)
+                         given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     for (stats <- context.stat.mapE(fromStat))
     yield stats.toList.convert
