@@ -208,10 +208,10 @@ object Typers {
     lookIn(id).flatMap { fCtx =>
       implied for Context = fCtx
       for {
-        _     <- assertEmptyStoupCondition(Err.illegalStoupLinearLambda)
+        _     <- assertStoupEmpty(Err.illegalStoupLinearLambda)
         arg1  <- arg.typed(any)
         name  =  (arg.convert: Name)
-        _     <- assertLinearEntryCondition(name, arg1.tpe)
+        _     <- assertIsLinear(name, arg1.tpe)
         body1 <- checked {
           implied for Stoup = DependsOn(name)
           body.typed(any)
@@ -275,7 +275,7 @@ object Typers {
                            (pt: Type)
                            given Context, Mode, Stoup: Checked[Tree] = {
     for {
-      _   <- assertEmptyStoupCondition(Err.illegalStoupBang)
+      _   <- assertStoupEmpty(Err.illegalStoupBang)
       t1  <- t.typed(any)
       tpe <- bangTermTpe(t1)
     } yield Bang(t1)(tpe)
@@ -801,7 +801,7 @@ object Typers {
     } else {
       for {
         _ <- name.foldWildcard(()) { n =>
-          for (_ <- assertLinearEntryCondition(n, pt))
+          for (_ <- assertIsLinear(n, pt))
           yield putType(n -> pt)
         }
       } yield Ident(name)(id, pt)
@@ -816,47 +816,43 @@ object Typers {
       idRefTpe <- checked {
         implied for Context = fstCtx
         for {
-          _        <- assertDependencyStoupCondition(name)
           tpe      <- getType(name)
-          _        <- assertIdentStoupCondition(tpe, name)
+          _        <- assertInScope(name, tpe)
         } yield tpe: Type
       }
     } yield Ident(name)(id, idRefTpe.freshVariables)
   }
 
-  private def assertDependencyStoupCondition(x: Name)
-                                            given Context, Stoup: Checked[Unit] = {
-    if isLinear(x) && stoup != DependsOn(x) then
-      Err.illegalStoupDependency(x)
+  private def assertInScope(name: Name, tpe: Type)
+                           given Context, Stoup: Checked[Unit] = {
+    if isLinear(name) then
+      assertStoupIs(name)(Err.illegalStoupDependency)
     else
-      ()
+      assertStoupEmpty(Err.illegalStoupValueIdent(_, name, tpe))
   }
 
-  private def assertIdentStoupCondition(tpe: Type, name: Name) given Stoup: Checked[Unit] = {
-    if tpe.isValueType then
-      assertEmptyStoupCondition(Err.illegalStoupValueIdent(_, name, tpe))
-    else
-      ()
-  }
-
-  private def assertEmptyStoupCondition(msg: Name => CompilerError)
+  private def assertStoupEmpty(err: Name => CompilerError)
                               given Stoup: Checked[Unit] = stoup match {
-    case Blank => ()
-    case DependsOn(z) => msg(z)
+    case DependsOn(z) => err(z)
+    case _            => ()
   }
 
-  def assertLinearEntryCondition(name: Name, tpe: Type)
-                                given Context: Checked[Unit] = {
-    if tpe.isValueType && isLinear(name) then {
+  private def assertStoupIs(name: Name)(err: Name => CompilerError)
+                           given Stoup: Checked[Unit] = stoup match {
+    case DependsOn(`name`) => ()
+    case _                 => err(name)
+  }
+
+  def assertIsLinear(name: Name, tpe: Type) given Context: Checked[Unit] = {
+    if tpe.isValueType && isLinear(name) then
       Err.illegalStoupEntry(name, tpe)
-    } else {
+    else
       ()
-    }
   }
 
   private def typedLiteral(constant: Constant) given Stoup: Checked[Tree] = {
     for {
-      _ <- assertEmptyStoupCondition(Err.illegalStoupValueLiteral)
+      _ <- assertStoupEmpty(Err.illegalStoupValueLiteral)
     } yield Literal(constant)(constantTpe(constant))
   }
 
