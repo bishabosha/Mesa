@@ -6,6 +6,9 @@
 ## About
 This repository is for implementing a programming language based on the enriched effect calculus by Egger, Ejlers and Simpson (2014).
 
+## Changes
+* Refer to [CHANGELOG.md](CHANGELOG.md)
+
 ## Features
 * Read Eval Print Loop
   - Define `EEC+` terms and typecheck them.
