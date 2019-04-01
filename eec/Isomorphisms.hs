@@ -34,8 +34,8 @@ isomorphism_3_1b f [t] : (A -> (B# |- C#)) -> (!A *: B# |- C#) =
 isomorphism_3_2a f [b] : (A -> (B# |- C#)) -> (B# |- (A -> C#)) =
   \(a: A) => f a [b]
 
-isomorphism_3_2b f a : (B# |- (A -> C#)) -> A -> (B# |- C#) =
-  |(b: B#) |- f [b] a
+isomorphism_3_2b f a [b] : (B# |- (A -> C#)) -> A -> (B# |- C#) =
+  f [b] a
 
 isomorphism_3_3a f [b] : (!A *: B# |- C#) -> (B# |- (A -> C#)) =
   \(a: A) => f [!a *: b]
@@ -47,11 +47,11 @@ isomorphism_3_3b f [t] : (B# |- (A -> C#)) -> (!A *: B# |- C#) =
 isomorphism_4a _ : (A# |- ()) -> () =
   ()
 
-isomorphism_4b _ : () -> (A# |- ()) =
-  |(a: A#) |- ()
+isomorphism_4b _ [a] : () -> (A# |- ()) =
+  ()
 
 isomorphism_5a f : (A# |- (B#, C#)) -> (A# |- B#, A# |- C#) =
-  (|(a: A#) |- fstL [f [a]], | (a: A#) |- sndL [f [a]])
+  (|(a: A#) |- fstL [f [a]], |(a: A#) |- sndL [f [a]])
 
 isomorphism_5b p [a] : (A# |- B#, A# |- C#) -> (A# |- (B#, C#)) =
   (fst p [a], snd p [a])
@@ -63,7 +63,7 @@ isomorphism_6b _ : () -> (Void# |- A#) =
   absurd
 
 isomorphism_7a f : (A# +: B# |- C#) -> (A# |- C#, B# |- C#) =
-  (| (a: A#) |- f [InL [a]], | (b: B#) |- f [InR [b]])
+  (|(a: A#) |- f [InL [a]], |(b: B#) |- f [InR [b]])
 
 isomorphism_7b p [e] : (A# |- C#, B# |- C#) -> (A# +: B# |- C#) =
   case [e] of
@@ -80,7 +80,8 @@ isomorphism_8b [w] : !(A, B) |- !A *: !B =
   !(fst z) *: !(snd z)
 
 isomorphism_9a [t] : !A *: Void# |- Void# =
-  let !_ *: v = t in v
+  let !_ *: v = t in
+  v
 
 isomorphism_9b : Void# |- !A *: Void# =
   absurd
