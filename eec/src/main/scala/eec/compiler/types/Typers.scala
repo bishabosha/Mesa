@@ -35,12 +35,12 @@ object Typers {
 
   private[Typers] val any = WildcardType
 
-  enum Stoup {
+  private[Typers] enum Stoup {
     case DependsOn(z: Name)
     case Blank
   }
 
-  object Stoup {
+  private[Typers] object Stoup {
     def stoup given (stoup: Stoup): Stoup = stoup
   }
 
@@ -76,7 +76,7 @@ object Typers {
 
   private def (ts: List[Tree]) sameType(pt: Type): Checked[Type] = ts match {
     case t :: ts =>
-      unifiesThenOrError(t.tpe, pt)
+      unifiesThen[Checked[Type]](t.tpe, pt)
         { t1Tpe =>
           if ts.forall(t => unifies(t.tpe, t1Tpe)) then t1Tpe
           else Err.tpesNotUnifyTo(pt)
@@ -148,13 +148,15 @@ object Typers {
 
   private def checkFunctorWithProtoImpl(canUnify: (Type, Type) => Boolean)
                                        (f: Type => Type)
-                                       (functor: Name, fTpe: Type, proto: Type): Checked[Type] = {
-    if proto == WildcardType then
+                                       (fun: Name, fTpe: Type, proto: Type): Checked[Type] = {
+    if proto == WildcardType then {
       fTpe
-    else if canUnify(fTpe, proto) then
-      unifiesThen(fTpe, proto)(f)(Err.functorNotMatch(functor, fTpe, _, _))
-    else
+    } else if canUnify(fTpe, proto) then {
+      unifiesThen[Checked[Type]](fTpe, proto)(f)(
+        Err.functorNotMatch(fun, fTpe, _, _))
+    } else {
       Err.noApplyNonFunctionType
+    }
   }
 
   private def checkFunWithProtoImpl(getArg: Type => Checked[Type])
@@ -206,10 +208,12 @@ object Typers {
     lookIn(id).flatMap { fCtx =>
       implied for Context = fCtx
       for {
-        _     <- assertStoupEmpty(Err.illegalStoupLinearLambda)
+        _     <- assertEmptyStoupCondition(Err.illegalStoupLinearLambda)
         arg1  <- arg.typed(any)
+        name  =  (arg.convert: Name)
+        _     <- assertLinearEntryCondition(name, arg1.tpe)
         body1 <- checked {
-          implied for Stoup = DependsOn(arg.convert)
+          implied for Stoup = DependsOn(name)
           body.typed(any)
         }
         fTpe  <- linearFunctionTypeTpe(arg1, body1)
@@ -225,7 +229,7 @@ object Typers {
   }
 
   private def linearFunctionTypeTpe(arg1: Tree, body1: Tree)
-                             given Mode: Checked[Type] = {
+                                   given Mode: Checked[Type] = {
     if arg1.tpe.isValueType then
       Err.noCompArg
     else if body1.tpe.isValueType then
@@ -271,7 +275,7 @@ object Typers {
                            (pt: Type)
                            given Context, Mode, Stoup: Checked[Tree] = {
     for {
-      _   <- assertStoupEmpty(Err.illegalStoupBang)
+      _   <- assertEmptyStoupCondition(Err.illegalStoupBang)
       t1  <- t.typed(any)
       tpe <- bangTermTpe(t1)
     } yield Bang(t1)(tpe)
@@ -306,10 +310,9 @@ object Typers {
                  given Context, Mode, Stoup: Checked[Tree] = {
     for {
       tpeTree1 <- tpeTree.typedAsTyping(pt)
-      check    <- assertNotInStoupForValue(arg, tpeTree1.tpe)
     } yield {
-      putType(arg -> check)
-      Tagged(arg, tpeTree1)(check)
+      putType(arg -> tpeTree1.tpe)
+      Tagged(arg, tpeTree1)(tpeTree1.tpe)
     }
   }
 
@@ -556,7 +559,7 @@ object Typers {
       implied for Context = ccCtx
       for {
         pat1    <- pat.typedAsLinearPattern(selTpe)
-        stoup   <- uniqueStoupVariable
+        stoup   <- uniqueLinearVariable
         body1   <- checked {
           implied for Stoup = DependsOn(stoup)
           body.typedAsExpr(pt)
@@ -728,7 +731,7 @@ object Typers {
   private def mapLinearArg(arg: Name, tpe: Type)
                           given Context: Checked[Unit] = tpe match {
     case LinearFunctionType(argTpe, _) =>
-      for (_ <- lookForInStoup(arg))
+      for (_ <- lookForInLinear(arg))
       yield putType(arg, argTpe)
 
     case _ => Err.linearArgNotMatchType(arg)
@@ -798,7 +801,7 @@ object Typers {
     } else {
       for {
         _ <- name.foldWildcard(()) { n =>
-          for (_ <- assertNotInStoupForValue(n, pt))
+          for (_ <- assertLinearEntryCondition(n, pt))
           yield putType(n -> pt)
         }
       } yield Ident(name)(id, pt)
@@ -813,42 +816,47 @@ object Typers {
       idRefTpe <- checked {
         implied for Context = fstCtx
         for {
-          _        <- assertStoupCondition(name)
+          _        <- assertDependencyStoupCondition(name)
           tpe      <- getType(name)
-          _        <- assertStoupIdentTpe(tpe, name)
+          _        <- assertIdentStoupCondition(tpe, name)
         } yield tpe: Type
       }
     } yield Ident(name)(id, idRefTpe.freshVariables)
   }
 
-  private def assertStoupCondition(x: Name) given Context, Stoup: Checked[Unit] = {
-    val linearX = inStoup(x)
-    stoup match {
-      case Blank if linearX => Err.illegalStoupDependency(x)
-
-      case DependsOn(z) if (z != x && linearX) || (z == x && !linearX) =>
-        Err.illegalStoupDependency(x)
-
-      case _ => ()
-    }
-  }
-
-  private def assertStoupIdentTpe(tpe: Type, name: Name) given Stoup: Checked[Unit] = {
-    if tpe.isValueType then
-      assertStoupEmpty(Err.illegalStoupValueIdent(_, name, tpe))
+  private def assertDependencyStoupCondition(x: Name)
+                                            given Context, Stoup: Checked[Unit] = {
+    if isLinear(x) && stoup != DependsOn(x) then
+      Err.illegalStoupDependency(x)
     else
       ()
   }
 
-  private def assertStoupEmpty(msg: Name => CompilerError)
+  private def assertIdentStoupCondition(tpe: Type, name: Name) given Stoup: Checked[Unit] = {
+    if tpe.isValueType then
+      assertEmptyStoupCondition(Err.illegalStoupValueIdent(_, name, tpe))
+    else
+      ()
+  }
+
+  private def assertEmptyStoupCondition(msg: Name => CompilerError)
                               given Stoup: Checked[Unit] = stoup match {
     case Blank => ()
     case DependsOn(z) => msg(z)
   }
 
+  def assertLinearEntryCondition(name: Name, tpe: Type)
+                                given Context: Checked[Unit] = {
+    if tpe.isValueType && isLinear(name) then {
+      Err.illegalStoupEntry(name, tpe)
+    } else {
+      ()
+    }
+  }
+
   private def typedLiteral(constant: Constant) given Stoup: Checked[Tree] = {
     for {
-      _ <- assertStoupEmpty(Err.illegalStoupValueLiteral)
+      _ <- assertEmptyStoupCondition(Err.illegalStoupValueLiteral)
     } yield Literal(constant)(constantTpe(constant))
   }
 
@@ -863,11 +871,6 @@ object Typers {
       Err.typecheckFail(typed)(typed.tpe, pt)
   }
 
-  inline def unifiesThenOrError[O](tpe: Type, pt: Type)
-                                  (f: Type => O)
-                                  (orElse: (Type, Type) => Checked[O]): Checked[O] =
-    unifiesThen[O, Checked[O]](tpe, pt)(f)(orElse)
-
   private def (tree: Tree) typed
               (pt: Type)
               given Context, Mode, Stoup: Checked[Tree] = {
@@ -881,7 +884,7 @@ object Typers {
       case u @ Function(ts,t)       if isType     => typedFunctionType(ts,t)(u.id, pt)
       case u @ LinearFunction(a,b)  if isType     => typedLinearFunctionType(a,b)(u.id, pt)
       // Linear patterns
-      case Unapply(f,ts)            if isLinear   => typedLinearUnapply(f,ts)(pt)
+      case Unapply(f,ts)            if isLPattern => typedLinearUnapply(f,ts)(pt)
       // Patterns
       case u @ Ident(n)             if isPattern  => typedIdentPat(n)(u.id, pt)
       case Bind(n,t)                if isPattern  => typedBind(n,t)(pt)

@@ -18,3 +18,5 @@
 * fst and snd primitives are achieved with linear patt match, where only 1 variable may be bound
 
 * highlight all de-sugaring or encodings of eec primitives
+
+* Explain exhaustivity checking - not being faithful

@@ -41,7 +41,7 @@ object Contexts {
   object Mode {
     inline def mode given (mode: Mode) = mode
 
-    def isLinear given Mode =
+    def isLPattern given Mode =
       LinearPat == mode
 
     def isPattern given Mode =
@@ -98,7 +98,7 @@ object Contexts {
 
   sealed trait Context (
     val scope: Scope,
-    var stoup: Option[Name],
+    var linearScope: Option[Name],
     val typeTable: TypeTable,
     val primTable: PrimTable,
     val localIdGen: IdGen,
@@ -150,19 +150,19 @@ object Contexts {
       inner(ctx)
     }
 
-    def inStoup(name: Name) given Context: Boolean = {
-      ctx.stoup.filter(_ == name).isDefined
+    def isLinear(name: Name) given Context: Boolean = {
+      ctx.linearScope.filter(_ == name).isDefined
     }
 
-    def inStoupDeep(name: Name) given Context: Boolean = {
+    def isLinearDeep(name: Name) given Context: Boolean = {
       @tailrec
       def inner(current: Context): Boolean = {
         implied for Context = current
-        if inStoup(name) then
-          true
-        else ctx match {
-          case _: RootContext => false
-          case ctx: Fresh     => inner(ctx.outer)
+        isLinear(name) || {
+          ctx match {
+            case ctx: Fresh => inner(ctx.outer)
+            case _          => false
+          }
         }
       }
       inner(ctx)
@@ -174,16 +174,16 @@ object Contexts {
          .isDefined
     }
 
-    def uniqueStoupVariable given Context: Checked[Name] = {
+    def uniqueLinearVariable given Context: Checked[Name] = {
       if scopeContainsNames then {
         CompilerError.UnexpectedType(s"Context contains non linear variables.")
       } else {
-        val stoup = ctx.stoup
-        if stoup.flatMap(ctx.typeTable.get).isEmpty then {
+        val linearScope = ctx.linearScope
+        if linearScope.flatMap(ctx.typeTable.get).isEmpty then {
           CompilerError.UnexpectedType(
             "Context does not contain a typed linear variable")
         } else {
-          stoup.get
+          linearScope.get
         }
       }
     }
@@ -194,7 +194,6 @@ object Contexts {
       }.isDefined
     }
 
-    // no changes required by stoup
     def lookIn(id: Id) given Context: Checked[Context] = {
       ctx.scope.collectFirst[Checked[Context]] {
         case (Sym(`id`, _), c) => c
@@ -212,8 +211,8 @@ object Contexts {
       }
     }
 
-    def lookForInStoup(name: Name) given Context: Checked[Unit] = {
-      if name != Wildcard && !inStoup(name) then {
+    def lookForInLinear(name: Name) given Context: Checked[Unit] = {
+      if name != Wildcard && !isLinear(name) then {
         CompilerError.IllegalState(
           s"No variable in immediate linear scope found for name `${name.show}`")
       } else {
@@ -223,17 +222,17 @@ object Contexts {
 
     def contains(name: Name) given Context = {
       name.nonEmpty && {
-        inStoup(name) || inScope(name)
+        isLinear(name) || inScope(name)
       }
     }
 
-    def containsForStoup(name: Name) given Context = {
-      contains(name) || ctx.stoup.nonEmpty
+    def containsForLinear(name: Name) given Context = {
+      contains(name) || ctx.linearScope.nonEmpty
     }
 
     def containsDeep(name: Name) given Context = {
       name.nonEmpty && {
-        inStoupDeep(name) || inScope(name)
+        isLinearDeep(name) || inScope(name)
       }
     }
 
@@ -254,21 +253,21 @@ object Contexts {
       }
     }
 
-    def enterStoup(name: Name) given Context: Checked[Unit] = {
-      guardContainsForStoup(name) {
+    def enterLinear(name: Name) given Context: Checked[Unit] = {
+      guardContainsForLinear(name) {
         name.foldWildcard
           { CompilerError.UnexpectedType(
-            "Illegal anonymous variable in stoup.") }
+            "Illegal anonymous variable in linear context.") }
           { name =>
-            ctx.stoup = Some(name)
+            ctx.linearScope = Some(name)
           }
       }
     }
 
-    private def guardContainsForStoup[O](name: Name)
+    private def guardContainsForLinear[O](name: Name)
                                         (f: given Context => Checked[O])
                                         given Context = {
-      guardContainsImpl(name)(containsForStoup)(f){ n =>
+      guardContainsImpl(name)(containsForLinear)(f){ n =>
         s"Illegal attempt to put multiple variables in linear context with name: ${n.show}"
       }
     }
@@ -326,23 +325,6 @@ object Contexts {
         )
     }
 
-    def getTypeIdent(name: Name) given Context: Checked[Type] = {
-      for {
-        tpe     <- getType(name)
-        checked <- assertNotInStoupForValue(name, tpe)
-      } yield checked
-    }
-
-    def assertNotInStoupForValue(name: Name, tpe: Type)
-                                given Context: Checked[Type] = {
-      if tpe.isValueType && inStoup(name) then {
-        CompilerError.UnexpectedType(
-          s"name `${name.show}` of value type: `${tpe.show}` is not allowed in the linear context.")
-      } else {
-        tpe
-      }
-    }
-
     def (tpe: Type) freshVariables given Context: Type = {
       tpe.replaceVariables {
         _.updateDerivedStr(Synthetic(ctx.localIdGen.fresh(), _))
@@ -396,7 +378,7 @@ object Contexts {
     import Scoping._
 
     enum Scoping derives Eql {
-      case Stoup(name: Scoping, tpe: Scoping)
+      case LinearScope(name: Scoping, tpe: Scoping)
       case NamedScope(name: Scoping, tpe: Scoping, scope: Seq[Scoping])
       case AnonScope(scope: Seq[Scoping])
       case ForName(name: String)
@@ -408,20 +390,20 @@ object Contexts {
     def (ctx: Context) toScoping: Seq[Scoping] = {
 
       def branch(ctx: Context): Seq[Scoping] = {
-        val stoupOpt = {
+        val linearScopeOpt = {
           for {
-            name <- ctx.stoup
+            name <- ctx.linearScope
             tpe  = ctx.typeTable.get(name) match {
               case Some(t) => TypeDef(t.show)
               case _       => EmptyType
             }
-          } yield Stoup(ForName(name.show), tpe)
+          } yield LinearScope(ForName(name.show), tpe)
         }
         val defs = {
           for {
             pair <- ctx.scope.filter { pair =>
                       val (Sym(_, name), child) = pair
-                      child.scope.nonEmpty || child.stoup.nonEmpty || name.nonEmpty
+                      child.scope.nonEmpty || child.linearScope.nonEmpty || name.nonEmpty
                     }
             (sym, child)  = pair
             tpeOpt        = ctx.typeTable.get(sym.name)
@@ -434,11 +416,11 @@ object Contexts {
               AnonScope(child.toScoping)
           }
         }
-        stoupOpt.toList ++ defs
+        linearScopeOpt.toList ++ defs
       }
 
       def (ctx: Fresh) hasMembers =
-        ctx.scope.nonEmpty || ctx.typeTable.nonEmpty || ctx.stoup.isDefined
+        ctx.scope.nonEmpty || ctx.typeTable.nonEmpty || ctx.linearScope.isDefined
 
       ctx match {
         case ctx: RootContext =>

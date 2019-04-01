@@ -23,7 +23,7 @@ import implied TreeOps._
 
 object Namers {
 
-  private[this] val anon = EmptyName
+  private val anon = EmptyName
 
   def namedDefDef(modifiers: Set[Modifier], sig: DefSig | LinearSig)
                  (tpeAs: Tree, body: Tree)
@@ -36,20 +36,20 @@ object Namers {
       implied for Context = ctx1
       for {
         _ <- args.mapE(enterVariable)
-        _ <- sig.linearArg.foldEmptyName(())(enterLinearArgDef(modifiers))
+        _ <- sig.linearArg.foldEmptyName(())(enterLinearArg(modifiers))
         _ <- index(body)
       } yield ()
     }
   }
 
-  def enterLinearArgDef(mods: Set[Modifier])(linearArg: Name) given Context: Checked[Unit] = {
+  def enterLinearArg(mods: Set[Modifier])(linearArg: Name) given Context: Checked[Unit] = {
     val enterArg = {
       val isPrimitive = mods.contains(Primitive)
       val isWildcard  = linearArg == Wildcard
       (isPrimitive && !isWildcard) || !isPrimitive
     }
     if enterArg then
-      enterStoup(linearArg)
+      enterLinear(linearArg)
     else
       ()
   }
@@ -72,7 +72,7 @@ object Namers {
     enterScope(id, anon).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
-        _ <-  enterStoup(arg.convert)
+        _ <-  enterLinear(arg.convert)
         _ <-  index(body)
       } yield ()
     }
@@ -132,7 +132,7 @@ object Namers {
               implied for Context = ctx1
               for {
                 _ <- enterVariable(x)
-                _ <- enterStoup(z)
+                _ <- enterLinear(z)
                 _ <- index(t)
               } yield ()
             }
@@ -197,7 +197,7 @@ object Namers {
     enterVariable(name)
 
   def namedIdentLinearPat(name: Name) given Context, Mode: Checked[Unit] =
-    name.foldWildcard(())(enterStoup)
+    name.foldWildcard(())(enterLinear)
 
   def indexAsPattern(tree: Tree) given Context: Checked[Unit] = {
     implied for Mode = Mode.Pat
@@ -216,8 +216,8 @@ object Namers {
 
   def index(tree: Tree) given Context, Mode: Checked[Unit] = tree match {
     /* Linear Pattern Trees */
-    case Ident(n)                 if isLinear   => namedIdentLinearPat(n)
-    case Unapply(_,ts)            if isLinear   => namedUnapply(ts)
+    case Ident(n)                 if isLPattern => namedIdentLinearPat(n)
+    case Unapply(_,ts)            if isLPattern => namedUnapply(ts)
     /* Pattern Trees */
     case Ident(n)                 if isPattern  => namedIdentPat(n)
     case Bind(n,t)                if isPattern  => namedBind(n,t)

@@ -57,13 +57,13 @@ object TyperErrors {
   }
 
   def typeNotTuple(pt: Type) =
-    CompilerError.UnexpectedType(s"expected `${pt.show}` but was a Tuple.")
+    CompilerError.UnexpectedType(s"Expected `${pt.show}` but was a Tuple.")
 
   def tupleNotMatchLength =
-    CompilerError.UnexpectedType("Tuple lengths do not match")
+    CompilerError.UnexpectedType("Tuple lengths do not match.")
 
   def argsNotMatchLength =
-    CompilerError.UnexpectedType("arg lengths do not match")
+    CompilerError.UnexpectedType("Arg lengths do not match.")
 
   def linearUnapplyArgLengthGT1 =
     CompilerError.UnexpectedType("Linear case clause must have a single path.")
@@ -85,7 +85,7 @@ object TyperErrors {
         ""
       }
     CompilerError.UnexpectedType(
-      s"HK args do not match. Expected $argsExpect but got $argsPassed.$hint")
+      s"Higher kinded type args do not match. Expected $argsExpect but got $argsPassed.$hint")
   }
 
   def typingMissing(tree: Tree) given Mode =
@@ -154,6 +154,10 @@ object TyperErrors {
     CompilerError.UnexpectedType(
       s"${name.show} does not qualify to be a constructor.")
   }
+
+  def illegalStoupEntry(name: Name, tpe: Type) =
+    CompilerError.UnexpectedType(
+        s"name `${name.show}` of value type: `${tpe.show}` is not allowed in the linear context.")
 
   def illegalStoupDependency(name: Name) =
     CompilerError.UnexpectedType(

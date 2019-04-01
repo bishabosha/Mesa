@@ -51,15 +51,15 @@ object Types {
     val TensorConstructor = {
       FunctionType(
         AppliedType(
-          Bootstraps.BangType,
+          BangType,
           List(Variable("$A".readAs))
         ),
         FunctionType(
           Variable("$B#".readAs),
           InfixAppliedType(
-            Bootstraps.TensorType,
+            TensorType,
             AppliedType(
-              Bootstraps.BangType,
+              BangType,
               List(Variable("$A".readAs))
             ),
             Variable("$B#".readAs)
@@ -74,7 +74,7 @@ object Types {
         FunctionType(
           Variable("$B#".readAs),
           InfixAppliedType(
-            Bootstraps.CoTensorType,
+            CoTensorType,
             Variable("$A#".readAs),
             Variable("$B#".readAs)
           )
@@ -86,7 +86,7 @@ object Types {
       FunctionType(
         Variable("$v".readAs),
         AppliedType(
-          Bootstraps.BangType,
+          BangType,
           List(Variable("$v".readAs))
         )
       )
@@ -98,7 +98,7 @@ object Types {
         FunctionType(
           Variable("$r".readAs),
           AppliedType(
-            Bootstraps.EitherType,
+            EitherType,
             List(
               Variable("$l".readAs),
               Variable("$r".readAs)
@@ -338,9 +338,9 @@ object Types {
       unifiesThen(tpe, pt)(_ => true)((_,_) => false)
     }
 
-    inline def unifiesThen[A, U](tpe: Type, pt: Type)
-                                (f: Type => A)
-                                (orElse: (Type, Type) => U): A | U = {
+    inline def unifiesThen[U](tpe: Type, pt: Type)
+                             (f: Type => U)
+                             (orElse: (Type, Type) => U): U = {
       val tpe1 = tpe.unify(pt)
       val pt1  = pt.unify(tpe1)
       if pt1 =!= tpe1 then f(tpe1)

@@ -36,7 +36,7 @@ import implied TreeOps._
 
 object Repl {
 
-  private[this] val defaultPrompt = "eec"
+  private val defaultPrompt = "eec"
 
   def loop(): Unit = {
 
@@ -66,7 +66,7 @@ object Repl {
       }
   }
 
-  private[this] def newContext: Checked[(IdGen, Context)] = {
+  private def newContext: Checked[(IdGen, Context)] = {
     val rootCtx   = new RootContext()
     val rootIdGen = new IdGen
     implied for Context = rootCtx
@@ -74,9 +74,9 @@ object Repl {
     for (_ <- Context.enterBootstrapped) yield (rootIdGen, rootCtx)
   }
 
-  private[this] case class LoopState(prompt: String, break: Boolean, pwd: String, idGen: IdGen, ctx: Context)
+  private case class LoopState(prompt: String, break: Boolean, pwd: String, idGen: IdGen, ctx: Context)
 
-  private[this] def loadFile(pwd: String, name: String): Checked[String] = {
+  private def loadFile(pwd: String, name: String): Checked[String] = {
     var file: scala.io.BufferedSource = null
     try {
       file = scala.io.Source.fromFile(s"$pwd/$name")
@@ -91,7 +91,7 @@ object Repl {
     }
   }
 
-  private[this] def guarded(state: LoopState, string: String)(body: => LoopState): LoopState =
+  private def guarded(state: LoopState, string: String)(body: => LoopState): LoopState =
     if string.isEmpty then {
       println(s"[ERROR] empty input")
       state
@@ -99,7 +99,7 @@ object Repl {
       body
     }
 
-  private[this] def command(state: LoopState, input: String): LoopState = {
+  private def command(state: LoopState, input: String): LoopState = {
 
     implied for Context = state.ctx
     implied for IdGen   = state.idGen
