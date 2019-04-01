@@ -28,11 +28,26 @@ class StatTest {
               InRproxy 0 [()] """,
 
     "() -> (() |- ())"
-    -|: """ primitive ok _ [_] : () -> (() |- ()) """
+    -|: """ primitive ok _ [_] : () -> (() |- ()) """,
   )
 
   @Test def failLinearSig() = noType(
     """ linearFail _ [_] : () -> (() |- ()) = () """ // error: cant put wildcard in stoup for non primitive
+  )
+
+  @Test def failLinearEither() = noType(
+    """ evaluation [a]: A# |- Either () () =
+          Left () """ // error - `a` is not allowed to be in scope
+  )
+
+  @Test def failLinearBang() = noType(
+    """ evaluation [a]: A# |- !() =
+          !() """ // error - `a` is not allowed to be in scope
+  )
+
+  @Test def failLinearConstant() = noType(
+    """ evaluation [a]: A# |- () =
+          0 """ // error - `a` is not allowed to be in scope
   )
 
   @Test def failRecursion() = noType(
@@ -121,8 +136,8 @@ class StatTest {
   )
 
   @Test def typecheckLinearLambdaEval() = typecheck(
-    "Void# |- A#" -|: """ summonProxy: Void# |- A# =
-                            | (v: Void#) |- summon[v] """,
+    "Void# |- A#" -|: """ absurdProxy: Void# |- A# =
+                            | (v: Void#) |- absurd[v] """,
   )
 
   @Test def typecheckLambdaApply() = typecheck(

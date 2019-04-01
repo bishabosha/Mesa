@@ -32,38 +32,16 @@ import implied TreeOps._
 
 object Typers {
   import Stoup._
-  import StoupOps._
 
   private[Typers] val any = WildcardType
 
-  enum Stoup {
+  private[Typers] enum Stoup {
     case DependsOn(z: Name)
     case Blank
   }
 
-  object Stoup {
+  private[Typers] object Stoup {
     def stoup given (stoup: Stoup): Stoup = stoup
-  }
-
-  object StoupOps {
-
-    implied given Context for Showable[Stoup] {
-      def (stoup: Stoup) show = stoup match {
-        case Blank => "Γ | -"
-
-        case DependsOn(name) =>
-          val tpe = for {
-            ctx <- firstCtx(name)
-            tpe <- checked {
-              implied for Context = ctx
-              getType(name)
-            }
-          } yield tpe
-          tpe.fold
-            { err => s"Γ | ${name.show}: <error: Not Found>" }
-            { tpe => s"Γ | ${name.show}: ${tpe.show}" }
-      }
-    }
   }
 
   def (tree: Tree) typedWith(pt: Type) given Context: Checked[Tree] = {
@@ -98,7 +76,7 @@ object Typers {
 
   private def (ts: List[Tree]) sameType(pt: Type): Checked[Type] = ts match {
     case t :: ts =>
-      unifiesThenOrError(t.tpe, pt)
+      unifiesThen[Checked[Type]](t.tpe, pt)
         { t1Tpe =>
           if ts.forall(t => unifies(t.tpe, t1Tpe)) then t1Tpe
           else Err.tpesNotUnifyTo(pt)
@@ -170,13 +148,15 @@ object Typers {
 
   private def checkFunctorWithProtoImpl(canUnify: (Type, Type) => Boolean)
                                        (f: Type => Type)
-                                       (functor: Name, fTpe: Type, proto: Type): Checked[Type] = {
-    if proto == WildcardType then
+                                       (fun: Name, fTpe: Type, proto: Type): Checked[Type] = {
+    if proto == WildcardType then {
       fTpe
-    else if canUnify(fTpe, proto) then
-      unifiesThen(fTpe, proto)(f)(Err.functorNotMatch(functor, fTpe, _, _))
-    else
+    } else if canUnify(fTpe, proto) then {
+      unifiesThen[Checked[Type]](fTpe, proto)(f)(
+        Err.functorNotMatch(fun, fTpe, _, _))
+    } else {
       Err.noApplyNonFunctionType
+    }
   }
 
   private def checkFunWithProtoImpl(getArg: Type => Checked[Type])
@@ -227,11 +207,13 @@ object Typers {
                                      given Context, Mode, Stoup: Checked[Tree] = {
     lookIn(id).flatMap { fCtx =>
       implied for Context = fCtx
-      implied for Stoup   = Blank
       for {
+        _     <- assertStoupEmpty(Err.illegalStoupLinearLambda)
         arg1  <- arg.typed(any)
+        name  =  (arg.convert: Name)
+        _     <- assertIsLinear(name, arg1.tpe)
         body1 <- checked {
-          implied for Stoup = DependsOn(arg.convert)
+          implied for Stoup = DependsOn(name)
           body.typed(any)
         }
         fTpe  <- linearFunctionTypeTpe(arg1, body1)
@@ -247,7 +229,7 @@ object Typers {
   }
 
   private def linearFunctionTypeTpe(arg1: Tree, body1: Tree)
-                             given Mode: Checked[Type] = {
+                                   given Mode: Checked[Type] = {
     if arg1.tpe.isValueType then
       Err.noCompArg
     else if body1.tpe.isValueType then
@@ -280,9 +262,34 @@ object Typers {
     if comp1.tpe.isValueType then {
       Err.noTensorCompCodomain(comp1)
     } else {
-      val bangTpe = AppliedType(Bootstraps.ComputationType, List(value1.tpe))
+      val bangTpe = AppliedType(Bootstraps.BangType, List(value1.tpe))
       InfixAppliedType(Bootstraps.TensorType, bangTpe, comp1.tpe)
     }
+  }
+
+  private def bangTermTpe(value1: Tree): Checked[Type] = {
+    AppliedType(Bootstraps.BangType, List(value1.tpe))
+  }
+
+  private def typedBangTerm(t: Tree)
+                           (pt: Type)
+                           given Context, Mode, Stoup: Checked[Tree] = {
+    for {
+      _   <- assertStoupEmpty(Err.illegalStoupBang)
+      t1  <- t.typed(any)
+      tpe <- bangTermTpe(t1)
+    } yield Bang(t1)(tpe)
+  }
+
+  private def typedWhyNotTerm(t: Tree)
+                             (pt: Type)
+                             given Context, Mode, Stoup: Checked[Tree] = {
+    for {
+      t1  <- checked {
+        implied for Stoup = Blank
+        t.typed(Bootstraps.VoidType)
+      }
+    } yield WhyNot(t1)(pt)
   }
 
   private def typedTensorTerm(t: Tree, u: Tree)
@@ -303,10 +310,9 @@ object Typers {
                  given Context, Mode, Stoup: Checked[Tree] = {
     for {
       tpeTree1 <- tpeTree.typedAsTyping(pt)
-      check    <- assertNotInStoupForValue(arg, tpeTree1.tpe)
     } yield {
-      putType(arg -> check)
-      Tagged(arg, tpeTree1)(check)
+      putType(arg -> tpeTree1.tpe)
+      Tagged(arg, tpeTree1)(tpeTree1.tpe)
     }
   }
 
@@ -430,7 +436,7 @@ object Typers {
   private def unwrapCompApply(tpe: Type)
                              (x: Name, t: Tree): Checked[Type] = tpe match {
     case AppliedType(
-      TypeRef(ComputationTag),
+      TypeRef(BangTag),
       List(t)
     ) => t
 
@@ -442,7 +448,7 @@ object Typers {
     tpe match {
       case InfixAppliedType(
         TypeRef(TensorTag),
-        AppliedType(TypeRef(ComputationTag), List(x)),
+        AppliedType(TypeRef(BangTag), List(x)),
         z
       ) => (x, z)
 
@@ -553,7 +559,7 @@ object Typers {
       implied for Context = ccCtx
       for {
         pat1    <- pat.typedAsLinearPattern(selTpe)
-        stoup   <- uniqueStoupVariable
+        stoup   <- uniqueLinearVariable
         body1   <- checked {
           implied for Stoup = DependsOn(stoup)
           body.typedAsExpr(pt)
@@ -725,7 +731,7 @@ object Typers {
   private def mapLinearArg(arg: Name, tpe: Type)
                           given Context: Checked[Unit] = tpe match {
     case LinearFunctionType(argTpe, _) =>
-      for (_ <- lookForInStoup(arg))
+      for (_ <- lookForInLinear(arg))
       yield putType(arg, argTpe)
 
     case _ => Err.linearArgNotMatchType(arg)
@@ -795,7 +801,7 @@ object Typers {
     } else {
       for {
         _ <- name.foldWildcard(()) { n =>
-          for (_ <- assertNotInStoupForValue(n, pt))
+          for (_ <- assertIsLinear(n, pt))
           yield putType(n -> pt)
         }
       } yield Ident(name)(id, pt)
@@ -803,34 +809,52 @@ object Typers {
   }
 
   private def typedIdentTerm(name: Name)
-                    (id: Id, pt: Type)
-                    given Context, Mode, Stoup: Checked[Tree] = {
+                            (id: Id, pt: Type)
+                            given Context, Mode, Stoup: Checked[Tree] = {
     for {
       fstCtx   <- firstCtx(name)
       idRefTpe <- checked {
         implied for Context = fstCtx
         for {
-          _        <- assertStoupCondition(name)
-          idRefTpe <- getTypeIdent(name)
-        } yield idRefTpe
+          tpe      <- getType(name)
+          _        <- assertInScope(name, tpe)
+        } yield tpe: Type
       }
     } yield Ident(name)(id, idRefTpe.freshVariables)
   }
 
-  private def assertStoupCondition(x: Name) given Context, Stoup: Checked[Unit] = {
-    val linearX = inStoup(x)
-    stoup match {
-      case Blank if linearX => Err.illegalStoupDependency(x)
-
-      case DependsOn(z) if (z != x && linearX) || (z == x && !linearX) =>
-        Err.illegalStoupDependency(x)
-
-      case _ => ()
-    }
+  private def assertInScope(name: Name, tpe: Type)
+                           given Context, Stoup: Checked[Unit] = {
+    if isLinear(name) then
+      assertStoupIs(name)(Err.illegalStoupDependency)
+    else
+      assertStoupEmpty(Err.illegalStoupValueIdent(_, name, tpe))
   }
 
-  private def typedLiteral(constant: Constant): Checked[Tree] =
-    Literal(constant)(constantTpe(constant))
+  private def assertStoupEmpty(err: Name => CompilerError)
+                              given Stoup: Checked[Unit] = stoup match {
+    case DependsOn(z) => err(z)
+    case _            => ()
+  }
+
+  private def assertStoupIs(name: Name)(err: Name => CompilerError)
+                           given Stoup: Checked[Unit] = stoup match {
+    case DependsOn(`name`) => ()
+    case _                 => err(name)
+  }
+
+  def assertIsLinear(name: Name, tpe: Type) given Context: Checked[Unit] = {
+    if tpe.isValueType && isLinear(name) then
+      Err.illegalStoupEntry(name, tpe)
+    else
+      ()
+  }
+
+  private def typedLiteral(constant: Constant) given Stoup: Checked[Tree] = {
+    for {
+      _ <- assertStoupEmpty(Err.illegalStoupValueLiteral)
+    } yield Literal(constant)(constantTpe(constant))
+  }
 
   private def check(typed: Tree)(pt: Type) given Mode: Checked[Tree] = {
     inline def ignoreType(tree: Tree) = tree match {
@@ -842,11 +866,6 @@ object Typers {
     else
       Err.typecheckFail(typed)(typed.tpe, pt)
   }
-
-  inline def unifiesThenOrError[O](tpe: Type, pt: Type)
-                                  (f: Type => O)
-                                  (orElse: (Type, Type) => Checked[O]): Checked[O] =
-    unifiesThen[O, Checked[O]](tpe, pt)(f)(orElse)
 
   private def (tree: Tree) typed
               (pt: Type)
@@ -861,7 +880,7 @@ object Typers {
       case u @ Function(ts,t)       if isType     => typedFunctionType(ts,t)(u.id, pt)
       case u @ LinearFunction(a,b)  if isType     => typedLinearFunctionType(a,b)(u.id, pt)
       // Linear patterns
-      case Unapply(f,ts)            if isLinear   => typedLinearUnapply(f,ts)(pt)
+      case Unapply(f,ts)            if isLPattern => typedLinearUnapply(f,ts)(pt)
       // Patterns
       case u @ Ident(n)             if isPattern  => typedIdentPat(n)(u.id, pt)
       case Bind(n,t)                if isPattern  => typedBind(n,t)(pt)
@@ -882,6 +901,8 @@ object Typers {
       case u @ LetTensor(x,z,v,t)   if isTerm     => typedLetTensor(x,z,v,t)(u.id, pt)
       case u @ Function(ts,t)       if isTerm     => typedFunctionTerm(ts,t)(u.id, pt)
       case u @ LinearFunction(a,b)  if isTerm     => typedLinearFunctionTerm(a,b)(u.id, pt)
+      case WhyNot(t)                if isTerm     => typedWhyNotTerm(t)(pt)
+      case Bang(t)                  if isTerm     => typedBangTerm(t)(pt)
       case Tensor(t,u)              if isTerm     => typedTensorTerm(t,u)(pt)
       case Tagged(n,t)              if isTerm     => typedTagged(n,t)(pt)
       case CaseExpr(t,ts)           if isTerm     => typedCaseExpr(t,ts)(pt)

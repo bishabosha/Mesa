@@ -57,13 +57,13 @@ object TyperErrors {
   }
 
   def typeNotTuple(pt: Type) =
-    CompilerError.UnexpectedType(s"expected `${pt.show}` but was a Tuple.")
+    CompilerError.UnexpectedType(s"Expected `${pt.show}` but was a Tuple.")
 
   def tupleNotMatchLength =
-    CompilerError.UnexpectedType("Tuple lengths do not match")
+    CompilerError.UnexpectedType("Tuple lengths do not match.")
 
   def argsNotMatchLength =
-    CompilerError.UnexpectedType("arg lengths do not match")
+    CompilerError.UnexpectedType("Arg lengths do not match.")
 
   def linearUnapplyArgLengthGT1 =
     CompilerError.UnexpectedType("Linear case clause must have a single path.")
@@ -85,7 +85,7 @@ object TyperErrors {
         ""
       }
     CompilerError.UnexpectedType(
-      s"HK args do not match. Expected $argsExpect but got $argsPassed.$hint")
+      s"Higher kinded type args do not match. Expected $argsExpect but got $argsPassed.$hint")
   }
 
   def typingMissing(tree: Tree) given Mode =
@@ -122,7 +122,7 @@ object TyperErrors {
 
   def noTensorLetValue(x: Name, z: Name, value: Tree) =
     CompilerError.UnexpectedType(
-      s"Can not infer type of `!${x.show} |*| ${x.show} = ${value.show}` as of !_ |*| _ type.")
+      s"Can not infer type of `!${x.show} *: ${x.show} = ${value.show}` as of !_ *: _ type.")
 
   def noBangLetValue(name: Name, value: Tree) =
     CompilerError.UnexpectedType(
@@ -155,9 +155,29 @@ object TyperErrors {
       s"${name.show} does not qualify to be a constructor.")
   }
 
+  def illegalStoupEntry(name: Name, tpe: Type) =
+    CompilerError.UnexpectedType(
+        s"name `${name.show}` of value type: `${tpe.show}` is not allowed in the linear context.")
+
   def illegalStoupDependency(name: Name) =
     CompilerError.UnexpectedType(
-      s"Illegal dependency on linear context variable `${name.show}`.")
+      s"Reference to on linear variable `${name.show}` not in scope.")
+
+  def illegalStoupBang(name: Name) =
+    CompilerError.UnexpectedType(
+      s"linear variable `${name.show}` can not be in scope when evaluating ! terms.")
+
+  def illegalStoupLinearLambda(name: Name) =
+    CompilerError.UnexpectedType(
+      s"linear variable `${name.show}` can not be in scope when evaluating linear lambda terms.")
+
+  def illegalStoupValueIdent(z: Name, name: Name, tpe: Type) =
+    CompilerError.UnexpectedType(
+      s"linear variable `${z.show}` can not be in scope when evaluating variable `${name.show}: ${tpe.show}` of value type.")
+
+  def illegalStoupValueLiteral(name: Name) =
+    CompilerError.UnexpectedType(
+      s"linear variable `${name.show}` can not be in scope when evaluating a constant literal.")
 
   def memberSelection given Mode =
     CompilerError.SyntaxError(

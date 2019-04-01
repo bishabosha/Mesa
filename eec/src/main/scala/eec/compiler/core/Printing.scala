@@ -24,6 +24,8 @@ object Printing {
       case Apply(id: Ast, args: List[Ast])
       case InfixApply(f: Ast, left: Ast, right: Ast)
       case Eval(f: Ast, arg: Ast)
+      case Bang(value: Ast)
+      case WhyNot(value: Ast)
       case Tensor(value: Ast, computation: Ast)
       case Function(args: List[Ast], body: Ast)
       case LinearFunction(arg: Ast, body: Ast)
@@ -61,7 +63,9 @@ object Printing {
         case Tree.InfixApply(f, left, right) =>
           InfixApply(toAst(f), toAst(left), toAst(right))
 
-        case Tree.Eval(f, arg) => Eval(toAst(f), toAst(arg))
+        case Tree.Eval(f, arg)  => Eval(toAst(f), toAst(arg))
+        case Tree.WhyNot(value) => WhyNot(toAst(value))
+        case Tree.Bang(value)   => Bang(toAst(value))
 
         case Tree.Tensor(value, computation) =>
           Tensor(toAst(value), toAst(computation))

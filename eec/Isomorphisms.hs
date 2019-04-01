@@ -1,47 +1,46 @@
 package eec.report.example
 
-primitive absurd v    : Void -> A
 primitive Left  l     : L -> Either L R
 primitive Right r     : R -> Either L R
-primitive summon [v]  : Void# |- A#
+primitive absurd [v]  : Void# |- A#
 primitive InL [l]     : L# |- L# +: R#
 primitive InR [r]     : R# |- L# +: R#
 
-fstL [p]: (A#, B#) |- A# =
+fstL [p] : (A#, B#) |- A# =
   case [p] of (a, _) |- a
 
-sndL [p]: (A#, B#) |- B# =
+sndL [p] : (A#, B#) |- B# =
   case [p] of (_, b) |- b
 
-fst p: (A, B) -> A =
+fst p : (A, B) -> A =
   case p of (a, _) => a
 
-snd p: (A, B) -> B =
+snd p : (A, B) -> B =
   case p of (_, b) => b
 
-isomorphism_2a f [t]: (A -> B#) -> (!A |- B#) =
+isomorphism_2a f [t] : (A -> B#) -> (!A |- B#) =
   let !x = t in f x
 
-isomorphism_2b f a: (!A |- B#) -> A -> B# =
+isomorphism_2b f a : (!A |- B#) -> A -> B# =
   f [!a]
 
-isomorphism_3_1a f a [b]: (!A *: B# |- C#) -> A -> (B# |- C#) =
+isomorphism_3_1a f a [b] : (!A *: B# |- C#) -> A -> (B# |- C#) =
   f [!a *: b]
 
-isomorphism_3_1b f [t]: (A -> (B# |- C#)) -> (!A *: B# |- C#) =
+isomorphism_3_1b f [t] : (A -> (B# |- C#)) -> (!A *: B# |- C#) =
   let !a *: b = t in
   f a [b]
 
-isomorphism_3_2a f [b]: (A -> (B# |- C#)) -> (B# |- (A -> C#)) =
+isomorphism_3_2a f [b] : (A -> (B# |- C#)) -> (B# |- (A -> C#)) =
   \(a: A) => f a [b]
 
-isomorphism_3_2b f a: (B# |- (A -> C#)) -> A -> (B# |- C#) =
+isomorphism_3_2b f a : (B# |- (A -> C#)) -> A -> (B# |- C#) =
   |(b: B#) |- f [b] a
 
-isomorphism_3_3a f [b]: (!A *: B# |- C#) -> (B# |- (A -> C#)) =
+isomorphism_3_3a f [b] : (!A *: B# |- C#) -> (B# |- (A -> C#)) =
   \(a: A) => f [!a *: b]
 
-isomorphism_3_3b f [t]: (B# |- (A -> C#)) -> (!A *: B# |- C#) =
+isomorphism_3_3b f [t] : (B# |- (A -> C#)) -> (!A *: B# |- C#) =
   let !a *: b = t in
   f [b] a
 
@@ -61,7 +60,7 @@ isomorphism_6a _ : (Void# |- A#) -> () =
   ()
 
 isomorphism_6b _ : () -> (Void# |- A#) =
-  summon
+  absurd
 
 isomorphism_7a f : (A# +: B# |- C#) -> (A# |- C#, B# |- C#) =
   (| (a: A#) |- f [InL [a]], | (b: B#) |- f [InR [b]])
@@ -71,7 +70,7 @@ isomorphism_7b p [e] : (A# |- C#, B# |- C#) -> (A# +: B# |- C#) =
     InL [a] |- fst p [a]
     InR [b] |- snd p [b]
 
-isomorphism_8a [w]: !A *: !B |- !(A, B) =
+isomorphism_8a [w] : !A *: !B |- !(A, B) =
   let !x *: z = w in
   let !y      = z in
   !(x,y)
@@ -84,7 +83,7 @@ isomorphism_9a [t] : !A *: Void# |- Void# =
   let !_ *: v = t in v
 
 isomorphism_9b : Void# |- !A *: Void# =
-  summon
+  absurd
 
 isomorphism_10a [t] : !A *: (B# +: C#) |- (!A *: B#) +: (!A *: C#) =
   let !a *: e = t in
@@ -107,7 +106,7 @@ isomorphism_11a [t] : !() *: A# |- A# =
 isomorphism_11b [a] : A# |- !() *: A# =
   !() *: a
 
-isomorphism_12a [v]: !(A, B) *: C# |- !A *: !B *: C# =
+isomorphism_12a [v] : !(A, B) *: C# |- !A *: !B *: C# =
   let !p *: z = v in
   !(fst p) *: !(snd p) *: z
 
@@ -118,10 +117,10 @@ isomorphism_12b [v] : !A *: !B *: C# |- !(A, B) *: C# =
 
 isomorphism_13a [t] : !Void |- Void# =
   let !v = t in
-  absurd v
+  ?v
 
 isomorphism_13b : Void# |- !Void =
-  summon
+  absurd
 
 isomorphism_14a [t] : !(Either A B) |- !A +: !B =
   let !e = t in
@@ -138,12 +137,12 @@ isomorphism_14b [e] : !A +: !B |- !(Either A B) =
       let !b = u in
       !(Right b)
 
-isomorphism_15a [t]: !Void *: A# |- Void# =
+isomorphism_15a [t] : !Void *: A# |- Void# =
   let !v *: a = t in
-  absurd v
+  ?v
 
-isomorphism_15b: Void# |- !Void *: A# =
-  summon
+isomorphism_15b : Void# |- !Void *: A# =
+  absurd
 
 isomorphism_16a [t] : !(Either A B) *: C# |- (!A *: C#) +: (!B *: C#) =
   let !e *: c = t in

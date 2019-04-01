@@ -22,7 +22,7 @@ object Names {
   enum Name derives Eql {
     case From(derived: Derived)
     case Comp(derived: Derived)
-    case ComputationTag, IntegerTag, DecimalTag, EitherTag, VoidTag,
+    case BangTag, IntegerTag, DecimalTag, EitherTag, VoidTag,
       VoidCompTag, BooleanTag, StringTag, CharTag, Wildcard, TensorTag,
       CoTensorTag
     case EmptyName
@@ -71,7 +71,7 @@ object Names {
       def (n: Name) show = n match {
         case Comp(n)        => n.show
         case From(n)        => n.show
-        case ComputationTag => "!"
+        case BangTag        => "!"
         case TensorTag      => "*:"
         case CoTensorTag    => "+:"
         case EitherTag      => "Either"
@@ -89,7 +89,7 @@ object Names {
 
     implied for Readable[Name] {
       def (str: String) readAs = str match {
-        case "!"        => ComputationTag
+        case "!"        => BangTag
         case "*:"       => TensorTag
         case "+:"       => CoTensorTag
         case "_"        => Wildcard
