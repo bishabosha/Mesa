@@ -1,10 +1,13 @@
 # EEC
 
 ### Current Release
-0.1.1-RC1
+0.1.2-RC1
 
 ## About
 This repository is for implementing a programming language based on the enriched effect calculus by Egger, Ejlers and Simpson (2014).
+
+## Changes
+* Refer to [CHANGELOG.md](CHANGELOG.md)
 
 ## Features
 * Read Eval Print Loop

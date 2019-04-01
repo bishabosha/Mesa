@@ -136,8 +136,8 @@ class StatTest {
   )
 
   @Test def typecheckLinearLambdaEval() = typecheck(
-    "Void# |- A#" -|: """ summonProxy: Void# |- A# =
-                            | (v: Void#) |- summon[v] """,
+    "Void# |- A#" -|: """ absurdProxy: Void# |- A# =
+                            | (v: Void#) |- absurd[v] """,
   )
 
   @Test def typecheckLambdaApply() = typecheck(

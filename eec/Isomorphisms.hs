@@ -2,7 +2,7 @@ package eec.report.example
 
 primitive Left  l     : L -> Either L R
 primitive Right r     : R -> Either L R
-primitive summon [v]  : Void# |- A#
+primitive absurd [v]  : Void# |- A#
 primitive InL [l]     : L# |- L# +: R#
 primitive InR [r]     : R# |- L# +: R#
 
@@ -60,7 +60,7 @@ isomorphism_6a _ : (Void# |- A#) -> () =
   ()
 
 isomorphism_6b _ : () -> (Void# |- A#) =
-  summon
+  absurd
 
 isomorphism_7a f : (A# +: B# |- C#) -> (A# |- C#, B# |- C#) =
   (| (a: A#) |- f [InL [a]], | (b: B#) |- f [InR [b]])
@@ -83,7 +83,7 @@ isomorphism_9a [t] : !A *: Void# |- Void# =
   let !_ *: v = t in v
 
 isomorphism_9b : Void# |- !A *: Void# =
-  summon
+  absurd
 
 isomorphism_10a [t] : !A *: (B# +: C#) |- (!A *: B#) +: (!A *: C#) =
   let !a *: e = t in
@@ -120,7 +120,7 @@ isomorphism_13a [t] : !Void |- Void# =
   ?v
 
 isomorphism_13b : Void# |- !Void =
-  summon
+  absurd
 
 isomorphism_14a [t] : !(Either A B) |- !A +: !B =
   let !e = t in
@@ -142,7 +142,7 @@ isomorphism_15a [t] : !Void *: A# |- Void# =
   ?v
 
 isomorphism_15b : Void# |- !Void *: A# =
-  summon
+  absurd
 
 isomorphism_16a [t] : !(Either A B) *: C# |- (!A *: C#) +: (!B *: C#) =
   let !e *: c = t in
