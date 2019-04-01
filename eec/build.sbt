@@ -11,7 +11,7 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := "eec",
-    version := "0.1.0",
+    version := "0.1-RC1",
 
     compileOrder := CompileOrder.JavaThenScala,
 

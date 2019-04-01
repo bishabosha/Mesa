@@ -1,9 +1,22 @@
-## sbt project compiled with Dotty
+# EEC 0.1-RC1
 
-### Usage
+## Requirements
+* Dotty 0.13.0-RC1 <http://dotty.epfl.ch>
 
-This is a normal sbt project, you can compile code with `sbt compile` and run it
-with `sbt run`, `sbt console` will start a Dotty REPL.
+## Usage
 
-For more information on the sbt-dotty plugin, see the
-[dotty-example-project](https://github.com/lampepfl/dotty-example-project/blob/master/README.md).
+* Load sbt with `sbt`
+* To run tests, in the sbt CLI use `test`.
+* To launch the EEC REPL, in the sbt CLI use `run -e`.
+
+## REPL
+* `:help` to get a list of commands available.
+* `:tf` to type check a file in the current directory, e.g. `Isomorphisms.hs`; adding any definitions to the environment.
+* `:ctx` to print the current environment after defining terms.
+* `:reset` to clear all definitions in the environment.
+* `:def` to define a new top level definition.
+* `:t` to type an expression.
+* `:ast` to print the AST of an expression.
+* `:astt` to print the AST of a top level definition.
+* `:astf` to print the AST of a source file in the current directory.
+* `:q` to quit the REPL.
