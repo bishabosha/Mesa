@@ -19,7 +19,7 @@ import implied NameOps._
 
 object TyperErrors {
 
-  def functorNotMatchProto(functor: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
+  def functorNotMatch(functor: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
     val functorTyp1Str  = functorTyp1.show
     val proto1Str       = proto1.show
     val functorNameStr  = functor.show
@@ -27,7 +27,7 @@ object TyperErrors {
       s"Functor definition `$functorNameStr: ${fTpe.show}` does not match args. Expected `$functorTyp1Str` but was `$proto1Str` in type tree.")
   }
 
-  def functionNotMatchProto(fun: Tree, arg1: Type, argProto: Type) = {
+  def functionNotMatch(fun: Tree, arg1: Type, argProto: Type) = {
     val argProtoStr = argProto.show
     val arg1Str     = arg1.show
     val funNameStr  = uniqName(fun).show
@@ -35,7 +35,7 @@ object TyperErrors {
       s"Function definition `$funNameStr: ${fun.tpe.show}` does not match args. Expected `$arg1Str` but was `$argProtoStr` in application expr.")
   }
 
-  def linearFunctionNotMatchProto(fun: Tree, arg1: Type, argProto: Type) = {
+  def linearFunctionNotMatch(fun: Tree, arg1: Type, argProto: Type) = {
     val argProtoStr = argProto.show
     val arg1Str     = arg1.show
     val funNameStr  = uniqName(fun).show
@@ -68,7 +68,7 @@ object TyperErrors {
   def linearUnapplyArgLengthGT1 =
     CompilerError.UnexpectedType("Linear case clause must have a single path.")
 
-  def typecheckFail(typed: Tree, pt: Type) given Mode = {
+  def typecheckFail(typed: Tree)(tpe1: Type, pt: Type) given Mode = {
     CompilerError.UnexpectedType(
       s"Check failed. Type ${typed.tpe.show} != ${pt.show} in ${mode.show}:\n${typed.show}")
   }
@@ -109,9 +109,12 @@ object TyperErrors {
     CompilerError.UnexpectedType(
       "Linear function does not have computational co-domain.")
 
-  def noTensorCompCodomain =
+  def noTensorCompCodomain(comp1: Tree) = {
+    val name = (comp1.convert: Name).show
+    val tpe = comp1.tpe.show
     CompilerError.UnexpectedType(
-      "Linear tensor does not have computational second argument.")
+      s"Linear tensor does not have computational second argument. Given `$name: $tpe`")
+  }
 
   def noCompLetContinuation =
     CompilerError.UnexpectedType(

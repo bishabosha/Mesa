@@ -226,12 +226,7 @@ object Parsers {
   private[this] def fromInfixAppliedType
       (context: EECParser.InfixAppliedTypeContext) given IdGen: Tree = {
     val functor1 = fromFunctorType(context.functorType)
-    val name = {
-      if defined(context.Tensor) then
-        context.Tensor.getText.readAs
-      else
-        context.CoTensor.getText.readAs
-    }
+    val name = context.rassocOpId.getText.readAs
     val iat = fromInfixType(context.infixType)
     val functor = Ident(name)(freshId(), uTpe)
     InfixApply(functor, functor1, iat)(uTpe)

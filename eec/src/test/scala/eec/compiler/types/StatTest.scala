@@ -2,23 +2,13 @@ package eec
 package compiler
 package types
 
-import core.Contexts._
-import ast.Trees._
-import parsing.EntryPoint._
-import error.CompilerErrors._
-import error.CompilerErrors.CompilerError._
-import Types._
-import types.Typers._
-import error.CompilerErrors._
 import BootstrapTests._
-import CompilerErrorOps._
+import StatBootstraps._
 
 import org.junit.Test
 import org.junit.Assert._
 
-class TopDefTest {
-
-  val any = Type.WildcardType
+class StatTest {
 
   @Test def typecheckTrivial() = typecheck(
     "()" -|: "unit: () = ()"
@@ -29,20 +19,20 @@ class TopDefTest {
   )
 
   @Test def typecheckLinearSig() = typecheck(
-    "A -> (R# -* L# |+| R#)"
-    -|: """ InRproxy _ [r] : A -> (R# -* L# |+| R#) =
+    "A -> (R# |- L# +: R#)"
+    -|: """ InRproxy _ [r] : A -> (R# |- L# +: R#) =
               InR [r] """,
 
-    "L# |+| ()"
-    -|: """ foo : L# |+| () =
+    "L# +: ()"
+    -|: """ foo : L# +: () =
               InRproxy 0 [()] """,
 
-    "() -> (() -* ())"
-    -|: """ primitive ok _ [_] : () -> (() -* ()) """
+    "() -> (() |- ())"
+    -|: """ primitive ok _ [_] : () -> (() |- ()) """
   )
 
   @Test def failLinearSig() = noType(
-    """ linearFail _ [_] : () -> (() -* ()) = () """ // error: cant put wildcard in stoup for non primitive
+    """ linearFail _ [_] : () -> (() |- ()) = () """ // error: cant put wildcard in stoup for non primitive
   )
 
   @Test def failRecursion() = noType(
@@ -67,26 +57,26 @@ class TopDefTest {
    *  than once
    */
   @Test def noDuplicateState() = someNoType(
-    """ fst [p]: (A#, B#) -* A# =
-          | case p of (a, _) -* a """, // ok
+    """ fst [p]: (A#, B#) |- A# =
+          | case p of (a, _) |- a """, // ok
 
-    """ snd [p]: (A#, B#) -* B# =
-          | case p of (_, b) -* b """, // ok
+    """ snd [p]: (A#, B#) |- B# =
+          | case p of (_, b) |- b """, // ok
 
-    """ linearEval [pair]: (!A, !A) -* () =
+    """ linearEval [pair]: (!A, !A) |- () =
           let !_ = fst [pair] in
           let !_ = snd [pair] in
           () """ // error: `snd [pair]` has illegal dependency
   )
 
   @Test def projectTuplesLinear() = typecheck(
-    "(A#, B#) -* A#"       -|:  """ fst[pair] : (A#, B#) -* A# =
-                                      | case pair of (a, _) -* a """,
+    "(A#, B#) |- A#"       -|:  """ fst[pair] : (A#, B#) |- A# =
+                                      | case pair of (a, _) |- a """,
 
-    "(A#, B#) -* B#"       -|:  """ snd[pair] : (A#, B#) -* B# =
-                                      | case pair of (_, b) -* b """,
+    "(A#, B#) |- B#"       -|:  """ snd[pair] : (A#, B#) |- B# =
+                                      | case pair of (_, b) |- b """,
 
-    "(A#, B#) -* (A#, B#)" -|:  """ linearEval[pair] : (A#, B#) -* (A#, B#) =
+    "(A#, B#) |- (A#, B#)" -|:  """ linearEval[pair] : (A#, B#) |- (A#, B#) =
                                       (fst[pair], snd[pair]) """
   )
 
@@ -94,7 +84,7 @@ class TopDefTest {
    *  depends on a linear variable
    */
   @Test def noDuplicateState2() = someNoType(
-    """ duplicateState [e]: A# -* (A#, A#) =
+    """ duplicateState [e]: A# |- (A#, A#) =
           (e, e) """, // ok
 
     """ sequentialEval pair: (!A, !A) -> () =
@@ -104,7 +94,7 @@ class TopDefTest {
               let !_ = r in
               () """, // ok
 
-    """ cantDuplicate [e]: !A -* () =
+    """ cantDuplicate [e]: !A |- () =
           sequentialEval (duplicateState e) """, // error: dependency on e
   )
 
@@ -124,17 +114,15 @@ class TopDefTest {
   )
 
   @Test def linearNonDuplication() = typecheck(
-    "A# -* ()" -|:  """ safeDuplication [a] : A# -* () =
+    "A# |- ()" -|:  """ safeDuplication [a] : A# |- () =
                           | case (a, a) of
-                            (q, _) -* ()
-                            (_, r) -* () """
+                            (q, _) |- ()
+                            (_, r) |- () """
   )
 
   @Test def typecheckLinearLambdaEval() = typecheck(
-    "() -* A#" -|:  """ primitive f [a]: () -* A# """,
-
-    "() -* A#" -|:  """ evalTest: () -* A# =
-                          | (u: ()) -* f[u] """,
+    "Void# |- A#" -|: """ summonProxy: Void# |- A# =
+                            | (v: Void#) |- summon[v] """,
   )
 
   @Test def typecheckLambdaApply() = typecheck(
@@ -177,24 +165,29 @@ class TopDefTest {
                 Right (Right (Right d)) => zu d """
   )
 
-  private def typecheck(seq: (String, String)*): Unit = {
-    val (idGen, ctx)    = initialCtx
-    implied for IdGen   = idGen
-    implied for Context = ctx
-    seq.foreach { (f, s) => checkTpe(typeStat(f)(any), s) }
-  }
+  @Test def typecheckLinearMatchEitherArbitraryDepth() = typecheck(
+    "(w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> ((w# +: x#) +: y# +: z# |- !u)"
+    -|: """ cat4_alt0 wu xu yu zu [e] : (w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> ((w# +: x#) +: y# +: z# |- !u) =
+              | case e of
+                InL [InL [a]] |- wu [a]
+                InL [InR [b]] |- xu [b]
+                InR [InL [c]] |- yu [c]
+                InR [InR [d]] |- zu [d] """,
 
-  private def noType(seq: String*): Unit = {
-    val (idGen, ctx)    = initialCtx
-    implied for IdGen   = idGen
-    implied for Context = ctx
-    seq.foreach { f => failIfUnparsedOrTypedStat(f)(any) }
-  }
+    "(w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (((w# +: x#) +: y#) +: z# |- !u)"
+    -|: """ cat4_alt1 wu xu yu zu [e]: (w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (((w# +: x#) +: y#) +: z# |- !u) =
+              | case e of
+                InL [InL [InL [a]]] |- wu [a]
+                InL [InL [InR [b]]] |- xu [b]
+                InL [InR [c]]       |- yu [c]
+                InR [d]             |- zu [d] """,
 
-  private def someNoType(seq: String*): Unit = {
-    val (idGen, ctx)    = initialCtx
-    implied for IdGen   = idGen
-    implied for Context = ctx
-    failIfAllTyped(seq.mapE { f => typeStat(f)(any) })
-  }
+    "(w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (w# +: x# +: y# +: z# |- !u)"
+    -|: """ cat4_alt2 wu xu yu zu [e]: (w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (w# +: x# +: y# +: z# |- !u) =
+              | case e of
+                InL [a]             |- wu [a]
+                InR [InL [b]]       |- xu [b]
+                InR [InR [InL [c]]] |- yu [c]
+                InR [InR [InR [d]]] |- zu [d] """
+  )
 }

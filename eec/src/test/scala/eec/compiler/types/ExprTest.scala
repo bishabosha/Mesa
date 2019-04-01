@@ -2,23 +2,13 @@ package eec
 package compiler
 package types
 
-import core.Contexts._
-import ast.Trees._
-import parsing.EntryPoint._
-import error.CompilerErrors._
-import error.CompilerErrors.CompilerError._
-import Types._
-import types.Typers._
-import error.CompilerErrors._
+import ExprBootstraps._
 import BootstrapTests._
-import CompilerErrorOps._
 
 import org.junit.Test
 import org.junit.Assert._
 
-class TyperTest {
-
-  val any = Type.WildcardType
+class ExprTest {
 
   @Test def typecheckInteger() = typecheck(
     "0"  :|- "Integer",
@@ -71,15 +61,15 @@ class TyperTest {
   )
 
   @Test def typecheckTensor() = typecheck(
-    "!() |*| ()" :|- "!() |*| ()",
+    "!() *: ()" :|- "!() *: ()",
   )
 
   @Test def failTensor() = noType(
-    "!0 |*| 0", // error: 0 is not of computation type
+    "!0 *: 0", // error: 0 is not of computation type
   )
 
   @Test def failTensorParse() = noParse(
-    "0 |*| ()", // error: syntax error, expecting !
+    "0 *: ()", // error: syntax error, expecting !
   )
 
   @Test def typecheckCompute() = typecheck(
@@ -91,7 +81,7 @@ class TyperTest {
   @Test def failCompute() = noType(
     """ \(_: ! a b) => () """, // error: expected types [_] but got [a, b]
     """ ! () () """, // error: expected args [_: _] but got [(): (), (): ()]
-    """ | (x: A#) -* !x """, // error: `!t` can't depend on linear variable
+    """ | (x: A#) |- !x """, // error: `!t` can't depend on linear variable
   )
 
   @Test def typecheckIf() = typecheck(
@@ -159,34 +149,35 @@ class TyperTest {
   )
 
   @Test def typecheckCoTensor() = typecheck(
-    """ InR [InL [()]] """ :|- "<L#:2> |+| () |+| <R#:4>",
+    """ InR [InL [()]] """ :|- "<L#:2> +: () +: <R#:4>",
+    """ InL [InR [()]] """ :|- "(<L#:8> +: ()) +: <R#:6>",
   )
 
   @Test def typecheckLinearCase() = typecheck(
     """ | case InR [InL [()]] of
-          InR [InL [m]] -* m """     :|- "()",
+          InR [InL [m]] |- m """     :|- "()",
 
     """ | case ((), ()) of
-          (x, _) -* x """            :|- "()",
+          (x, _) |- x """            :|- "()",
 
     """ | case ((),()) of
-          (x, ( )) -* x """          :|- "()",
+          (x, ( )) |- x """          :|- "()",
 
     """ | case InR [((), ())] of
-          InR [(x, _)] -* x """      :|- "()",
+          InR [(x, _)] |- x """      :|- "()",
 
     """ | case (InR [()], ()) of
-          (InR [x], _) -* x """      :|- "()",
+          (InR [x], _) |- x """      :|- "()",
 
     """ | case InL [()] of
-          InL [n] -* () """          :|- "()",
+          InL [n] |- () """          :|- "()",
   )
 
   @Test def failLinearCase() = noType(
     """| case (0, ()) of
-        (x, _) -* x""",  // error: `x: Integer` not allowed in stoup
+        (x, _) |- x""",  // error: `x: Integer` not allowed in stoup
     """| case ((), ()) of
-        (x, y) -* x""",   // error: can't put x and y together in stoup
+        (x, y) |- x""",   // error: can't put x and y together in stoup
   )
 
   @Test def typecheckLambda() = typecheck(
@@ -194,7 +185,7 @@ class TyperTest {
     """\(_: ()) => ()"""                :|- "() -> ()",
     """\(t: ()) => t"""                 :|- "() -> ()",
     """\(_: () -> ()) => ()"""          :|- "(() -> ()) -> ()",
-    """\(_: () -* ()) => ()"""          :|- "(() -* ()) -> ()",
+    """\(_: () |- ()) => ()"""          :|- "(() |- ()) -> ()",
     """\(_: ()) (_: ()) => ()"""        :|- "() -> () -> ()",
     """\(a: ()) (b: ()) => (a,b)"""     :|- "() -> () -> ((), ())",
   )
@@ -210,20 +201,20 @@ class TyperTest {
   )
 
   @Test def typecheckLinearLambda() = typecheck(
-    "| (a: A#) -* a"  :|- "A# -* A#",
-    "| (b: B#) -* ()" :|- "B# -* ()",
+    "| (a: A#) |- a"  :|- "A# |- A#",
+    "| (b: B#) |- ()" :|- "B# |- ()",
   )
 
   @Test def failLinearLambda() = noType(
-    """| (a: A)  -* ()""", // error: a is not of computation type, so cant be in stoup
-    """| (c: C#) -* !c""", // error: no dependency on c allowed
-    """| (a: A#) -* | (b: B#) -* b""", // error: rhs is not computational codomain
-    """(| (a: ()) -* \(b: ()) => | (c: ()) -* a)""", // error: no dependency on a allowed
-    """| (_: A#) -* ()""", // error: Illegal wildcard var name in stoup
+    """| (a: A)  |- ()""", // error: a is not of computation type, so cant be in stoup
+    """| (c: C#) |- !c""", // error: no dependency on c allowed
+    """| (a: A#) |- | (b: B#) |- b""", // error: rhs is not computational codomain
+    """(| (a: ()) |- \(b: ()) => | (c: ()) |- a)""", // error: no dependency on a allowed
+    """| (_: A#) |- ()""", // error: Illegal wildcard var name in stoup
   )
 
   @Test def typecheckEval() = typecheck(
-    "(| (u: ()) -* u)[()]" :|- "()"
+    "(| (u: ()) |- u)[()]" :|- "()"
   )
 
   @Test def typecheckLet() = typecheck(
@@ -234,37 +225,16 @@ class TyperTest {
   @Test def failLet() = noType(
     "let !x = () in ()",  // error: () is not ! type
     "let !x = !0 in 0",   // error: 0 is not of computation type
-    "| (u: ()) -* let !_ = !() in u", // error: no dependency on u allowed
+    "| (u: ()) |- let !_ = !() in u", // error: no dependency on u allowed
   )
 
   @Test def typecheckLetTensor() = typecheck(
-    """let !x |*| y = !() |*| () in
-        !x |*| y"""                 :|- "!() |*| ()",
+    """let !x *: y = !() *: () in
+        !x *: y"""                 :|- "!() *: ()",
   )
 
   @Test def failLetTensor() = noType(
-    """let !x |*| y = () in
-        !x |*| y""", // error : () is not of tensor type
+    """let !x *: y = () in
+        !x *: y""", // error : () is not of tensor type
   )
-
-  def typecheck(seq: (String, String)*): Unit = {
-    val (idGen, ctx)    = initialCtx
-    implied for IdGen   = idGen
-    implied for Context = ctx
-    seq.toList.foreach { (f, s) => checkTpe(typeExpr(f)(any), s) }
-  }
-
-  def noType(seq: String*): Unit = {
-    val (idGen, ctx)    = initialCtx
-    implied for IdGen   = idGen
-    implied for Context = ctx
-    seq.toList.foreach { f => failIfUnparsedOrTypedExpr(f)(any) }
-  }
-
-  def noParse(seq: String*): Unit = {
-    val (idGen, ctx)    = initialCtx
-    implied for IdGen   = idGen
-    implied for Context = ctx
-    seq.toList.foreach { f => failIfParsed(parseExpr)(f) }
-  }
 }

@@ -30,82 +30,6 @@ object Names {
 
   val rootName: Name = "_root_".readAs
 
-  val tensorConstructor = {
-    FunctionType(
-      AppliedType(
-        TypeRef("!".readAs),
-        List(Variable("$A".readAs))
-      ),
-      FunctionType(
-        Variable("$B#".readAs),
-        InfixAppliedType(
-          TypeRef(TensorTag),
-          AppliedType(
-            TypeRef("!".readAs),
-            List(Variable("$A".readAs))
-          ),
-          Variable("$B#".readAs)
-        )
-      )
-    )
-  }
-
-  val coTensorConstructor = {
-    FunctionType(
-      Variable("$A#".readAs),
-      FunctionType(
-        Variable("$B#".readAs),
-        InfixAppliedType(
-          TypeRef(CoTensorTag),
-          Variable("$A#".readAs),
-          Variable("$B#".readAs)
-        )
-      )
-    )
-  }
-
-  val bangConstructor = {
-    FunctionType(
-      Variable("$v".readAs),
-      AppliedType(
-        TypeRef("!".readAs),
-        List(Variable("$v".readAs))
-      )
-    )
-  }
-
-  val eitherConstructor = {
-    FunctionType(
-      Variable("$l".readAs),
-      FunctionType(
-        Variable("$r".readAs),
-        AppliedType(
-          TypeRef(EitherTag),
-          List(
-            Variable("$l".readAs),
-            Variable("$r".readAs)
-          )
-        )
-      )
-    )
-  }
-
-  val bootstrapped = {
-    List(
-      TensorTag       -> tensorConstructor,
-      CoTensorTag     -> coTensorConstructor,
-      ComputationTag  -> bangConstructor,
-      EitherTag       -> eitherConstructor,
-      VoidCompTag     -> TypeRef(VoidCompTag),
-      VoidTag         -> TypeRef(VoidTag),
-      IntegerTag      -> TypeRef(IntegerTag),
-      DecimalTag      -> TypeRef(DecimalTag),
-      BooleanTag      -> TypeRef(BooleanTag),
-      StringTag       -> TypeRef(StringTag),
-      CharTag         -> TypeRef(CharTag)
-    )
-  }
-
   object DerivedOps {
     implied for Showable[Derived] {
       def (n: Derived) show = n match {
@@ -148,8 +72,8 @@ object Names {
         case Comp(n)        => n.show
         case From(n)        => n.show
         case ComputationTag => "!"
-        case TensorTag      => "|*|"
-        case CoTensorTag    => "|+|"
+        case TensorTag      => "*:"
+        case CoTensorTag    => "+:"
         case EitherTag      => "Either"
         case VoidTag        => "Void"
         case VoidCompTag    => "Void#"
@@ -166,8 +90,8 @@ object Names {
     implied for Readable[Name] {
       def (str: String) readAs = str match {
         case "!"        => ComputationTag
-        case "|*|"      => TensorTag
-        case "|+|"      => CoTensorTag
+        case "*:"       => TensorTag
+        case "+:"       => CoTensorTag
         case "_"        => Wildcard
         case "Integer"  => IntegerTag
         case "Decimal"  => DecimalTag

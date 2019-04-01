@@ -11,7 +11,8 @@ import NameOps._
 import Derived._
 import error.CompilerErrors._
 import CompilerErrorOps._
-import types.Types._
+import types.Types
+import Types._
 import Type._
 import TypeOps._
 import util.Showable
@@ -356,7 +357,7 @@ object Contexts {
         CompilerError.IllegalState("Non-fresh IdGen context")
       } else {
         implied for Context = root
-        Names.bootstrapped.foreach { (name, tpe) =>
+        Types.bootstrapped.foreach { (name, tpe) =>
           for (_ <- enterVariable(name))
             yield {
               putType(name -> tpe)
@@ -388,7 +389,7 @@ object Contexts {
     }
 
     def isDefined(tpe: Type): Boolean =
-      Names.bootstrapped.map(_._2).contains(tpe)
+      Types.bootstrapped.map(_._2).contains(tpe)
   }
 
   object ContextOps {
@@ -396,7 +397,8 @@ object Contexts {
 
     enum Scoping derives Eql {
       case Stoup(name: Scoping, tpe: Scoping)
-      case ScopeDef(name: Scoping, tpe: Scoping, scope: Seq[Scoping])
+      case NamedScope(name: Scoping, tpe: Scoping, scope: Seq[Scoping])
+      case AnonScope(scope: Seq[Scoping])
       case ForName(name: String)
       case TypeDef(tpe: String)
       case EmptyType
@@ -424,8 +426,13 @@ object Contexts {
             (sym, child)  = pair
             tpeOpt        = ctx.typeTable.get(sym.name)
             tpe           = tpeOpt.fold(EmptyType)(t => TypeDef(t.show))
-            name          = sym.name.show
-          } yield ScopeDef(ForName(name), tpe, child.toScoping)
+            name          = sym.name
+          } yield {
+            if name.nonEmpty then
+              NamedScope(ForName(name.show), tpe, child.toScoping)
+            else
+              AnonScope(child.toScoping)
+          }
         }
         stoupOpt.toList ++ defs
       }
@@ -436,7 +443,7 @@ object Contexts {
       ctx match {
         case ctx: RootContext =>
           List(
-            ScopeDef(ForName(rootSym.name.show),
+            NamedScope(ForName(rootSym.name.show),
             TypeDef(rootPkg.show), branch(ctx))
           )
 

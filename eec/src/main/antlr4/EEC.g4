@@ -7,6 +7,8 @@ literal:
 	| CharacterLiteral
 	| StringLiteral;
 
+rassocOpId: RassocOpId | CoTensor | Tensor;
+
 id: alphaId | OpId;
 
 alphaId: Patid | Varid;
@@ -23,9 +25,9 @@ type: infixType | func | linearFunc;
 
 func: infixType ('->' infixType)+;
 
-linearFunc: infixType '-*' infixType;
+linearFunc: infixType '|-' infixType;
 
-infixAppliedType: functorType (CoTensor | Tensor) infixType;
+infixAppliedType: functorType rassocOpId infixType;
 
 infixType: functorType | infixAppliedType;
 
@@ -56,7 +58,7 @@ eval: '[' expr ']';
 
 lambda: '\\' bindings '=>' expr;
 
-linearLambda: '|' '(' binding ')' '-*' expr;
+linearLambda: '|' '(' binding ')' '|-' expr;
 
 letExpr: 'let' '!' (Varid | Wildcard) '=' expr 'in' expr;
 
@@ -95,7 +97,7 @@ linearCases: linearCaseClause (Sep? linearCaseClause)*;
 
 caseClause: pattern guard? '=>' expr;
 
-linearCaseClause: linearPattern '-*' expr;
+linearCaseClause: linearPattern '|-' expr;
 
 exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 
@@ -205,8 +207,8 @@ translationUnit:
 
 Dashes: '--';
 Bang: '!';
-Tensor: '|*|';
-CoTensor: '|+|';
+Tensor: '*:';
+CoTensor: '+:';
 Wildcard: '_';
 
 BooleanLiteral: 'True' | 'False';
@@ -214,6 +216,7 @@ BooleanLiteral: 'True' | 'False';
 CompId: (Varid | Patid) '#';
 Patid: Upper Idrest;
 Varid: Lower Idrest;
+RassocOpId: OpId ':';
 OpId: Op;
 
 CharacterLiteral: '\'' (PrintableChar | CharEscapeSeq) '\'';

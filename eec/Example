@@ -7,45 +7,11 @@ primitive putStrLn s : String -> !()
 primitive readInteger : !Integer
 primitive a == b : A -> A -> Boolean
 
-primitive absurd v : Void -> A
-primitive Left  l : L -> Either L R
-primitive Right r : R -> Either L R
-primitive summon [v] : Void# -* A#
-primitive InL [l] : L# -* L# |+| R#
-primitive InR [r] : R# -* L# |+| R#
-
 liftD f x : (A -> B#) -> !A -> B# =
   let !y = x in f y
 
 liftC f x : (A -> B) -> A -> !B =
   !(f x)
-
-const x _ : A -> B -> A =
-  x
-
-evalBang [z] : !A -* () =
-  let !_ = z in ()
-
-id [z] : A# -* A# =
-  z
-
-evalAbsurd f: (Void -> ()) -> () = ()
-
-givenAbsurd: () = evalAbsurd absurd
-
-safeDuplication [a] : A# -* () =
-  | case (a, a) of
-    (q, _) -* ()
-    (_, r) -* ()
-
-cool [a] : A# -* (Integer -> A#) =
-  \(_: Integer) => a
-
-fstL [p]: (A#, B#) -* A# =
-  | case p of (a, _) -* a
-
-sndL [p]: (A#, B#) -* B# =
-  | case p of (_, b) -* b
 
 fst p: (A, B) -> A =
   case p of (a, _) => a
@@ -55,121 +21,14 @@ snd p: (A, B) -> B =
 
 pairEq : Boolean = (fst (0,""), snd (0,"")) == (0,"")
 
-isomorphism2 f [t]: (A -> B#) -> (!A -* B#) =
-  let !x = t in f x
-
-isomorphism3a f a [b]: (!A |*| B# -* C#) -> A -> (B# -* C#) =
-  f [!a |*| b]
-
-isomorphism3b f [b]: (A -> (B# -* C#)) -> (B# -* (A -> C#)) =
-  \(a: A) => f a [b]
-
-isomorphism3c f [b]: (!A |*| B# -* C#) -> (B# -* (A -> C#)) =
-  \(a: A) => f [!a |*| b]
-
-isomorphism4 [a]: A# -* () =
-  ()
-
-isomorphism5 f : (A# -* (B#, C#)) -> (A# -* B#, A# -* C#) =
-  (| (a: A#) -* fstL[f[a]], | (a: A#) -* sndL[f[a]])
-
-isomorphism7 f : (A# |+| B# -* C#) -> (A# -* C#, B# -* C#) =
-  (| (a: A#) -* f[InL[a]], | (b: B#) -* f[InR[b]])
-
-{- From the EEC paper -}
-isomorphism8a [w]: !A |*| !B -* !(A, B) =
-  let !x |*| z = w in
-  let !y       = z in
-  !(x,y)
-
-{- From the EEC paper -}
-isomorphism8b [w] : !(A, B) -* !A |*| !B =
-  let !z = w in
-  !(fst z) |*| !(snd z)
-
-{- From the EEC paper -}
-isomorphism12a [v]: !(A, B) |*| C# -* !A |*| !B |*| C# =
-  let !w |*| z = v in
-  !(fst w) |*| !(snd w) |*| z
-
-{- From the EEC paper -}
-isomorphism12b [v] : !A |*| !B |*| C# -* !(A, B) |*| C# =
-  let !x |*| w = v in
-  let !y |*| z = w in
-  !(x,y) |*| z
-
-safeDuplication2 l x: (A# -* ()) -> A# -> () =
-  | case (l[x], l[x]) of
-    (q, _) -* q
-    (_, r) -* r
-
-matchCoTensor1 [e]: A# |+| B# -* () =
-  | case e of
-    InR [m] -* ()
-    InL [n] -* ()
-
-stateMake v [s] : V -> (S# -* !V |*| S#) =
-  !v |*| s
-
-contMake a [f] : A -> ((A -> R#) -* R#) =
-  f a
-
-evalTest: () =
-  (| (a: ()) -* a)[()]
-
 ma >>= f : !A -> (A -> !B) -> !B =
   liftD f ma
 
 f =<< ma : (A -> !B) -> !A -> !B =
   ma >>= f
 
-earthDiameter : Decimal = 12.742e+10
-
-u: Either y (Either () z) = Right (Left ())
-
-movie : String = "12 Monkeys"
-
-cat2 e lu ru : Either x y -> (x -> !u) -> (y -> !u) -> !u =
-  case e of
-    Left  a => lu a;
-    Right b => ru b
-
-cat3 e xu yu zu : Either (Either x y) z -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
-  case e of
-    Left  (Left a)  => xu a;
-    Left  (Right b) => yu b;
-    Right c         => zu c
-
-cat4 e wu xu yu zu : Either (Either (Either w x) y) z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
-  case e of
-    Left  (Left  (Left  a)) => wu a;
-    Left  (Left  (Right b)) => xu b;
-    Left  (Right c)         => yu c;
-    Right d                 => zu d
-
-json : String = """{
-  "title": "12 Monkeys",
-  "director": "Terry Gilliam",
-  "length": 129
-}"""
-
-nl : Char = '\n'
-
-e : Char = 'e'
-
-unit : () = ()
-
 succ x : Integer -> Integer =
   x + 1
-
-a `and` b : Boolean -> Boolean -> Boolean =
-  if a then b else False
-
-a `or` b : Boolean -> Boolean -> Boolean =
-  if a then True else b
-
-not b : Boolean -> Boolean =
-  if True then False else True
 
 isZero x : Integer -> Boolean =
   case x of
@@ -177,7 +36,7 @@ isZero x : Integer -> Boolean =
     _ => False
 
 main : !() =
-  let !x    = readInteger in
+  let !x = readInteger in
   if isZero x then
     putStrLn "Entered Zero"
   else
