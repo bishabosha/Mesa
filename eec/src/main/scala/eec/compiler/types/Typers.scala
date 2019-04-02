@@ -120,7 +120,7 @@ object Typers {
 
   private val checkFunctorWithProto: (functor: Name, fTpe: Type, proto: Type) =>
                                      Checked[Type] =
-    checkFunctorWithProtoImpl(unifyFunctionTypes)(toCurriedList(_).last)
+    checkFunctorWithProtoImpl((_,_) => true)(identity)
 
   private val checkFunctionWithProto: (function: Name, fTpe: Type, proto: Type) =>
                                       Checked[Type] =
@@ -262,13 +262,13 @@ object Typers {
     if comp1.tpe.isValueType then {
       Err.noTensorCompCodomain(comp1)
     } else {
-      val bangTpe = AppliedType(Bootstraps.BangType, List(value1.tpe))
+      val bangTpe = AppliedType(Bootstraps.BangType, value1.tpe :: Nil)
       InfixAppliedType(Bootstraps.TensorType, bangTpe, comp1.tpe)
     }
   }
 
   private def bangTermTpe(value1: Tree): Checked[Type] = {
-    AppliedType(Bootstraps.BangType, List(value1.tpe))
+    AppliedType(Bootstraps.BangType, value1.tpe :: Nil)
   }
 
   private def typedBangTerm(t: Tree)
@@ -366,7 +366,7 @@ object Typers {
   }
 
   private def typeAsFunctorArgs(
-        functor: Name, ts: List[Tree], fTpeArgs: List[Type])
+       functor: Name, ts: List[Tree], fTpeArgs: List[Type])
       given Context, Mode, Stoup: Checked[List[Tree]] = {
     if ts.length != fTpeArgs.length then
       Err.argsNotMatchLength
@@ -374,20 +374,13 @@ object Typers {
       ts.zip(fTpeArgs).mapE(_.typed(_))
   }
 
-  private def unifyConstructorToHkType(functor: Tree, args: List[Type]): Checked[Type] = {
-    val res :: args0 = toCurriedList(functor.tpe).reverse
-    if args0.length == args.length then res
-    else Err.hkArgsDoNotUnify(functor, args0, args)
-  }
-
   private def typedApplyType(functor: Tree, args: List[Tree])
                             given Context, Mode, Stoup: Checked[Tree] = {
     for {
       functor1 <- functor.typed(any)
       args1    <- args.mapE(_.typed(any))
-      applied  <- unifyConstructorToHkType(functor1, args1.map(_.tpe))
-      funProto <- toFunctionType(args1.map(_.tpe) :+ applied)
       name     =  uniqName(functor1)
+      funProto <- AppliedType(TypeRef(name), args1.map(_.tpe))
       tpe      <- checkFunctorWithProto(name, functor1.tpe, funProto)
     } yield Apply(functor1, args1)(tpe)
   }
@@ -398,10 +391,8 @@ object Typers {
       functor1 <- functor.typed(any)
       a11      <- a1.typed(any)
       a21      <- a2.typed(any)
-      args1    =  a11.tpe :: a21.tpe :: Nil
-      applied  <- unifyConstructorToHkType(functor1, args1)
-      funProto <- toFunctionType(args1 :+ applied)
       name     =  uniqName(functor1)
+      funProto <- InfixAppliedType(TypeRef(name), a11.tpe, a21.tpe)
       tpe      <- checkFunctorWithProto(name, functor1.tpe, funProto)
     } yield InfixApply(functor1, a11, a21)(tpe)
   }
@@ -437,7 +428,7 @@ object Typers {
                              (x: Name, t: Tree): Checked[Type] = tpe match {
     case AppliedType(
       TypeRef(BangTag),
-      List(t)
+      t :: Nil
     ) => t
 
     case _ => Err.noBangLetValue(x, t)
@@ -448,7 +439,7 @@ object Typers {
     tpe match {
       case InfixAppliedType(
         TypeRef(TensorTag),
-        AppliedType(TypeRef(BangTag), List(x)),
+        AppliedType(TypeRef(BangTag), x :: Nil),
         z
       ) => (x, z)
 
@@ -468,8 +459,9 @@ object Typers {
                   implied for Context = lCtx
                   implied for Stoup   = Blank
                   putType(x -> t1U)
-                  u.typed(pt).filter(Err.noCompLetContinuation) {
-                    _.tpe.isComputationType
+                  u.typed(pt).flatMap { u1 =>
+                    if u1.tpe.isComputationType then u1
+                    else Err.noCompLetContinuation
                   }
                 }
     } yield Let(x, t1, u1)(id, u1.tpe)
@@ -488,10 +480,10 @@ object Typers {
         val (xTpe, zType)   = s1U
         putType(x -> xTpe)
         putType(z -> zType)
-        t.typed(pt)
-          .filter(Err.noCompLetContinuation) {
-            _.tpe.isComputationType
-          }
+        t.typed(pt).flatMap { t1 =>
+          if t1.tpe.isComputationType then t1
+          else Err.noCompLetContinuation
+        }
       }
     } yield LetTensor(x, z, s1, t1)(id, t1.tpe)
   }
@@ -598,22 +590,22 @@ object Typers {
     if isPrimitive(name) then getType(name)
     else Err.nameNotConstructor(name)
 
-  private def typedUnapply(functor: Name, args: List[Tree])
+  private def typedUnapply(constructor: Name, args: List[Tree])
                           (pt: Type)
                           given Context, Mode, Stoup: Checked[Tree] = {
     for {
-      fCtx <- firstCtx(functor)
-      fTpe <- checked {
-        implied for Context = fCtx
-        getPrimitiveType(functor)
+      cCtx <- firstCtx(constructor)
+      cTpe <- checked {
+        implied for Context = cCtx
+        getPrimitiveType(constructor)
       }
-      pair <- typeAsDestructor(fTpe, pt)
+      pair <- typeAsDestructor(cTpe, pt)
       (fTpeArgs, tpe) = pair
-      args1 <- typeAsFunctorArgs(functor, args, fTpeArgs)
-    } yield Unapply(functor, args1)(tpe)
+      args1 <- typeAsFunctorArgs(constructor, args, fTpeArgs)
+    } yield Unapply(constructor, args1)(tpe)
   }
 
-  private def typedLinearUnapply(functor: Name, args: List[Tree])
+  private def typedLinearUnapply(constructor: Name, args: List[Tree])
                                 (pt: Type)
                                 given Context, Mode, Stoup: Checked[Tree] = {
 
@@ -624,15 +616,15 @@ object Typers {
 
     for {
       arg  <- assertSingleArg(args)
-      fCtx <- firstCtx(functor)
-      fTpe <- checked {
-        implied for Context = fCtx
-        getPrimitiveType(functor)
+      cCtx <- firstCtx(constructor)
+      cTpe <- checked {
+        implied for Context = cCtx
+        getPrimitiveType(constructor)
       }
-      pair <- typeAsLinearDestructor(fTpe, pt)
+      pair <- typeAsLinearDestructor(cTpe, pt)
       (linearArg, tpe) = pair
       arg1 <- arg.typed(linearArg)
-    } yield Unapply(functor, List(arg1))(tpe)
+    } yield Unapply(constructor, arg1 :: Nil)(tpe)
   }
 
   private def typePackaging(tree: Tree)

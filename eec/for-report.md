@@ -20,3 +20,6 @@
 * highlight all de-sugaring or encodings of eec primitives
 
 * Explain exhaustivity checking - not being faithful
+
+* explain intuition for linearity
+  - using ecc.compiler.core.Contexts.ContextOps.Scoping

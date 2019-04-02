@@ -35,7 +35,7 @@ object Namers {
     enterScope(sig.id, name).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
-        _ <- args.mapE(enterVariable)
+        _ <- args.foldLeftE(())((_, n) => enterVariable(n))
         _ <- sig.linearArg.foldEmptyName(())(enterLinearArg(modifiers))
         _ <- index(body)
       } yield ()
@@ -60,7 +60,7 @@ object Namers {
     enterScope(id, anon).flatMap { ctx1 =>
       implied for Context = ctx1
       for {
-        _ <-  args.map(_.convert: Name).mapE(enterVariable)
+        _ <-  args.foldLeftE(())((_, n) => enterVariable(n.convert))
         _ <-  index(body)
       } yield ()
     }
@@ -87,8 +87,7 @@ object Namers {
     }
     cPkgCtx.flatMap { pkgCtx =>
       implied for Context = pkgCtx
-      for (_ <- stats.mapE(index(_)))
-        yield ()
+      stats.foldLeftE(())((_, stat) => index(stat))
     }
   }
 
@@ -96,7 +95,7 @@ object Namers {
                     given Context, Mode: Checked[Unit] = {
     for {
       _ <- index(fun)
-      _ <- args.mapE(index)
+      _ <- args.foldLeftE(())((_, arg) => index(arg))
     } yield ()
   }
 
@@ -143,7 +142,7 @@ object Namers {
                    given Context, Mode: Checked[Unit] = {
     for {
       _ <-  index(selector)
-      _ <-  cases.mapE { tree =>
+      _ <-  cases.foldLeftE(()) { (_, tree) =>
               tree match {
                 case tree: (CaseClause | LinearCaseClause) =>
                   enterScope(tree.id, anon).flatMap { ctx1 =>

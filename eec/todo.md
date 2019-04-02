@@ -1,7 +1,30 @@
 # Tasks for EEC
 
+## Pattern Matching Exhaustiveness Checking
+Look at scrutiny type
+* e.g. `case e of ...` where `e: Either (A, B) C`
+* Build a stack of template patterns required to prove the
+  scrutiny type. The given algorithm will construct a stack of functions that
+  transform a stack of templates. Ran after type checking?
+  - Lookup constructor terms for the type.
+    - The constructor for any base type is a identifier sentinel.
+  - For each constructor function type, push to stack a function that can
+    construct a template for a pattern from a stack of templates and push it
+    back to the template stack.
+      - The identifier sentinel will push an `Ident` template.
+  - Unify the types of the constructor arguments with
+    the current scrutiny type. Recurse on the type arguments.
+  - Run the stack program to get a stack of final templates.
+* Iterate through case clauses, each time a pattern unifies with the
+  top of the stack, pop it off. When a pattern fails to unify with the top of
+  the stack, continue to the next case clause.
+    - An `Ident` pattern unifies with any template.
+    - A `Literal` pattern unifies with no template.
+    - All other patterns unify with a template of the same shape.
+* After all cases, the stack should be empty, proving exhaustivity.
+
 [x] desugar operators into list of calls  
-[-] test how diff postfix levels interact  
+[-] test how diff postfix levels interact
 [?] lazy implementation of tuple  
 [-] desugar
   - `case x [: !_] of !(a, _) => a ; !x => x` to
@@ -62,9 +85,3 @@ for linear pattern match on tuples - keep track of linear variables,
     one has one usage.
 
 ## Interpretation of Evaluation and linearity
-
-I am going with `t[z]` means that `z` substituted into `t` where it exists.
-  - i.e. evaluation only happens by either primitives or the language constructs.
-  - A.K.A. `|(z: A#) -* ()` never evaluates `z`, but `!A -* ()`
-    is able to evaluate `z` using `|(z: !A) -* let !_ = z in ()` and then give back nothing.
-  - `A -* () ∼= ()` confirmed by EEC paper that its fine!!!

@@ -255,7 +255,7 @@ object Parsers {
       }
     } yield {
       val head :: rest = infixes.toList.reverse
-      rest.foldLeft(head)((acc, t) => Function(List(t), acc)(freshId(), uTpe))
+      rest.foldLeft(head)((acc, t) => Function(t :: Nil, acc)(freshId(), uTpe))
     }
   }
 
@@ -431,7 +431,7 @@ object Parsers {
       val caseTrue  = CaseClause(patTrue, EmptyTree, exprs(1))(freshId(), uTpe)
       val caseFalse = CaseClause(patFalse, EmptyTree, exprs(2))(freshId(), uTpe)
       val selector  = exprs(0)
-      CaseExpr(selector, List(caseTrue, caseFalse))(uTpe)
+      CaseExpr(selector, caseTrue :: caseFalse :: Nil)(uTpe)
     }
   }
 
@@ -452,8 +452,8 @@ object Parsers {
         fromAlphaId(context.alphaId)
     }
     for (infixes <- context.infixExpr.mapE(fromInfixExpr)) yield {
-      val firstApply = Apply(id, List(infixes(0)))(uTpe)
-      Apply(firstApply, List(infixes(1)))(uTpe)
+      val firstApply = Apply(id, infixes(0) :: Nil)(uTpe)
+      Apply(firstApply, infixes(1) :: Nil)(uTpe)
     }
   }
 
@@ -568,7 +568,7 @@ object Parsers {
     import CompilerErrorOps._
     val functor = context.Patid.getText.readAs
     val binding = fromLinearPattern(context.linearPattern)
-    Unapply(functor, List(binding))(uTpe)
+    Unapply(functor, binding :: Nil)(uTpe)
   }
 
   private def fromLinearPatterns(context: LinearPatternsContext)

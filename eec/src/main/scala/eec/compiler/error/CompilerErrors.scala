@@ -43,13 +43,6 @@ object CompilerErrors {
       case _                  => f(o.asInstanceOf[O])
     }
 
-    def (o: Checked[O]) filter [O]
-        (orElse: => CompilerError)
-        (f: O => Boolean): Checked[O] = o match {
-      case err: CompilerError => err
-      case _                  => if f(o.asInstanceOf[O]) then o else orElse
-    }
-
     def (o: Checked[O]) flatMap [O, U]
         (f: O => Checked[U]): Checked[U] = o match {
       case err: CompilerError => err
@@ -87,12 +80,6 @@ object CompilerErrors {
           acc
 
       inner(z, l.iterator)
-    }
-
-    def (f: => O) recoverDefault[O]: Checked[O] = {
-      f.recover {
-        case e: Exception if NonFatal(e) => Internal(e)
-      }
     }
 
     def (f: => O) recover[O]
