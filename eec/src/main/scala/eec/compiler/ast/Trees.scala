@@ -6,6 +6,7 @@ import core._
 import Names._
 import Name._
 import Constants._
+import Constant._
 import Contexts._
 import Modifiers._
 import types.Types._
@@ -53,6 +54,58 @@ object Trees {
   }
 
   object TreeOps {
+
+    def showPatternTemplate(tree: Tree): String = {
+      type StackT = List[String]
+      type StatT = StackT => StackT
+      type ProgT = List[StatT]
+
+      @tailrec
+      def inner(acc: ProgT, patts: List[Tree]): ProgT = patts match {
+        case Nil => acc
+
+        case patt :: patts => patt match {
+
+          case Unapply(name, args) =>
+            val prog = { stack: StackT =>
+              val (args1, rest) = stack.splitAt(args.length)
+              val args2 = args1.view.zip(args).map { (str, arg) =>
+                arg match {
+                  case _: Ident => str
+                  case _ => s"($str)"
+                }
+              }
+              val argsStr = args2.mkString(" ")
+              s"${name.show} $argsStr" :: rest
+            }
+            inner(prog :: acc, args ::: patts)
+
+          case Parens(args) =>
+            val prog = { stack: StackT =>
+              val (args1, rest) = stack.splitAt(args.length)
+              val args2 = args1.view.zip(args).map { (str, arg) =>
+                arg match {
+                  case _: Ident => str
+                  case _ => s"($str)"
+                }
+              }
+              val argsStr = args2.mkString("(", ", ", ")")
+              argsStr :: rest
+            }
+            inner(prog :: acc, args ::: patts)
+
+          case Ident(name) => inner((name.show :: _) :: acc, patts)
+
+          case Literal(BooleanConstant(b)) =>
+            val str = if b then "True" else "False"
+            inner((str :: _) :: acc, patts)
+
+          case _ => inner(("<???>" :: _) :: acc, patts)
+        }
+      }
+
+      inner(Nil, tree :: Nil).foldLeft(Nil: List[String])((acc, f) => f(acc)).head
+    }
 
     implied for Showable[Tree] {
       def (t: Tree) show = toAst(t).toString

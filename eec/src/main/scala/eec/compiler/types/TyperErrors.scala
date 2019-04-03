@@ -4,6 +4,7 @@ package types
 
 import error.CompilerErrors._
 import ast.Trees._
+import TreeOps._
 import types.Types._
 import types.Typers._
 import core.Names._
@@ -54,6 +55,16 @@ object TyperErrors {
       typeNotTuple(pt)
     else
       tupleNotMatchLength
+  }
+
+  def nonExhaustivePatterns(templates: List[Tree]) = {
+    val temps = {
+      templates
+        .map(showPatternTemplate(_))
+        .mkString("[", ", ", "]")
+    }
+    CompilerError.UnexpectedType(
+      s"Pattern match will fail on values matching these patterns: $temps")
   }
 
   def typeNotTuple(pt: Type) =

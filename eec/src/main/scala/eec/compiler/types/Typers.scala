@@ -2,6 +2,9 @@ package eec
 package compiler
 package types
 
+import scala.collection.mutable
+import scala.annotation.tailrec
+
 import Types._
 import TypeOps._
 import Type._
@@ -517,6 +520,10 @@ object Typers {
                       selector.typed(any)
                     }
       cases1     <- typeAsCaseClauses(cases, selector1.tpe)(pt)
+      _          <- assertMatchIsExhaustive(cases1, selector1.tpe) {
+                      (name, tpe, selTpe) =>
+                        typeAsDestructor(tpe, selTpe).map(name -> _._1)
+                    }
       tpe        <- cases1.sameType(pt)
     } yield CaseExpr(selector1, cases1)(tpe)
   }
@@ -540,6 +547,10 @@ object Typers {
     for {
       selector1  <- selector.typed(any)
       cases1     <- typeAsLinearCaseClauses(cases, selector1.tpe)(pt)
+      _          <- assertMatchIsExhaustive(cases1, selector1.tpe) {
+                      (name, tpe, selTpe) =>
+                        typeAsLinearDestructor(tpe, selTpe).map(t => name -> (t._1 :: Nil))
+                    }
       tpe        <- cases1.sameType(pt)
     } yield LinearCaseExpr(selector1, cases1)(tpe)
   }
@@ -586,8 +597,8 @@ object Typers {
     } yield Alternative(patterns1)(tpe)
   }
 
-  private def getPrimitiveType(name: Name) given Context: Checked[Type] =
-    if isPrimitive(name) then getType(name)
+  private def getConstructorType(name: Name) given Context: Checked[Type] =
+    if isConstructor(name) then getType(name)
     else Err.nameNotConstructor(name)
 
   private def typedUnapply(constructor: Name, args: List[Tree])
@@ -597,7 +608,7 @@ object Typers {
       cCtx <- firstCtx(constructor)
       cTpe <- checked {
         implied for Context = cCtx
-        getPrimitiveType(constructor)
+        getConstructorType(constructor)
       }
       pair <- typeAsDestructor(cTpe, pt)
       (fTpeArgs, tpe) = pair
@@ -619,7 +630,7 @@ object Typers {
       cCtx <- firstCtx(constructor)
       cTpe <- checked {
         implied for Context = cCtx
-        getPrimitiveType(constructor)
+        getConstructorType(constructor)
       }
       pair <- typeAsLinearDestructor(cTpe, pt)
       (linearArg, tpe) = pair
@@ -699,7 +710,7 @@ object Typers {
       val freshTpe = resolveVariables(tpe)
       putType(name, freshTpe)
       if modifiers.contains(Modifier.Primitive) then {
-        setPrimitive(name)
+        linkPrimitive(name, freshTpe)
       }
       DefDef(modifiers, sig1, tpeD1, body1)(tpe)
     }
@@ -840,6 +851,200 @@ object Typers {
       Err.illegalStoupEntry(name, tpe)
     else
       ()
+  }
+
+  def assertMatchIsExhaustive(cases: List[Tree], selTpe: Type)
+                             (unify: (ctor: Name, ctorTpe: Type, sumTpe: Type) => Checked[(Name, List[Type])])
+                             given Context: Checked[Unit] = {
+
+    def unifyCaseWithTemplates(templates: List[Tree], caseClause: Tree): Checked[List[Tree]] = {
+      if templates.isEmpty then templates
+      else caseClause match {
+        case CaseClause(patt,_,_) =>
+          templates.filterNot(unifiesWithTemplate(patt))
+        case LinearCaseClause(patt,_) =>
+          templates.filterNot(unifiesWithTemplate(patt))
+
+        case unknown => Err.notCaseClase(unknown)
+      }
+    }
+
+    def assertNoneRemain(templates: List[Tree]): Checked[Unit] = {
+      if templates.isEmpty then
+        ()
+      else
+        Err.nonExhaustivePatterns(templates)
+    }
+
+    for {
+      templates <- getTemplates(selTpe)(unify)
+      remaining <- cases.foldLeftE(templates)(unifyCaseWithTemplates)
+      _         <- assertNoneRemain(remaining)
+    } yield ()
+  }
+
+  def unifiesWithTemplate(pattern: Tree)(template: Tree): Boolean = {
+
+    @tailrec
+    def inner(z: Boolean, patts: List[Tree], templates: List[Tree]): Boolean = patts match {
+      case Nil => z
+
+      case patt :: patts => templates match {
+        case Nil => z
+
+        case template :: templates => (patt, template) match {
+          case (Ident(_), _) => inner(z, patts, templates)
+
+          case (Literal(BooleanConstant(b1)),
+            Literal(BooleanConstant(b2))) =>
+              b1 == b2 && inner(z, patts, templates)
+
+          case (Literal(_),  _) => false
+
+          case (Parens(patts1), Parens(templates1)) =>
+            patts1.size == templates1.size && inner(
+              z,
+              patts1 ::: patts,
+              templates1 ::: templates
+            )
+
+          case (Unapply(op1, patts1), Unapply(op2, templates1)) =>
+            op1 == op2 && inner(
+              z,
+              patts1 ::: patts,
+              templates1 ::: templates
+            )
+
+          case _ => inner(z, patts, templates)
+        }
+      }
+    }
+    inner(true, pattern :: Nil, template :: Nil)
+  }
+
+  def getTemplates(selTpe: Type)
+                  (unify: (
+                      ctor: Name,
+                      ctorTpe: Type,
+                      sumTpe: Type
+                    ) => Checked[(Name, List[Type])])
+                  given Context: Checked[List[Tree]] = {
+
+    type StackT = List[Tree]
+    type ProgT = List[StackT => StackT]
+
+    val constructors = new mutable.HashMap[Name, List[(Name, Type)]]()
+
+    def cacheConstructors(name: Name) = {
+      constructors.getOrElse(name, {
+        for {
+          cCtx  <- firstCtxConstructors(name)
+          ctors <- checked {
+            implied for Context = cCtx
+            constructorsFor(name)
+          }
+        } yield {
+          constructors += name -> ctors
+          ctors
+        }
+      })
+    }
+
+    def constructorsForSum(name: Name, sumTpe: Type) = {
+      for {
+        ctors   <- cacheConstructors(name)
+        unified <- ctors.mapE(unify(_, _, sumTpe))
+      } yield unified
+    }
+
+    @tailrec
+    def inner(
+        acc: List[Tree],
+        progs: List[ProgT],
+        selTpess: List[List[Type]]): Checked[List[Tree]] = selTpess match {
+      case Nil => acc
+
+      case selTpes :: selTpess => selTpes match {
+
+        case Nil =>
+          val prog :: progRest = progs
+          val template = prog.foldLeft(Nil: StackT)((s,p) => p(s)).head
+          inner(template :: acc, progRest, selTpess)
+
+        case selTpe :: selTpes => selTpe match {
+
+          case Product(ts) =>
+            val prog :: progRest = progs
+            inner(
+              acc,
+              ({ stack =>
+                val (ts1, rest) = stack.splitAt(ts.length)
+                Parens(ts1)(Untyped) :: rest
+              } :: prog) :: progRest,
+              (ts ::: selTpes) :: selTpess
+            )
+
+          case TypeRef(BooleanTag) =>
+            val prog :: progRest = progs
+            val progs1 = {
+              (
+                { stack =>
+                  Literal(BooleanConstant(false))(Untyped) :: stack
+                } :: prog
+              ) :: (
+                { stack =>
+                  Literal(BooleanConstant(true))(Untyped) :: stack
+                } :: prog
+              ) :: progRest
+            }
+            inner(
+              acc,
+              progs1,
+              (Variable(Wildcard) :: Nil) :: selTpes :: selTpess
+            )
+
+          case _ => constructorEligableName(selTpe) match {
+
+            case EmptyName =>
+              val prog :: progRest = progs
+              inner(
+                acc,
+                (
+                  { stack =>
+                    Ident(Wildcard)(Id.noId, Untyped) :: stack
+                  } :: prog
+                ) :: progRest,
+                selTpes :: selTpess
+              )
+
+            case sumName =>
+              val prog :: progRest = progs
+              constructorsForSum(sumName, selTpe) match {
+                case err: CompilerError => err
+
+                case constructors0 =>
+                  val (constructors: List[(Name, List[Type])]) = constructors0
+                  val programs = {
+                    for ((name, args) <- constructors)
+                    yield {
+                      { stack =>
+                        val (args1, rest) = stack.splitAt(args.length)
+                        Unapply(name, args1)(any) :: rest
+                      } :: prog
+                    }
+                  }
+                  val additions = constructors.map(_._2 ::: selTpes)
+                  inner(
+                    acc,
+                    (programs ::: progRest) ::: progs,
+                    additions ::: selTpess
+                  )
+              }
+          }
+        }
+      }
+    }
+    inner(Nil, Nil :: Nil, (selTpe :: Nil) :: Nil)
   }
 
   private def typedLiteral(constant: Constant) given Stoup: Checked[Tree] = {

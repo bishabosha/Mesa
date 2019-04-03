@@ -310,6 +310,23 @@ object Types {
       other == WildcardType
     }
 
+    def constructorEligableName(tpe: Type): Name = {
+      object Sum {
+        inline def unapply(tpe: Name) =
+          tpe == EitherTag || tpe == CoTensorTag
+      }
+      tpe match {
+        case AppliedType(TypeRef(name @ Sum()), _)         => name
+        case InfixAppliedType(TypeRef(name @ Sum()), _, _) => name
+        case _                                             => EmptyName
+      }
+    }
+
+    def (tpe: Type) unwrapLinearBody: Type = tpe match {
+      case LinearFunctionType(_, ret) => ret
+      case _                          => tpe
+    }
+
     def unifies(tpe: Type, pt: Type) = {
       unifiesThen(tpe, pt)(_ => true)((_,_) => false)
     }
