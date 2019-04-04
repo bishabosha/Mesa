@@ -340,7 +340,7 @@ object Contexts {
       }
     }
 
-    def linkPrimitive(name: Name, tpe: Type) given Context: Unit = {
+    def linkConstructor(name: Name, tpe: Type) given Context: Unit = {
       import NameOps._
       val ret = toCurriedList(tpe).last.unwrapLinearBody
       constructorEligableName(ret).foldEmptyName(()) { functor =>

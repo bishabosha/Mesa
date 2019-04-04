@@ -5,7 +5,10 @@ val preludeDefs = List(
   """ data Either L R =
         Left L
       | Right R """,
-  "primitive absurd [v] : Void# |- A#",
-  "primitive InL    [l] : L# |- L# +: R#",
-  "primitive InR    [r] : R# |- L# +: R#",
+
+  """ data L# +: R# =
+        InL [L#]
+      | InR [R#] """,
+
+  """ primitive absurd [v] : Void# |- A# """,
 )

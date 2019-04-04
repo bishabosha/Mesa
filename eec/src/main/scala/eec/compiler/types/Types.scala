@@ -44,7 +44,6 @@ object Types {
     val StringType    = TypeRef(StringTag)
     val BangType      = TypeRef(BangTag)
     val TensorType    = TypeRef(TensorTag)
-    val CoTensorType  = TypeRef(CoTensorTag)
     val VoidType      = TypeRef(VoidTag)
     val VoidCompType  = TypeRef(VoidCompTag)
 
@@ -55,14 +54,6 @@ object Types {
           BangType,
           List(Variable("A".readAs))
         ),
-        Variable("B#".readAs)
-      )
-    }
-
-    val CoTensorConstructor = {
-      InfixAppliedType(
-        CoTensorType,
-        Variable("A#".readAs),
         Variable("B#".readAs)
       )
     }
@@ -78,7 +69,6 @@ object Types {
   val bootstrapped = {
     Vector(
       TensorTag     -> Bootstraps.TensorConstructor,
-      CoTensorTag   -> Bootstraps.CoTensorConstructor,
       BangTag       -> Bootstraps.BangConstructor,
       VoidCompTag   -> Bootstraps.VoidCompType,
       VoidTag       -> Bootstraps.VoidType,
@@ -451,7 +441,7 @@ object Types {
 
         case tpe :: tpes => tpe match {
           case AppliedType(TypeRef(BangTag), _ :: Nil)
-          |    InfixAppliedType(TypeRef(TensorTag | CoTensorTag),_,_)
+          |    InfixAppliedType(TypeRef(TensorTag),_,_)
           |    TypeRef(_: Comp | VoidCompTag)
           |    Variable(_: Comp)     => true
 

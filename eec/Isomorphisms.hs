@@ -1,8 +1,10 @@
 package eec.report.example
 
 primitive absurd [v] : Void# |- A#
-primitive InL [l]    : L# |- L# +: R#
-primitive InR [r]    : R# |- L# +: R#
+
+data L# +: R# =
+    InL [L#]
+  | InR [R#]
 
 data L |: R =
     Left L

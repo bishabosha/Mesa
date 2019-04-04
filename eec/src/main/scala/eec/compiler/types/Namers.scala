@@ -244,6 +244,7 @@ object Namers {
     case DataDcl(n,_,c)           if isTerm     => namedDataDcl(n,c)
     case InfixDataDcl(n,_,_,c)    if isTerm     => namedDataDcl(n,c)
     case CtorSig(n,_)             if isTerm     => namedCtorSig(n)
+    case LinearCtorSig(n,_)       if isTerm     => namedCtorSig(n)
     case DefDef(                  // DefDef
       m,                          // DefDef
       s: (DefSig | LinearSig),    // DefDef

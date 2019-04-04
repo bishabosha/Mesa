@@ -124,6 +124,10 @@ object TyperErrors {
     CompilerError.UnexpectedType(
       "Linear function does not have computational domain.")
 
+  def noCompArgCtor(ctor: Name, data: Name, tpe: Type) =
+    CompilerError.UnexpectedType(
+      s"Argument of value type ${tpe.show} in linear constructor ${ctor.show} of ${data.show}.")
+
   def noLinearCompCodomain =
     CompilerError.UnexpectedType(
       "Linear function does not have computational co-domain.")

@@ -692,6 +692,8 @@ object Parsers {
   private def fromDcl(context: DclContext) given IdGen: Checked[Tree] = {
     if defined(context.primitiveDcl) then
       fromPrimitiveDcl(context.primitiveDcl)
+    else if defined(context.linearDataDcl) then
+      fromLinearDataDcl(context.linearDataDcl)
     else
       fromDataDcl(context.dataDcl)
   }
@@ -716,6 +718,39 @@ object Parsers {
     }
   }
 
+  private def fromLinearDataDcl(context: LinearDataDclContext)
+                               given IdGen: Checked[Tree] = {
+    import CompilerErrorOps._
+    fromLinearTypeDcl(context.linearTypeDcl) match {
+      case Left(name, args) =>
+        for (ctors <- fromLinearConstructors(context.linearConstructors))
+        yield DataDcl(name, args, ctors)(uTpe)
+
+      case Right(op, left, right) =>
+        for (ctors <- fromLinearConstructors(context.linearConstructors))
+        yield InfixDataDcl(op, left, right, ctors)(uTpe)
+    }
+  }
+
+  private def fromLinearTypeDcl(context: LinearTypeDclContext)
+                               given IdGen: Either[(Name, List[Name]),(Name, Name, Name)] = {
+    val args = context.linearTpeId.map(fromLinearTpeId)
+    if defined(context.alphaId) then {
+      val name = context.alphaId.getText.readAs
+      Left(name, args.toList)
+    } else {
+      val op = context.RassocOpId.getText.readAs
+      Right(op, args(0), args(1))
+    }
+  }
+
+  private def fromLinearTpeId(context: LinearTpeIdContext): Name = {
+    if defined(context.CompId) then
+      context.CompId.getText.readAs.promoteComp
+    else
+      context.alphaId.getText.readAs
+  }
+
   private def fromTypeDcl(context: TypeDclContext)
                          given IdGen: Either[(Name, List[Name]),(Name, Name, Name)] = {
     val names = context.alphaId.map(_.getText.readAs)
@@ -724,8 +759,8 @@ object Parsers {
       Left(name, Nil)
     } else {
       val names1 = names.toList
-      if defined(context.rassocOpId) then {
-        val op = context.rassocOpId.getText.readAs
+      if defined(context.RassocOpId) then {
+        val op = context.RassocOpId.getText.readAs
         Right(op, names(0), names(1))
       } else {
         Left(names1.head, names1.tail)
@@ -739,12 +774,26 @@ object Parsers {
     context.ctor.mapE(fromCtor).map(_.toList)
   }
 
+  private def fromLinearConstructors(context: LinearConstructorsContext)
+                                    given IdGen: Checked[List[Tree]] = {
+    import CompilerErrorOps._
+    context.linearCtor.mapE(fromLinearCtor).map(_.toList)
+  }
+
   private def fromCtor(context: CtorContext)
                       given IdGen: Checked[Tree] = {
    import CompilerErrorOps._
     val name = context.Patid.getText.readAs
     for (args <- context.`type`.mapE(fromType))
     yield CtorSig(name, args.toList)(uTpe)
+  }
+
+  private def fromLinearCtor(context: LinearCtorContext)
+                            given IdGen: Checked[Tree] = {
+   import CompilerErrorOps._
+    val name = context.Patid.getText.readAs
+    for (arg <- fromType(context.`type`))
+    yield LinearCtorSig(name, arg)(uTpe)
   }
 
   private def fromPrimDcl(context: PrimDeclContext)

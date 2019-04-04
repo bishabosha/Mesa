@@ -748,6 +748,10 @@ object Typers {
                          given Context, Mode, Stoup: Checked[List[Tree]] = {
     ctors.mapE {
       case CtorSig(name, args) => typedCtor(name, args)(dataType, tpeVars, ret)
+
+      case LinearCtorSig(name, arg) =>
+        typedLinearCtor(name, arg)(dataType, tpeVars, ret)
+
       case unknown             => Err.notCtorSig(unknown)
     }
   }
@@ -765,8 +769,34 @@ object Typers {
       args2 <- checked(args1.zip(fTpeArgs).map(_.withTpe(_)))
     } yield {
       putType(constructor -> cTpe1)
-      linkPrimitive(constructor, cTpe1)
+      linkConstructor(constructor, cTpe1)
       CtorSig(constructor, args2)(cTpe1)
+    }
+  }
+
+  private def assertLinearCtorIsComp(name: Name, data: Name, arg: Type): Checked[Unit] = {
+    if arg.isValueType then
+      Err.noCompArgCtor(name, data, arg)
+    else
+      ()
+  }
+
+  private def typedLinearCtor(constructor: Name, arg: Tree)
+                             (dataType: Name, tpeVars: List[Name], ret: Type)
+                             given Context, Mode, Stoup: Checked[Tree] = {
+    for {
+      arg1 <- arg.typedAsTyping(any)
+      _    <- assertLinearCtorIsComp(constructor, dataType, arg1.tpe)
+      argT <- resolveVariablesFrom(constructor, dataType, tpeVars)(arg1.tpe)
+      cTpe =  LinearFunctionType(argT, ret)
+      pair <- typeAsLinearDestructor(cTpe, ret)
+      (fTpeArg, tpe1) = pair
+      cTpe1 = LinearFunctionType(fTpeArg, tpe1)
+      arg2 <- arg1.withTpe(fTpeArg)
+    } yield {
+      putType(constructor -> cTpe1)
+      linkConstructor(constructor, cTpe1)
+      LinearCtorSig(constructor, arg2)(cTpe1)
     }
   }
 
@@ -795,9 +825,6 @@ object Typers {
       val name     = (sig1.convert: Name)
       val freshTpe = resolveVariables(tpe)
       putType(name, freshTpe)
-      if modifiers.contains(Modifier.Primitive) then {
-        linkPrimitive(name, freshTpe)
-      }
       DefDef(modifiers, sig1, tpeD1, body1)(tpe)
     }
     commitId(sig.id)
