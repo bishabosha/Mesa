@@ -11,6 +11,7 @@ import util.Showable
 
 object CompilerErrors {
   import CompilerError._
+  import CompilerErrorOps._
 
   enum CompilerError derives Eql {
     case UnexpectedType(msg: String)
@@ -28,25 +29,27 @@ object CompilerErrors {
     def (o: Checked[O]) onError [O]
         (handler: CompilerError => Nothing): O = o match {
       case err: CompilerError => handler(err)
-      case _                  => o.asInstanceOf[O]
+      case _                  => unchecked(o)
     }
+
+    inline def unchecked[O](o: Checked[O]): O = o.asInstanceOf[O]
 
     def (o: Checked[O]) fold [O, U]
         (e: CompilerError => U)
         (f: O => U): U = o match {
       case err: CompilerError => e(err)
-      case _                  => f(o.asInstanceOf[O])
+      case _                  => f(unchecked(o))
     }
 
     def (o: Checked[O]) map [O, U] (f: O => U): Checked[U] = o match {
       case err: CompilerError => err
-      case _                  => f(o.asInstanceOf[O])
+      case _                  => f(unchecked(o))
     }
 
     def (o: Checked[O]) flatMap [O, U]
         (f: O => Checked[U]): Checked[U] = o match {
       case err: CompilerError => err
-      case _                  => f(o.asInstanceOf[O])
+      case _                  => f(unchecked(o))
     }
 
     def (c: CC[A]) mapE [CC[A] <: Iterable[A], A, O, That]
@@ -56,7 +59,7 @@ object CompilerErrors {
       def inner(acc: mutable.Builder[O, That], it: Iterator[A]): Checked[That] = {
         if it.hasNext then f(it.next) match {
           case err: CompilerError => err
-          case o                  => inner(acc += o.asInstanceOf[O], it)
+          case o                  => inner(acc += unchecked(o), it)
         } else {
           acc.result
         }
@@ -74,7 +77,7 @@ object CompilerErrors {
         if it.hasNext then
           f(acc, it.next) match {
             case err: CompilerError => err
-            case acc1               => inner(acc1.asInstanceOf[O], it)
+            case acc1               => inner(unchecked(acc1), it)
           }
         else
           acc

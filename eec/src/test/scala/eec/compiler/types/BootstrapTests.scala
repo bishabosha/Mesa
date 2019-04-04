@@ -45,18 +45,18 @@ object BootstrapTests {
   private def typeCore(f: String => IdReader[Checked[Tree]])
                       (str: String)
                       (pt: Type) given IdGen, Context: Checked[Tree] =
-    for {
+    for
       exp <- f(str)
       tpd <- typeAfterParse(pt)(exp)
-    } yield tpd
+    yield tpd
 
   private def typeAfterParse(pt: Type)
                             (exp: Tree)
                             given IdGen, Context: Checked[Tree] =
-    for {
+    for
       _   <- indexAsExpr(exp)
       tpd <- exp.typedWith(pt)
-    } yield tpd
+    yield tpd
 
   def failIfUnparsedOrTyped(f: String => IdReader[Checked[Tree]])
                            (str: String)
@@ -113,10 +113,10 @@ object BootstrapTests {
     implied for Context = ctx
     implied for IdGen   = idGen
 
-    val pair = for {
+    val pair = for
       _ <- Context.enterBootstrapped
       _ <- compiler.preludeDefs.mapE(typeStat(_)(any))
-    } yield (idGen, ctx)
+    yield (idGen, ctx)
 
     pair.onError { err => fail(s"[INIT] ${err.show}"); ??? }
   }

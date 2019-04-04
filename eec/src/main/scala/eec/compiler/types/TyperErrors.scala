@@ -155,9 +155,9 @@ object TyperErrors {
     CompilerError.IllegalState(
       s"$unknown is not Tree.CaseClause")
 
-  def notCtorSig(unknown: Tree) =
+  def notGenCtorSig(unknown: Tree) =
     CompilerError.IllegalState(
-      s"$unknown is not Tree.CtorSig")
+      s"$unknown is not constructor signature")
 
   def notLinearCaseClase(unknown: Tree) =
     CompilerError.IllegalState(

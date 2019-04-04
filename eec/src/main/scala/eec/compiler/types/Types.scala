@@ -11,6 +11,7 @@ import core.Names
 import Names._
 import Name._
 import error.CompilerErrors._
+import CompilerErrorOps._
 import util.{Showable,|>,StackMachine}
 import StackMachine._
 import Program._
@@ -195,7 +196,8 @@ object Types {
       def inner(z: Checked[O], tpes: List[Type]): Checked[O] = {
         z match {
           case err: CompilerError => err
-          case z: O =>
+          case z0 =>
+            val z = unchecked(z0)
             tpes match {
               case Nil => z
 

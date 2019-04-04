@@ -58,7 +58,7 @@ object Parsers {
   private[parsing] def fromTranslationUnit(context: TranslationUnitContext)
                                           given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       pkgId <- fromPackageInfo(context.packageInfo)
       stats <- checked {
                 if defined(context.statSeq) then
@@ -66,7 +66,7 @@ object Parsers {
                 else
                   EmptyTree
                }
-    } yield PackageDef(pkgId, stats.convert)(uTpe)
+    yield PackageDef(pkgId, stats.convert)(uTpe)
   }
 
   private class ParserSyntaxException(msg: String) extends Exception(msg)
@@ -219,10 +219,10 @@ object Parsers {
     import CompilerErrorOps._
     val name = context.rassocOpId.getText.readAs
     val functor = Ident(name)(freshId(), uTpe)
-    for {
+    for
       functor1 <- fromFunctorType(context.functorType)
       iat      <- fromInfixType(context.infixType)
-    } yield iat match {
+    yield iat match {
       case InfixApply(Ident(other),_,_)
         if other != name && !context.infixType.getText.startsWith("(") =>
           CompilerError.SyntaxError(
@@ -236,24 +236,24 @@ object Parsers {
   private def fromLinearFunc(context: LinearFuncContext)
                             given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       infixes <- checked {
         context
           .infixType
           .mapE(fromInfixType)
       }
-    } yield LinearFunction(infixes(0), infixes(1))(freshId(), uTpe)
+    yield LinearFunction(infixes(0), infixes(1))(freshId(), uTpe)
   }
 
   private def fromFunc(context: FuncContext) given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       infixes <- checked {
         context
           .infixType
           .mapE(fromInfixType)
       }
-    } yield {
+    yield {
       val head :: rest = infixes.toList.reverse
       rest.foldLeft(head)((acc, t) => Function(t :: Nil, acc)(freshId(), uTpe))
     }
@@ -270,7 +270,7 @@ object Parsers {
   private def fromProductType(context: ProductTypeContext)
                              given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for (types <- context.`type`.mapE(fromType))
+    for types <- context.`type`.mapE(fromType)
     yield parensFromBuffer(types)
   }
 
@@ -285,7 +285,7 @@ object Parsers {
   private def fromFunctorType(context: PrefixTypeContext)
                              given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for (simpleTypes <- context.simpleType.mapE(fromSimpleType)) yield {
+    for simpleTypes <- context.simpleType.mapE(fromSimpleType) yield {
       val tag  = fromQualId(context.qualId)
       val args = simpleTypes.toList
       Apply(tag, args)(uTpe)
@@ -296,7 +296,7 @@ object Parsers {
                           given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     val tag = Ident(Name.BangTag)(freshId(), uTpe)
-    for (simpleTypes <- context.simpleType.mapE(fromSimpleType)) yield {
+    for simpleTypes <- context.simpleType.mapE(fromSimpleType) yield {
       val args        = simpleTypes.toList
       Apply(tag, args)(uTpe)
     }
@@ -339,36 +339,36 @@ object Parsers {
   private def fromEval(exprContext: ExprContext, evalContext: EvalContext)
                       given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       expr <- fromExpr(exprContext)
       eval <- fromExpr(evalContext.expr)
-    } yield Eval(expr, eval)(uTpe)
+    yield Eval(expr, eval)(uTpe)
   }
 
   private def fromExprSeqAsApply(exprs: java.util.List[ExprContext])
                                 given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       exprs <- exprs.mapE(fromExpr)
       Seq(expr, arg) = exprs
-    } yield Apply(expr, arg.convert)(uTpe)
+    yield Apply(expr, arg.convert)(uTpe)
   }
 
   private def fromLambda(context: LambdaContext) given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       body     <- fromExpr(context.expr)
       bindings <- fromBindings(context.bindings)
-    } yield Function(bindings.convert, body)(freshId(), uTpe)
+    yield Function(bindings.convert, body)(freshId(), uTpe)
   }
 
   private def fromLinearLambda(context: LinearLambdaContext)
                               given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       body    <- fromExpr(context.expr)
       binding <- fromBinding(context.binding)
-    } yield LinearFunction(binding, body)(freshId(), uTpe)
+    yield LinearFunction(binding, body)(freshId(), uTpe)
   }
 
   private def fromLetExpr(context: LetExprContext)
@@ -380,7 +380,7 @@ object Parsers {
       else
         Name.Wildcard
     }
-    for (exprs <- context.expr.mapE(fromExpr)) yield {
+    for exprs <- context.expr.mapE(fromExpr) yield {
       val value        = exprs.get(0)
       val continuation = exprs.get(1)
       Let(name, value, continuation)(freshId(), uTpe)
@@ -398,7 +398,7 @@ object Parsers {
     }
     val z = varids.last
     import CompilerErrorOps._
-    for (exprs <- context.expr.mapE(fromExpr)) yield {
+    for exprs <- context.expr.mapE(fromExpr) yield {
       val value        = exprs.get(0)
       val continuation = exprs.get(1)
       LetTensor(x, z, value, continuation)(freshId(), uTpe)
@@ -408,24 +408,24 @@ object Parsers {
   private def fromCaseExpr(context: CaseExprContext)
                           given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       selector <- fromExpr(context.expr)
       cases    <- fromCases(context.cases)
-    } yield CaseExpr(selector, cases.convert)(uTpe)
+    yield CaseExpr(selector, cases.convert)(uTpe)
   }
 
   private def fromLinearCaseExpr(context: LinearCaseExprContext)
                                 given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       selector <- fromExpr(context.expr)
       cases    <- fromLinearCases(context.linearCases)
-    } yield LinearCaseExpr(selector, cases.convert)(uTpe)
+    yield LinearCaseExpr(selector, cases.convert)(uTpe)
   }
 
   private def fromIfElse(context: Expr1Context) given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for (exprs <- context.expr.mapE(fromExpr)) yield {
+    for exprs <- context.expr.mapE(fromExpr) yield {
       val patTrue   = Literal(BooleanConstant(true))(uTpe)
       val patFalse  = Literal(BooleanConstant(false))(uTpe)
       val caseTrue  = CaseClause(patTrue, EmptyTree, exprs(1))(freshId(), uTpe)
@@ -451,7 +451,7 @@ object Parsers {
       else
         fromAlphaId(context.alphaId)
     }
-    for (infixes <- context.infixExpr.mapE(fromInfixExpr)) yield {
+    for infixes <- context.infixExpr.mapE(fromInfixExpr) yield {
       val firstApply = Apply(id, infixes(0) :: Nil)(uTpe)
       Apply(firstApply, infixes(1) :: Nil)(uTpe)
     }
@@ -476,10 +476,10 @@ object Parsers {
   private def fromTensorExpr(context: TensorExprContext)
                             given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       x <- fromSimpleExpr(context.simpleExpr)
       z <- fromInfixExpr(context.infixExpr)
-    } yield Tree.Tensor(x, z)(uTpe)
+    yield Tree.Tensor(x, z)(uTpe)
   }
 
   private def fromPrefixExpr(context: PrefixExprContext)
@@ -507,21 +507,21 @@ object Parsers {
   private def fromCases(context: CasesContext)
                        given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for (caseClauses <- context.caseClause.mapE(fromCaseClause))
+    for caseClauses <- context.caseClause.mapE(fromCaseClause)
     yield caseClauses.toList.convert
   }
 
   private def fromLinearCases(context: LinearCasesContext)
                              given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for (caseClauses <- context.linearCaseClause.mapE(fromLinearCaseClause))
+    for caseClauses <- context.linearCaseClause.mapE(fromLinearCaseClause)
     yield caseClauses.toList.convert
   }
 
   private def fromCaseClause(context: CaseClauseContext)
                             given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       pat   <- fromPattern(context.pattern)
       guard <- checked {
         if defined(context.guard) then
@@ -530,22 +530,22 @@ object Parsers {
           EmptyTree
       }
       body <- fromExpr(context.expr)
-    } yield CaseClause(pat, guard, body)(freshId(), uTpe)
+    yield CaseClause(pat, guard, body)(freshId(), uTpe)
   }
 
   private def fromLinearCaseClause(context: LinearCaseClauseContext)
                                   given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       pat  <- fromLinearPattern(context.linearPattern)
       body <- fromExpr(context.expr)
-    } yield LinearCaseClause(pat, body)(freshId(), uTpe)
+    yield LinearCaseClause(pat, body)(freshId(), uTpe)
   }
 
   private def fromExprsInParens(context: ExprsInParensContext)
                                given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for (exprs <- context.expr.mapE(fromExpr))
+    for exprs <- context.expr.mapE(fromExpr)
     yield parensFromBuffer(exprs)
   }
 
@@ -586,7 +586,7 @@ object Parsers {
   private def fromPattern(context: PatternContext)
                          given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for (patterns <- context.pattern1.mapE(fromPattern1)) yield {
+    for patterns <- context.pattern1.mapE(fromPattern1) yield {
       if patterns.size == 1 then
         patterns(0)
       else
@@ -602,7 +602,7 @@ object Parsers {
     import CompilerErrorOps._
     val name = context.Varid.getText.readAs
     if defined(context.pattern3) then {
-      for (patt3 <- fromPattern3(context.pattern3))
+      for patt3 <- fromPattern3(context.pattern3)
       yield Bind(name, patt3)(uTpe)
     } else {
       Ident(name)(freshId(), uTpe)
@@ -631,7 +631,7 @@ object Parsers {
                                 given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     val functor = context.Patid.getText.readAs
-    for (args <- context.pattern.mapE(fromPattern))
+    for args <- context.pattern.mapE(fromPattern)
     yield Unapply(functor, args.toList)(uTpe)
   }
 
@@ -654,7 +654,7 @@ object Parsers {
   private def fromPatterns(context: PatternsContext)
                           given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for (patterns <- context.pattern.mapE(fromPattern))
+    for patterns <- context.pattern.mapE(fromPattern)
     yield parensFromBuffer(patterns)
   }
 
@@ -672,7 +672,7 @@ object Parsers {
   private def fromBindingsTagged(context: BindingsTaggedContext)
                                 given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for (bindings <- context.binding.mapE(fromBinding))
+    for bindings <- context.binding.mapE(fromBinding)
     yield bindings.toList.convert
   }
 
@@ -685,7 +685,7 @@ object Parsers {
       else
         Name.Wildcard
     }
-    for (typ <- fromType(context.`type`))
+    for typ <- fromType(context.`type`)
     yield Tagged(name, typ)(uTpe)
   }
 
@@ -709,11 +709,11 @@ object Parsers {
     import CompilerErrorOps._
     fromTypeDcl(context.typeDcl) match {
       case Left(name, args) =>
-        for (ctors <- fromConstructors(context.constructors))
+        for ctors <- fromConstructors(context.constructors)
         yield DataDcl(name, args, ctors)(uTpe)
 
       case Right(op, left, right) =>
-        for (ctors <- fromConstructors(context.constructors))
+        for ctors <- fromConstructors(context.constructors)
         yield InfixDataDcl(op, left, right, ctors)(uTpe)
     }
   }
@@ -723,11 +723,11 @@ object Parsers {
     import CompilerErrorOps._
     fromLinearTypeDcl(context.linearTypeDcl) match {
       case Left(name, args) =>
-        for (ctors <- fromLinearConstructors(context.linearConstructors))
+        for ctors <- fromLinearConstructors(context.linearConstructors)
         yield DataDcl(name, args, ctors)(uTpe)
 
       case Right(op, left, right) =>
-        for (ctors <- fromLinearConstructors(context.linearConstructors))
+        for ctors <- fromLinearConstructors(context.linearConstructors)
         yield InfixDataDcl(op, left, right, ctors)(uTpe)
     }
   }
@@ -784,7 +784,7 @@ object Parsers {
                       given IdGen: Checked[Tree] = {
    import CompilerErrorOps._
     val name = context.Patid.getText.readAs
-    for (args <- context.`type`.mapE(fromType))
+    for args <- context.`type`.mapE(fromType)
     yield CtorSig(name, args.toList)(uTpe)
   }
 
@@ -792,7 +792,7 @@ object Parsers {
                             given IdGen: Checked[Tree] = {
    import CompilerErrorOps._
     val name = context.Patid.getText.readAs
-    for (arg <- fromType(context.`type`))
+    for arg <- fromType(context.`type`)
     yield LinearCtorSig(name, arg)(uTpe)
   }
 
@@ -805,7 +805,7 @@ object Parsers {
       else
         fromLinearSig(context.linearSig)
     }
-    for (typ <- fromType(context.`type`))
+    for typ <- fromType(context.`type`)
     yield DefDef(Set(), sig, typ, EmptyTree)(uTpe)
   }
 
@@ -827,16 +827,16 @@ object Parsers {
 
   private def fromDefDef(context: DefDefContext) given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for {
+    for
       expr <- fromExpr(context.expr)
-      typ  <-  fromType(context.`type`)
+      typ  <- fromType(context.`type`)
       sig  = {
         if defined(context.defSig) then
           fromDefSig(context.defSig)
         else
           fromLinearSig(context.linearSig)
       }
-    } yield DefDef(Set(), sig, typ, expr)(uTpe)
+    yield DefDef(Set(), sig, typ, expr)(uTpe)
   }
 
   private def fromDefSig(context: DefSigContext) given IdGen: Tree = {
@@ -886,7 +886,7 @@ object Parsers {
   private def fromStatSeq(context: StatSeqContext)
                          given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    for (stats <- context.stat.mapE(fromStat))
+    for stats <- context.stat.mapE(fromStat)
     yield stats.toList.convert
   }
 

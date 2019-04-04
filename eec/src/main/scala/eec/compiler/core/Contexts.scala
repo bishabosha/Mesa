@@ -248,12 +248,12 @@ object Contexts {
 
     def constructorsFor(name: Name)
                        given Context: Checked[List[(Name, Type)]] =
-      for {
+      for
         ctors <- ctx.constructorTable
                     .getOrElse[Checked[mutable.Set[(Name, Type)]]](
                       name, CompilerError.UnexpectedType(
                         s"Could not find constructors for ${name.show}"))
-      } yield ctors.toList
+      yield ctors.toList
 
     def contains(name: Name) given Context = {
       name.nonEmpty && {
@@ -378,10 +378,10 @@ object Contexts {
       } else {
         implied for Context = root
         Types.bootstrapped.foreach { (name, tpe) =>
-          for (_ <- enterVariable(name))
-            yield {
-              putType(name -> tpe)
-            }
+          for _ <- enterVariable(name)
+          yield {
+            putType(name -> tpe)
+          }
         }
       }
     }
@@ -429,16 +429,16 @@ object Contexts {
 
       def branch(ctx: Context): Seq[Scoping] = {
         val linearScopeOpt = {
-          for {
+          for
             name <- ctx.linearScope
             tpe  = ctx.typeTable.get(name) match {
               case Some(t) => TypeDef(t.show)
               case _       => EmptyType
             }
-          } yield LinearScope(ForName(name.show), tpe)
+          yield LinearScope(ForName(name.show), tpe)
         }
         val defs = {
-          for {
+          for
             pair <- ctx.scope.filter { pair =>
                       val (Sym(_, name), child) = pair
                       child.scope.nonEmpty || child.linearScope.nonEmpty || name.nonEmpty
@@ -447,7 +447,7 @@ object Contexts {
             tpeOpt        = ctx.typeTable.get(sym.name)
             tpe           = tpeOpt.fold(EmptyType)(t => TypeDef(t.show))
             name          = sym.name
-          } yield {
+          yield {
             if name.nonEmpty then
               NamedScope(ForName(name.show), tpe, child.toScoping)
             else
