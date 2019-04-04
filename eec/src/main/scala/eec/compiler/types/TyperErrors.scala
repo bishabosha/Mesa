@@ -177,11 +177,6 @@ object TyperErrors {
       s"No linear context found to bind function declaration argument ${name.show}.")
   }
 
-  def nameNotConstructor(name: Name) = {
-    CompilerError.UnexpectedType(
-      s"${name.show} does not qualify to be a constructor.")
-  }
-
   def illegalStoupEntry(name: Name, tpe: Type) =
     CompilerError.UnexpectedType(
         s"name `${name.show}` of value type: `${tpe.show}` is not allowed in the linear context.")

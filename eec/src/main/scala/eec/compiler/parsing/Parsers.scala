@@ -739,7 +739,7 @@ object Parsers {
       val name = context.alphaId.getText.readAs
       Left(name, args.toList)
     } else {
-      val op = context.RassocOpId.getText.readAs
+      val op = context.rassocOpId.getText.readAs
       Right(op, args(0), args(1))
     }
   }
@@ -759,8 +759,8 @@ object Parsers {
       Left(name, Nil)
     } else {
       val names1 = names.toList
-      if defined(context.RassocOpId) then {
-        val op = context.RassocOpId.getText.readAs
+      if defined(context.rassocOpId) then {
+        val op = context.rassocOpId.getText.readAs
         Right(op, names(0), names(1))
       } else {
         Left(names1.head, names1.tail)

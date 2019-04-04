@@ -176,11 +176,11 @@ dataDcl: 'data' typeDcl '=' constructors;
 
 linearDataDcl: 'data' linearTypeDcl '=' linearConstructors;
 
-typeDcl: alphaId+ | alphaId RassocOpId alphaId;
+typeDcl: alphaId+ | alphaId rassocOpId alphaId;
 
 linearTypeDcl:
 	alphaId linearTpeId+
-	| linearTpeId RassocOpId linearTpeId;
+	| linearTpeId rassocOpId linearTpeId;
 
 linearTpeId: CompId | alphaId;
 

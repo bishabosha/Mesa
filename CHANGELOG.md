@@ -3,6 +3,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.1-RC1] - 2019-04-4
+### Added
+- Separation of scopes for data definitions and normal terms, leading to more
+  flexibility in defining terms. Also prevents shadowing of imported data types,
+  such as the bootstrapped types in the `_root_` package.
+
 ## [0.2.0-RC1] - 2019-04-4
 ### Added
 - Type checking that ensures all possible cases in a match expression or
@@ -46,7 +52,8 @@ All notable changes to this project will be documented in this file.
   - Source files use `.hs` suffix at present to benefit from syntax highlighting.
   - Refer to [eec/src/main/antlr4/EEC.g4](eec/src/main/antlr4/EEC.g4) for a context free grammar.
 
-[Unreleased]: https://github.com/bishabosha/EEC/compare/0.2.0-RC1...HEAD
+[Unreleased]: https://github.com/bishabosha/EEC/compare/0.2.1-RC1...HEAD
+[0.2.1-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.1-RC1
 [0.2.0-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.0-RC1
 [0.1.2-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.1.2-RC1
 [0.1-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.1-RC1
