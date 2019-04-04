@@ -1,4 +1,4 @@
-# EEC 0.2.0-RC1
+# EEC 0.2.1-RC1
 
 ## Requirements
 * Dotty 0.13.0-RC1 <http://dotty.epfl.ch>
