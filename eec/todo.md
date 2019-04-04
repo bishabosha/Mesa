@@ -54,7 +54,7 @@ computation type, as in (ii)."
 
 * Note however that since types can currently be only defined in the `_root_` pkg
   and there is no user mechanism to define them, then it is safe to substitute
-  `TypeRef(a)`, where `a` is unknown, with any concrete type - substitution must
+  `BaseType(a)`, where `a` is unknown, with any concrete type - substitution must
   be propagated
 
 [!] - DONT IMPLEMENT `::` unless you have implemented multi expr defs

@@ -30,38 +30,34 @@ object Types {
     case FunctionType(arg: Type, body: Type)
     case LinearFunctionType(arg: Type, body: Type)
     case Product(args: List[Type])
-    case AppliedType(typ: Type, args: List[Type])
-    case InfixAppliedType(op: Type, a1: Type, a2: Type)
+    case BaseType(name: Name)
+    case AppliedType(op: Name, args: List[Type])
+    case InfixAppliedType(op: Name, a1: Type, a2: Type)
     case WildcardType
     case Untyped
     case EmptyType
   }
 
   object Bootstraps {
-    val BooleanType   = TypeRef(BooleanTag)
-    val DecimalType   = TypeRef(DecimalTag)
-    val IntegerType   = TypeRef(IntegerTag)
-    val CharType      = TypeRef(CharTag)
-    val StringType    = TypeRef(StringTag)
-    val BangType      = TypeRef(BangTag)
-    val TensorType    = TypeRef(TensorTag)
-    val VoidType      = TypeRef(VoidTag)
-    val VoidCompType  = TypeRef(VoidCompTag)
+    val BooleanType   = BaseType(BooleanTag)
+    val DecimalType   = BaseType(DecimalTag)
+    val IntegerType   = BaseType(IntegerTag)
+    val CharType      = BaseType(CharTag)
+    val StringType    = BaseType(StringTag)
+    val VoidType      = BaseType(VoidTag)
+    val VoidCompType  = BaseType(VoidCompTag)
 
-    val TensorConstructor = {
+    val TensorType = {
       InfixAppliedType(
-        TensorType,
-        AppliedType(
-          BangType,
-          List(Variable("A".readAs))
-        ),
+        TensorTag,
+        Variable("A".readAs),
         Variable("B#".readAs)
       )
     }
 
-    val BangConstructor = {
+    val BangType = {
       AppliedType(
-        BangType,
+        BangTag,
         List(Variable("A".readAs))
       )
     }
@@ -69,15 +65,15 @@ object Types {
 
   val bootstrapped = {
     Vector(
-      TensorTag     -> Bootstraps.TensorConstructor,
-      BangTag       -> Bootstraps.BangConstructor,
-      VoidCompTag   -> Bootstraps.VoidCompType,
-      VoidTag       -> Bootstraps.VoidType,
-      IntegerTag    -> Bootstraps.IntegerType,
-      DecimalTag    -> Bootstraps.DecimalType,
-      BooleanTag    -> Bootstraps.BooleanType,
-      StringTag     -> Bootstraps.StringType,
-      CharTag       -> Bootstraps.CharType
+      TensorTag   -> Bootstraps.TensorType,
+      BangTag     -> Bootstraps.BangType,
+      VoidCompTag -> Bootstraps.VoidCompType,
+      VoidTag     -> Bootstraps.VoidType,
+      IntegerTag  -> Bootstraps.IntegerType,
+      DecimalTag  -> Bootstraps.DecimalType,
+      BooleanTag  -> Bootstraps.BooleanType,
+      StringTag   -> Bootstraps.StringType,
+      CharTag     -> Bootstraps.CharType
     )
   }
 
@@ -146,14 +142,13 @@ object Types {
 
         case InfixAppliedType(tpe, a1, a2) =>
           stack =>
-            val tpe :: a1 :: a2 :: rest = stack
+            val a1 :: a2 :: rest = stack
             InfixAppliedType(tpe, a1, a2) :: rest
 
         case AppliedType(f, args) =>
           stack =>
-            val functor :: stack1 = stack
-            val (removed, rest) = stack1.splitAt(args.length)
-            AppliedType(functor, removed) :: rest
+            val (removed, rest) = stack.splitAt(args.length)
+            AppliedType(f, removed) :: rest
 
         case Product(tpes1) =>
           stack =>
@@ -173,14 +168,14 @@ object Types {
 
         case tpe :: rest =>
           tpe match {
-            case AppliedType(t, tpes) => inner(f(z, tpe), t :: tpes ::: rest)
+            case AppliedType(_, tpes) => inner(f(z, tpe), tpes ::: rest)
             case FunctionType(a1, b1) => inner(f(z, tpe), a1 :: b1 :: rest)
 
             case LinearFunctionType(a1, b1) =>
               inner(f(z, tpe), a1 :: b1 :: rest)
 
-            case InfixAppliedType(op, a1, a2) =>
-              inner(f(z, tpe), op :: a1 :: a2 :: rest)
+            case InfixAppliedType(_, a1, a2) =>
+              inner(f(z, tpe), a1 :: a2 :: rest)
 
             case Product(tpes)        => inner(f(z, tpe), tpes ::: rest)
             case _                    => inner(f(z, tpe), rest)
@@ -203,14 +198,14 @@ object Types {
 
               case tpe :: rest =>
                 tpe match {
-                  case AppliedType(t, tpes) => inner(f(z, tpe), t :: tpes ::: rest)
+                  case AppliedType(_, tpes) => inner(f(z, tpe), tpes ::: rest)
                   case FunctionType(a1, b1) => inner(f(z, tpe), a1 :: b1 :: rest)
 
                   case LinearFunctionType(a1, b1) =>
                     inner(f(z, tpe), a1 :: b1 :: rest)
 
-                  case InfixAppliedType(op, a1, a2) =>
-                    inner(f(z, tpe), op :: a1 :: a2 :: rest)
+                  case InfixAppliedType(_, a1, a2) =>
+                    inner(f(z, tpe), a1 :: a2 :: rest)
 
                   case Product(tpes)        => inner(f(z, tpe), tpes ::: rest)
                   case _                    => inner(f(z, tpe), rest)
@@ -235,11 +230,11 @@ object Types {
 
           case app :: appsRest =>
             if canUnify(arg, app) then (arg, app) match {
-              case (AppliedType(fun1, tpes1), AppliedType(fun2, tpes2)) =>
+              case (AppliedType(_, tpes1), AppliedType(_, tpes2)) =>
                 inner(
                   f(z, arg, app),
-                  fun1 :: tpes1 ::: argRest,
-                  fun2 :: tpes2 ::: appsRest
+                  tpes1 ::: argRest,
+                  tpes2 ::: appsRest
                 )
 
               case (FunctionType(a1, b1), FunctionType(a2, b2)) =>
@@ -256,12 +251,12 @@ object Types {
                   a2 :: b2 :: appsRest
                 )
 
-              case (InfixAppliedType(op1, a1, a2),
-                InfixAppliedType(op2, b1, b2)) =>
+              case (InfixAppliedType(_, a1, a2),
+                InfixAppliedType(_, b1, b2)) =>
                   inner(
                     f(z, arg, app),
-                    op1 :: a1 :: a2 :: argRest,
-                    op2 :: b1 :: b2 :: appsRest
+                    a1 :: a2 :: argRest,
+                    b1 :: b2 :: appsRest
                   )
 
               case (Product(tpes1), Product(tpes2)) =>
@@ -299,15 +294,16 @@ object Types {
 
             case ( _:FunctionType,       _:FunctionType       )
             |    ( _:LinearFunctionType, _:LinearFunctionType )
-            |    ( _:TypeRef,            _:TypeRef            )
+            |    ( _:BaseType,            _:BaseType          )
+            |    ( _:TypeRef,             _:TypeRef           )
             |    ( _:Variable
                 |    WildcardType,       _                    )
             |    ( _:PackageInfo,        _:PackageInfo        )
             |    (   EmptyType,            EmptyType          )
             |    (   Untyped,              Untyped            ) => true
 
-            case (InfixAppliedType(op1,_,_), InfixAppliedType(op2,_,_)) =>
-              inner(z, op1 :: argRest, op2 :: appsRest)
+            case (InfixAppliedType(_,_,_), InfixAppliedType(_,_,_)) =>
+              inner(z, argRest, appsRest)
 
             case _ => false
           }
@@ -322,17 +318,14 @@ object Types {
       other == WildcardType
     }
 
+    def isBootstrapped(name: Name) = bootstrapped.view.map(_._1).contains(name)
+
     def constructorEligableName(tpe: Type): Name = {
       tpe match {
-        case AppliedType(TypeRef(name), _)
-        if name != BangTag =>
-          name
-
-        case InfixAppliedType(TypeRef(name), _, _)
-        if name != TensorTag =>
-          name
-
-        case _ => EmptyName
+        case AppliedType(name, _) if !isBootstrapped(name)         => name
+        case InfixAppliedType(name, _, _) if !isBootstrapped(name) => name
+        case BaseType(name) if !isBootstrapped(name)               => name
+        case _                                                     => EmptyName
       }
     }
 
@@ -442,9 +435,10 @@ object Types {
         case Nil => acc
 
         case tpe :: tpes => tpe match {
-          case AppliedType(TypeRef(BangTag), _ :: Nil)
-          |    InfixAppliedType(TypeRef(TensorTag),_,_)
-          |    TypeRef(_: Comp | VoidCompTag)
+          case AppliedType(BangTag, _ :: Nil)
+          |    InfixAppliedType(TensorTag,_,_)
+          |    BaseType(VoidCompTag)
+          |    TypeRef(_: Comp)
           |    Variable(_: Comp)     => true
 
           case AppliedType(_, args) =>
@@ -472,6 +466,7 @@ object Types {
         case AppliedType(f, args)           => fromAppliedType(f, args)
         case Product(tpes1)                 => fromProduct(tpes1)
         case TypeRef(t)                     => t.show :: _
+        case BaseType(t)                    => t.show :: _
         case Variable(t)                    => t.show :: _
         case PackageInfo(parent, name)      => showPackage(parent, name) :: _
         case WildcardType                   => "<anytype>" :: _
@@ -507,11 +502,11 @@ object Types {
         s"$a1Final |- $a2Final" :: rest
       }
 
-      private def fromInfixAppliedType(op: Type, a1: Type, a2: Type)
+      private def fromInfixAppliedType(op: Name, a1: Type, a2: Type)
                                       (stack: Stack[String]) = {
-        val op1 :: b1 :: b2 :: rest = stack
+        val b1 :: b2 :: rest = stack
         val b1Final = a1 match {
-          case AppliedType(TypeRef(BangTag), _ :: Nil) => b1
+          case AppliedType(BangTag, _ :: Nil) => b1
 
           case _: (FunctionType | AppliedType | LinearFunctionType
           | InfixAppliedType) =>
@@ -520,16 +515,16 @@ object Types {
           case _ => b1
         }
         val b2Final = a2 match {
-          case AppliedType(TypeRef(BangTag), _ :: Nil) => b2
+          case AppliedType(BangTag, _ :: Nil) => b2
           case _: (FunctionType | AppliedType | LinearFunctionType) => s"($b2)"
           case InfixAppliedType(op1,_,_) if op1 != op => s"($b2)"
           case _                                      => b2
         }
-        s"$b1Final $op1 $b2Final" :: rest
+        s"$b1Final ${op.show} $b2Final" :: rest
       }
 
-      private def fromAppliedType(f: Type, args: List[Type])
-                                 (stack: Stack[String]) = {
+      private def fromAppliedType(f: Name, args: List[Type])
+                                 (stack: Stack[String]): List[String] = {
         def checkAll(tpes: List[Type], strs: List[String]) =
           tpes.zip(strs).map(check)
 
@@ -540,15 +535,15 @@ object Types {
             str
         }
 
-        val functor :: stack1 = stack
-        val (removed, rest) = stack1.splitAt(args.length)
+        val (removed, rest) = stack.splitAt(args.length)
         val str = {
           if removed.isEmpty then {
-            functor
+            f.show
           } else {
+            val fStr = f.show
             val init =
-              if f == Bootstraps.BangType && args.length == 1 then functor
-              else s"$functor "
+              if f == BangTag && args.length == 1 then fStr
+              else s"$fStr "
             checkAll(args, removed).mkString(init, " ", "")
           }
         }

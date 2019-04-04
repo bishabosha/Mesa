@@ -28,7 +28,7 @@ object Namers {
   def namedDataDcl(name: Name, ctors: List[Tree])
                   given Context, Mode: Checked[Unit] = {
     for
-      _ <- enterVariable(name)
+      _ <- enterData(name)
       _ <- ctors.foldLeftE(())((_, ctor) => index(ctor))
     yield ()
   }
@@ -44,7 +44,7 @@ object Namers {
                  given Context, Mode: Checked[Unit] = {
     val (name, args) = sig match {
       case LinearSig(name, args, _) => (name, args)
-      case DefSig(name, args)     => (name, args)
+      case DefSig(name, args)       => (name, args)
     }
     enterScope(sig.id, name).flatMap { ctx1 =>
       implied for Context = ctx1
