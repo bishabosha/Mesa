@@ -7,7 +7,7 @@ literal:
 	| CharacterLiteral
 	| StringLiteral;
 
-rassocOpId: RassocOpId | CoTensor | Tensor;
+rassocOpId: RassocOpId | Tensor;
 
 id: alphaId | OpId;
 
@@ -135,7 +135,7 @@ simplePattern
    : Wildcard
    | Varid
    | literal
-   | Patid pattern+
+   | Patid pattern*
 //   | stableId '(' (patterns? ',')? (Varid '@')? '_' '*' ')'
    | '(' patterns? ')'
    | '()'
@@ -166,11 +166,31 @@ binding: (id | Wildcard) ':' type;
 // -- Declarations and Definitions
 //
 
-dcl: primitiveDcl;
+dcl: primitiveDcl | dataDcl | linearDataDcl;
 
 primitiveDcl: 'primitive' primDecl;
 
 primDecl: (defSig | linearSig) ':' type; // still require type checking
+
+dataDcl: 'data' typeDcl '=' constructors;
+
+linearDataDcl: 'data' linearTypeDcl '=' linearConstructors;
+
+typeDcl: alphaId+ | alphaId RassocOpId alphaId;
+
+linearTypeDcl:
+	alphaId linearTpeId+
+	| linearTpeId RassocOpId linearTpeId;
+
+linearTpeId: CompId | alphaId;
+
+linearConstructors: linearCtor (Sep? '|' linearCtor)+;
+
+constructors: ctor (Sep? '|' ctor)+;
+
+linearCtor: Patid '[' type ']';
+
+ctor: Patid type*;
 
 def: defDef;
 
@@ -208,7 +228,6 @@ translationUnit:
 Dashes: '--';
 Bang: '!';
 Tensor: '*:';
-CoTensor: '+:';
 WhyNot: '?';
 Wildcard: '_';
 

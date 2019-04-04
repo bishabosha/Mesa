@@ -6,6 +6,7 @@ import core._
 import Names._
 import Name._
 import Constants._
+import Constant._
 import Contexts._
 import Modifiers._
 import types.Types._
@@ -25,6 +26,10 @@ object Trees {
     case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case Ident(name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case PackageDef(pid: Tree, stats: List[Tree])(tpe: Type) extends Tree(tpe)
+    case DataDcl(name: Name, args: List[Name], ctors: List[Tree])(tpe: Type) extends Tree(tpe)
+    case InfixDataDcl(name: Name, left: Name, right: Name, ctors: List[Tree])(tpe: Type) extends Tree(tpe)
+    case CtorSig(name: Name, tpeArgs: List[Tree])(tpe: Type) extends Tree(tpe)
+    case LinearCtorSig(name: Name, tpeArg: Tree)(tpe: Type) extends Tree(tpe)
     case DefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)(tpe: Type) extends Tree(tpe)
     case DefSig(name: Name, args: List[Name])(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case LinearSig(name: Name, args: List[Name], linear: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
@@ -53,6 +58,58 @@ object Trees {
   }
 
   object TreeOps {
+
+    def showPatternTemplate(tree: Tree): String = {
+      type StackT = List[String]
+      type StatT = StackT => StackT
+      type ProgT = List[StatT]
+
+      @tailrec
+      def inner(acc: ProgT, patts: List[Tree]): ProgT = patts match {
+        case Nil => acc
+
+        case patt :: patts => patt match {
+
+          case Unapply(name, args) =>
+            val prog = { stack: StackT =>
+              val (args1, rest) = stack.splitAt(args.length)
+              val args2 = args1.view.zip(args).map { (str, arg) =>
+                arg match {
+                  case _: (Ident | Parens) => str
+                  case _ => s"($str)"
+                }
+              }
+              val argsStr = args2.mkString(" ")
+              s"${name.show} $argsStr" :: rest
+            }
+            inner(prog :: acc, args ::: patts)
+
+          case Parens(args) =>
+            val prog = { stack: StackT =>
+              val (args1, rest) = stack.splitAt(args.length)
+              val args2 = args1.view.zip(args).map { (str, arg) =>
+                arg match {
+                  case _: Ident => str
+                  case _ => s"($str)"
+                }
+              }
+              val argsStr = args2.mkString("(", ", ", ")")
+              argsStr :: rest
+            }
+            inner(prog :: acc, args ::: patts)
+
+          case Ident(name) => inner((name.show :: _) :: acc, patts)
+
+          case Literal(BooleanConstant(b)) =>
+            val str = if b then "True" else "False"
+            inner((str :: _) :: acc, patts)
+
+          case _ => inner(("<???>" :: _) :: acc, patts)
+        }
+      }
+
+      inner(Nil, tree :: Nil).foldLeft(Nil: List[String])((acc, f) => f(acc)).head
+    }
 
     implied for Showable[Tree] {
       def (t: Tree) show = toAst(t).toString
@@ -125,6 +182,8 @@ object Trees {
       case tree: Select => tree.copy()(tree.id, tpe)
       case tree: Ident => tree.copy()(tree.id, tpe)
       case tree: PackageDef => tree.copy()(tpe)
+      case tree: DataDcl => tree.copy()(tpe)
+      case tree: CtorSig => tree.copy()(tpe)
       case tree: DefDef => tree.copy()(tpe)
       case tree: DefSig => tree.copy()(tree.id, tpe)
       case tree: LinearSig => tree.copy()(tree.id, tpe)

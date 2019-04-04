@@ -18,6 +18,10 @@ object Printing {
       case Select(tree: Ast, name: Name)
       case Ident(name: Name)
       case PackageDef(pid: Ast, stats: List[Ast])
+      case DataDcl(name: Name, args: List[Name], ctors: List[Ast])
+      case InfixDataDcl(name: Name, left: Name, right: Name, ctors: List[Ast])
+      case CtorSig(name: Name, tpeArgs: List[Ast])
+      case LinearCtorSig(name: Name, tpeArg: Ast)
       case DefDef(modifiers: Set[Modifier], sig: Ast, tpeAs: Ast, body: Ast)
       case DefSig(name: Name, args: List[Name])
       case LinearSig(name: Name, args: List[Name], linear: Name)
@@ -52,6 +56,18 @@ object Printing {
 
         case Tree.PackageDef(pid, stats) =>
           PackageDef(toAst(pid), stats.map(toAst))
+
+        case Tree.DataDcl(name, args, ctors) =>
+          DataDcl(name, args, ctors.map(toAst(_)))
+
+        case Tree.InfixDataDcl(name, left, right, ctors) =>
+          InfixDataDcl(name, left, right, ctors.map(toAst(_)))
+
+        case Tree.CtorSig(name, tpeArgs) =>
+          CtorSig(name, tpeArgs.map(toAst(_)))
+
+        case Tree.LinearCtorSig(name, tpeArg) =>
+          LinearCtorSig(name, toAst(tpeArg))
 
         case Tree.DefDef(modifiers, sig, tpeAs, body) =>
           DefDef(modifiers, toAst(sig), toAst(tpeAs), toAst(body))

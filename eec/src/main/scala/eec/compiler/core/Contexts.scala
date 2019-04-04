@@ -26,13 +26,14 @@ object Contexts {
   import IdGen._
   import Context._
 
-  type Scope          = mutable.Buffer[(Sym, Context)]
-  type TypeTable      = mutable.Map[Name, Type]
-  type PrimTable      = mutable.Buffer[Name]
-  type Modal[X]       = given Mode => X
-  type Contextual[O]  = given Context => O
-  type IdReader[O]    = given IdGen => O
-  opaque type Id      = Long
+  type Scope            = mutable.Buffer[(Sym, Context)]
+  type TypeTable        = mutable.Map[Name, Type]
+  type PrimTable        = mutable.Buffer[Name]
+  type ConstructorTable = mutable.MultiMap[Name, (Name, Type)]
+  type Modal[X]         = given Mode => X
+  type Contextual[O]    = given Context => O
+  type IdReader[O]      = given IdGen => O
+  opaque type Id        = Long
 
   enum Mode derives Eql {
     case PrimitiveType, Typing, Term, Pat, PatAlt, LinearPat
@@ -100,7 +101,8 @@ object Contexts {
     val scope: Scope,
     var linearScope: Option[Name],
     val typeTable: TypeTable,
-    val primTable: PrimTable,
+    val constructorTable: ConstructorTable,
+    val constructorNames: mutable.Buffer[Name],
     val localIdGen: IdGen,
   )
 
@@ -108,6 +110,7 @@ object Contexts {
     new mutable.ArrayBuffer,
     None,
     new mutable.AnyRefMap,
+    new mutable.HashMap[Name, mutable.Set[(Name, Type)]] with ConstructorTable,
     new mutable.ArrayBuffer,
     new IdGen,
   )
@@ -118,6 +121,7 @@ object Contexts {
     new mutable.ArrayBuffer,
     None,
     new mutable.AnyRefMap,
+    new mutable.HashMap[Name, mutable.Set[(Name, Type)]] with ConstructorTable,
     new mutable.ArrayBuffer,
     new IdGen,
   )
@@ -143,6 +147,22 @@ object Contexts {
         else ctx match {
           case _: RootContext =>
             CompilerError.IllegalState(s"name not found: ${name.show}")
+
+          case ctx: Fresh => inner(ctx.outer)
+        }
+      }
+      inner(ctx)
+    }
+
+    def firstCtxConstructors(name: Name) given Context: Checked[Context] = {
+      @tailrec
+      def inner(current: Context): Checked[Context] = {
+        implied for Context = current
+        if containsConstructorsFor(name) then
+          ctx
+        else ctx match {
+          case _: RootContext =>
+            CompilerError.IllegalState(s"constructor not found: ${name.show}")
 
           case ctx: Fresh => inner(ctx.outer)
         }
@@ -219,6 +239,21 @@ object Contexts {
         ()
       }
     }
+
+    def isConstructor(name: Name) given Context: Boolean =
+      ctx.constructorNames.contains(name)
+
+    def containsConstructorsFor(name: Name) given Context: Boolean =
+      ctx.constructorTable.keySet.contains(name)
+
+    def constructorsFor(name: Name)
+                       given Context: Checked[List[(Name, Type)]] =
+      for
+        ctors <- ctx.constructorTable
+                    .getOrElse[Checked[mutable.Set[(Name, Type)]]](
+                      name, CompilerError.UnexpectedType(
+                        s"Could not find constructors for ${name.show}"))
+      yield ctors.toList
 
     def contains(name: Name) given Context = {
       name.nonEmpty && {
@@ -305,11 +340,14 @@ object Contexts {
       }
     }
 
-    def isPrimitive(name: Name) given Context: Boolean =
-      ctx.primTable.contains(name)
-
-    def setPrimitive(name: Name) given Context: Unit =
-      ctx.primTable += name
+    def linkConstructor(name: Name, tpe: Type) given Context: Unit = {
+      import NameOps._
+      val ret = toCurriedList(tpe).last.unwrapLinearBody
+      constructorEligableName(ret).foldEmptyName(()) { functor =>
+        ctx.constructorTable.addBinding(functor, name -> tpe)
+        ctx.constructorNames += name
+      }
+    }
 
     def putType(pair: (Name, Type)) given Context: Unit =
       ctx.typeTable += pair
@@ -340,10 +378,10 @@ object Contexts {
       } else {
         implied for Context = root
         Types.bootstrapped.foreach { (name, tpe) =>
-          for (_ <- enterVariable(name))
-            yield {
-              putType(name -> tpe)
-            }
+          for _ <- enterVariable(name)
+          yield {
+            putType(name -> tpe)
+          }
         }
       }
     }
@@ -391,16 +429,16 @@ object Contexts {
 
       def branch(ctx: Context): Seq[Scoping] = {
         val linearScopeOpt = {
-          for {
+          for
             name <- ctx.linearScope
             tpe  = ctx.typeTable.get(name) match {
               case Some(t) => TypeDef(t.show)
               case _       => EmptyType
             }
-          } yield LinearScope(ForName(name.show), tpe)
+          yield LinearScope(ForName(name.show), tpe)
         }
         val defs = {
-          for {
+          for
             pair <- ctx.scope.filter { pair =>
                       val (Sym(_, name), child) = pair
                       child.scope.nonEmpty || child.linearScope.nonEmpty || name.nonEmpty
@@ -409,7 +447,7 @@ object Contexts {
             tpeOpt        = ctx.typeTable.get(sym.name)
             tpe           = tpeOpt.fold(EmptyType)(t => TypeDef(t.show))
             name          = sym.name
-          } yield {
+          yield {
             if name.nonEmpty then
               NamedScope(ForName(name.show), tpe, child.toScoping)
             else

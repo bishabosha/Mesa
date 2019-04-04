@@ -10,6 +10,8 @@ import Tree._
 import core.Names
 import Names._
 import Name._
+import error.CompilerErrors._
+import CompilerErrorOps._
 import util.{Showable,|>,StackMachine}
 import StackMachine._
 import Program._
@@ -43,68 +45,24 @@ object Types {
     val StringType    = TypeRef(StringTag)
     val BangType      = TypeRef(BangTag)
     val TensorType    = TypeRef(TensorTag)
-    val CoTensorType  = TypeRef(CoTensorTag)
-    val EitherType    = TypeRef(EitherTag)
     val VoidType      = TypeRef(VoidTag)
     val VoidCompType  = TypeRef(VoidCompTag)
 
     val TensorConstructor = {
-      FunctionType(
+      InfixAppliedType(
+        TensorType,
         AppliedType(
           BangType,
-          List(Variable("$A".readAs))
+          List(Variable("A".readAs))
         ),
-        FunctionType(
-          Variable("$B#".readAs),
-          InfixAppliedType(
-            TensorType,
-            AppliedType(
-              BangType,
-              List(Variable("$A".readAs))
-            ),
-            Variable("$B#".readAs)
-          )
-        )
-      )
-    }
-
-    val CoTensorConstructor = {
-      FunctionType(
-        Variable("$A#".readAs),
-        FunctionType(
-          Variable("$B#".readAs),
-          InfixAppliedType(
-            CoTensorType,
-            Variable("$A#".readAs),
-            Variable("$B#".readAs)
-          )
-        )
+        Variable("B#".readAs)
       )
     }
 
     val BangConstructor = {
-      FunctionType(
-        Variable("$v".readAs),
-        AppliedType(
-          BangType,
-          List(Variable("$v".readAs))
-        )
-      )
-    }
-
-    val EitherConstructor = {
-      FunctionType(
-        Variable("$l".readAs),
-        FunctionType(
-          Variable("$r".readAs),
-          AppliedType(
-            EitherType,
-            List(
-              Variable("$l".readAs),
-              Variable("$r".readAs)
-            )
-          )
-        )
+      AppliedType(
+        BangType,
+        List(Variable("A".readAs))
       )
     }
   }
@@ -112,9 +70,7 @@ object Types {
   val bootstrapped = {
     Vector(
       TensorTag     -> Bootstraps.TensorConstructor,
-      CoTensorTag   -> Bootstraps.CoTensorConstructor,
       BangTag       -> Bootstraps.BangConstructor,
-      EitherTag     -> Bootstraps.EitherConstructor,
       VoidCompTag   -> Bootstraps.VoidCompType,
       VoidTag       -> Bootstraps.VoidType,
       IntegerTag    -> Bootstraps.IntegerType,
@@ -233,6 +189,38 @@ object Types {
       inner(z, tpe :: Nil)
     }
 
+    def (tpe: Type) foldLeftChecked[O]
+        (z: Checked[O])
+        (f: (O, Type) => Checked[O]): Checked[O] = {
+      @tailrec
+      def inner(z: Checked[O], tpes: List[Type]): Checked[O] = {
+        z match {
+          case err: CompilerError => err
+          case z0 =>
+            val z = unchecked(z0)
+            tpes match {
+              case Nil => z
+
+              case tpe :: rest =>
+                tpe match {
+                  case AppliedType(t, tpes) => inner(f(z, tpe), t :: tpes ::: rest)
+                  case FunctionType(a1, b1) => inner(f(z, tpe), a1 :: b1 :: rest)
+
+                  case LinearFunctionType(a1, b1) =>
+                    inner(f(z, tpe), a1 :: b1 :: rest)
+
+                  case InfixAppliedType(op, a1, a2) =>
+                    inner(f(z, tpe), op :: a1 :: a2 :: rest)
+
+                  case Product(tpes)        => inner(f(z, tpe), tpes ::: rest)
+                  case _                    => inner(f(z, tpe), rest)
+                }
+            }
+        }
+      }
+      inner(z, tpe :: Nil)
+    }
+
     def (t1: Type) zipFold [O, That]
         (t2: Type)
         (z: O)
@@ -334,13 +322,32 @@ object Types {
       other == WildcardType
     }
 
-    inline def unifies(tpe: Type, pt: Type) = {
+    def constructorEligableName(tpe: Type): Name = {
+      tpe match {
+        case AppliedType(TypeRef(name), _)
+        if name != BangTag =>
+          name
+
+        case InfixAppliedType(TypeRef(name), _, _)
+        if name != TensorTag =>
+          name
+
+        case _ => EmptyName
+      }
+    }
+
+    def (tpe: Type) unwrapLinearBody: Type = tpe match {
+      case LinearFunctionType(_, ret) => ret
+      case _                          => tpe
+    }
+
+    def unifies(tpe: Type, pt: Type) = {
       unifiesThen(tpe, pt)(_ => true)((_,_) => false)
     }
 
-    inline def unifiesThen[U](tpe: Type, pt: Type)
-                             (f: Type => U)
-                             (orElse: (Type, Type) => U): U = {
+    def unifiesThen[U](tpe: Type, pt: Type)
+                      (f: Type => U)
+                      (orElse: (Type, Type) => U): U = {
       val tpe1 = tpe.unify(pt)
       val pt1  = pt.unify(tpe1)
       if pt1 =!= tpe1 then f(tpe1)
@@ -435,13 +442,16 @@ object Types {
         case Nil => acc
 
         case tpe :: tpes => tpe match {
-          case AppliedType(TypeRef(BangTag), List(_))
-          |    InfixAppliedType(TypeRef(TensorTag | CoTensorTag),_,_)
+          case AppliedType(TypeRef(BangTag), _ :: Nil)
+          |    InfixAppliedType(TypeRef(TensorTag),_,_)
           |    TypeRef(_: Comp | VoidCompTag)
           |    Variable(_: Comp)     => true
 
-          case AppliedType(TypeRef(EitherTag), List(a, b)) =>
-            inner(acc, a :: b :: tpes)
+          case AppliedType(_, args) =>
+            inner(acc, args ::: tpes)
+
+          case InfixAppliedType(_, left, right) =>
+            inner(acc, left :: right :: tpes)
 
           case FunctionType(_, body) => inner(acc, body :: tpes)
           case Product(ts)           => inner(acc, ts ::: tpes)
@@ -501,7 +511,7 @@ object Types {
                                       (stack: Stack[String]) = {
         val op1 :: b1 :: b2 :: rest = stack
         val b1Final = a1 match {
-          case AppliedType(TypeRef(BangTag), List(_)) => b1
+          case AppliedType(TypeRef(BangTag), _ :: Nil) => b1
 
           case _: (FunctionType | AppliedType | LinearFunctionType
           | InfixAppliedType) =>
@@ -510,7 +520,7 @@ object Types {
           case _ => b1
         }
         val b2Final = a2 match {
-          case AppliedType(TypeRef(BangTag), List(_)) => b2
+          case AppliedType(TypeRef(BangTag), _ :: Nil) => b2
           case _: (FunctionType | AppliedType | LinearFunctionType) => s"($b2)"
           case InfixAppliedType(op1,_,_) if op1 != op => s"($b2)"
           case _                                      => b2

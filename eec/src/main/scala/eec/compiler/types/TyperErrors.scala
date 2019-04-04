@@ -4,6 +4,7 @@ package types
 
 import error.CompilerErrors._
 import ast.Trees._
+import TreeOps._
 import types.Types._
 import types.Typers._
 import core.Names._
@@ -56,6 +57,16 @@ object TyperErrors {
       tupleNotMatchLength
   }
 
+  def nonExhaustivePatterns(templates: List[Tree]) = {
+    val temps = {
+      templates
+        .map(showPatternTemplate(_))
+        .mkString("[", ", ", "]")
+    }
+    CompilerError.UnexpectedType(
+      s"Pattern match will fail on values matching these patterns: $temps")
+  }
+
   def typeNotTuple(pt: Type) =
     CompilerError.UnexpectedType(s"Expected `${pt.show}` but was a Tuple.")
 
@@ -88,6 +99,14 @@ object TyperErrors {
       s"Higher kinded type args do not match. Expected $argsExpect but got $argsPassed.$hint")
   }
 
+  def recursiveData(ctor: Name, data: Name) =
+    CompilerError.UnexpectedType(
+      s"Recursive type reference in constructor ${ctor.show} of ${data.show}.")
+
+  def unresolvedVariable(ctor: Name, data: Name, name: Name) =
+    CompilerError.UnexpectedType(
+      s"Unresolved type variable ${name.show} in constructor ${ctor.show} of ${data.show}.")
+
   def typingMissing(tree: Tree) given Mode =
     CompilerError.IllegalState(
       s"Typing not implemented for <${mode.show}, ${tree.show}>")
@@ -104,6 +123,10 @@ object TyperErrors {
   def noCompArg =
     CompilerError.UnexpectedType(
       "Linear function does not have computational domain.")
+
+  def noCompArgCtor(ctor: Name, data: Name, tpe: Type) =
+    CompilerError.UnexpectedType(
+      s"Argument of value type ${tpe.show} in linear constructor ${ctor.show} of ${data.show}.")
 
   def noLinearCompCodomain =
     CompilerError.UnexpectedType(
@@ -131,6 +154,10 @@ object TyperErrors {
   def notCaseClase(unknown: Tree) =
     CompilerError.IllegalState(
       s"$unknown is not Tree.CaseClause")
+
+  def notGenCtorSig(unknown: Tree) =
+    CompilerError.IllegalState(
+      s"$unknown is not constructor signature")
 
   def notLinearCaseClase(unknown: Tree) =
     CompilerError.IllegalState(

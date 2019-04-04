@@ -71,7 +71,7 @@ object Repl {
     val rootIdGen = new IdGen
     implied for Context = rootCtx
     implied for IdGen = rootIdGen
-    for (_ <- Context.enterBootstrapped) yield (rootIdGen, rootCtx)
+    for _ <- Context.enterBootstrapped yield (rootIdGen, rootCtx)
   }
 
   private case class LoopState(prompt: String, break: Boolean, pwd: String, idGen: IdGen, ctx: Context)
@@ -106,11 +106,11 @@ object Repl {
 
     def Typed(s: String)(f: String => IdReader[Checked[Tree]]): LoopState =
       guarded(state, s) {
-        val yieldTyped = for {
+        val yieldTyped = for
           expr  <- f(s)
           _     <- indexAsExpr(expr)
           typed <- expr.typedWith(Type.WildcardType)
-        } yield typed
+        yield typed
 
         yieldTyped.fold
           { error => println(s"[ERROR] ${error.show}") }
@@ -121,11 +121,11 @@ object Repl {
 
     def Define(s: String): LoopState =
       guarded(state, s) {
-        val typed = for {
+        val typed = for
           exp <- parseStat(s)
           _   <- indexAsExpr(exp)
           tpd <- exp.typedWith(WildcardType)
-        } yield tpd
+        yield tpd
 
         typed.fold
           { err => println(s"[ERROR] ${err.show}") }
@@ -153,10 +153,10 @@ object Repl {
 
       case AstFile(name) =>
         Ast(name) { n =>
-          for {
+          for
             code  <- loadFile(state.pwd, n)
             ast   <- parseEEC(code)
-          } yield ast
+          yield ast
         }
 
       case Define(code)   => Define(code)
@@ -164,10 +164,10 @@ object Repl {
 
       case TypeFile(name) =>
         Typed(name) { n =>
-          for {
+          for
             code  <- loadFile(state.pwd, n)
             ast   <- parseEEC(code)
-          } yield ast
+          yield ast
         }
 
       case SetPrompt(newPrompt) =>

@@ -128,9 +128,23 @@ class ExprTest {
     "()"       -|:  """ case Right () of
                           Right x => x;
                           Left  _ => () """,
+
+    "()"       -|:  """ case False of
+                          True => ();
+                          _    => () """,
+
+    "()"       -|:  """ case True of
+                          False => ();
+                          _     => () """,
   )
 
   @Test def failCase() = noType(
+    """ case Left () of
+         Left  x => x """, // error: missing [Right _]
+
+    """ case Right () of
+         Right  x => x """, // error: missing [Left _]
+
     """ case () of
          a | _ => () """, // error: name in alternative
 
@@ -155,7 +169,10 @@ class ExprTest {
 
   @Test def typecheckLinearCase() = typecheck(
     """ case [InR [InL [()]]] of
-          InR [InL [m]] |- m """     :|- "()",
+          InR [InL [m]] |- m
+          InR [InR [u]] |- ()
+          InL [InL [u]] |- ()
+          InL [InR [u]] |- () """     :|- "()",
 
     """ case [((), ())] of
           (x, _) |- x """            :|- "()",
@@ -164,20 +181,30 @@ class ExprTest {
           (x, ( )) |- x """          :|- "()",
 
     """ case [InR [((), ())]] of
-          InR [(x, _)] |- x """      :|- "()",
+          InR [(x, _)] |- x
+          InL [u]      |- () """      :|- "()",
 
     """ case [(InR [()], ())] of
-          (InR [x], _) |- x """      :|- "()",
+          (InR [x], _) |- x
+          (InL [u], _) |- () """      :|- "()",
 
     """ case [InL [()]] of
-          InL [n] |- () """          :|- "()",
+          InL [n] |- n
+          InR [u] |- () """          :|- "()",
   )
 
   @Test def failLinearCase() = noType(
-    """case [(0, ())] of
-        (x, _) |- x""",  // error: `x: Integer` not allowed in stoup
-    """case [((), ())] of
-        (x, y) |- x""",   // error: can't put x and y together in stoup
+    """ case [InL [()]] of
+          InL [n] |- n""", // error: missing [InR _]
+
+    """ case [InR [()]] of
+          InR [n] |- n""", // error: missing [InL _]
+
+    """ case [(0, ())] of
+          (x, _) |- x """,    // error: `x: Integer` not allowed in stoup
+
+    """ case [((), ())] of
+          (x, y) |- x """,    // error: can't put x and y together in stoup
   )
 
   @Test def typecheckLambda() = typecheck(
