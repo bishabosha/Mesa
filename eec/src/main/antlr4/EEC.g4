@@ -135,7 +135,7 @@ simplePattern
    : Wildcard
    | Varid
    | literal
-   | Patid pattern+
+   | Patid pattern*
 //   | stableId '(' (patterns? ',')? (Varid '@')? '_' '*' ')'
    | '(' patterns? ')'
    | '()'
@@ -166,11 +166,19 @@ binding: (id | Wildcard) ':' type;
 // -- Declarations and Definitions
 //
 
-dcl: primitiveDcl;
+dcl: primitiveDcl | dataDcl;
 
 primitiveDcl: 'primitive' primDecl;
 
 primDecl: (defSig | linearSig) ':' type; // still require type checking
+
+dataDcl: 'data' typeDcl '=' constructors;
+
+typeDcl: alphaId+ | alphaId rassocOpId alphaId;
+
+constructors: ctor (Sep? '|' ctor)+;
+
+ctor: Patid type*;
 
 def: defDef;
 

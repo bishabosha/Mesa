@@ -162,7 +162,7 @@ object Contexts {
           ctx
         else ctx match {
           case _: RootContext =>
-            CompilerError.IllegalState(s"name not found: ${name.show}")
+            CompilerError.IllegalState(s"constructor not found: ${name.show}")
 
           case ctx: Fresh => inner(ctx.outer)
         }

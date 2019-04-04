@@ -99,6 +99,14 @@ object TyperErrors {
       s"Higher kinded type args do not match. Expected $argsExpect but got $argsPassed.$hint")
   }
 
+  def recursiveData(ctor: Name, data: Name) =
+    CompilerError.UnexpectedType(
+      s"Recursive type reference in constructor ${ctor.show} of ${data.show}.")
+
+  def unresolvedVariable(ctor: Name, data: Name, name: Name) =
+    CompilerError.UnexpectedType(
+      s"Unresolved type variable ${name.show} in constructor ${ctor.show} of ${data.show}.")
+
   def typingMissing(tree: Tree) given Mode =
     CompilerError.IllegalState(
       s"Typing not implemented for <${mode.show}, ${tree.show}>")
@@ -142,6 +150,10 @@ object TyperErrors {
   def notCaseClase(unknown: Tree) =
     CompilerError.IllegalState(
       s"$unknown is not Tree.CaseClause")
+
+  def notCtorSig(unknown: Tree) =
+    CompilerError.IllegalState(
+      s"$unknown is not Tree.CtorSig")
 
   def notLinearCaseClase(unknown: Tree) =
     CompilerError.IllegalState(

@@ -25,6 +25,21 @@ object Namers {
 
   private val anon = EmptyName
 
+  def namedDataDcl(name: Name, ctors: List[Tree])
+                  given Context, Mode: Checked[Unit] = {
+    for {
+      _ <- enterVariable(name)
+      _ <- ctors.foldLeftE(())((_, ctor) => index(ctor))
+    } yield ()
+  }
+
+  def namedCtorSig(name: Name)
+                  given Context, Mode: Checked[Unit] = {
+    for {
+      _ <- enterVariable(name)
+    } yield ()
+  }
+
   def namedDefDef(modifiers: Set[Modifier], sig: DefSig | LinearSig)
                  (tpeAs: Tree, body: Tree)
                  given Context, Mode: Checked[Unit] = {
@@ -226,6 +241,9 @@ object Namers {
     case PackageDef(t,ts)         if isTerm     => namedPackageDef(t,ts)
     case Apply(t,ts)              if isTerm     => namedApplyTerm(t,ts)
     case Eval(t,c)                if isTerm     => namedEvalTerm(t,c)
+    case DataDcl(n,_,c)           if isTerm     => namedDataDcl(n,c)
+    case InfixDataDcl(n,_,_,c)    if isTerm     => namedDataDcl(n,c)
+    case CtorSig(n,_)             if isTerm     => namedCtorSig(n)
     case DefDef(                  // DefDef
       m,                          // DefDef
       s: (DefSig | LinearSig),    // DefDef

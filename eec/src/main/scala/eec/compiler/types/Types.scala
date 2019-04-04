@@ -10,6 +10,7 @@ import Tree._
 import core.Names
 import Names._
 import Name._
+import error.CompilerErrors._
 import util.{Showable,|>,StackMachine}
 import StackMachine._
 import Program._
@@ -44,7 +45,6 @@ object Types {
     val BangType      = TypeRef(BangTag)
     val TensorType    = TypeRef(TensorTag)
     val CoTensorType  = TypeRef(CoTensorTag)
-    val EitherType    = TypeRef(EitherTag)
     val VoidType      = TypeRef(VoidTag)
     val VoidCompType  = TypeRef(VoidCompTag)
 
@@ -73,16 +73,6 @@ object Types {
         List(Variable("A".readAs))
       )
     }
-
-    val EitherConstructor = {
-      AppliedType(
-        EitherType,
-        List(
-          Variable("L".readAs),
-          Variable("R".readAs)
-        )
-      )
-    }
   }
 
   val bootstrapped = {
@@ -90,7 +80,6 @@ object Types {
       TensorTag     -> Bootstraps.TensorConstructor,
       CoTensorTag   -> Bootstraps.CoTensorConstructor,
       BangTag       -> Bootstraps.BangConstructor,
-      EitherTag     -> Bootstraps.EitherConstructor,
       VoidCompTag   -> Bootstraps.VoidCompType,
       VoidTag       -> Bootstraps.VoidType,
       IntegerTag    -> Bootstraps.IntegerType,
@@ -209,6 +198,37 @@ object Types {
       inner(z, tpe :: Nil)
     }
 
+    def (tpe: Type) foldLeftChecked[O]
+        (z: Checked[O])
+        (f: (O, Type) => Checked[O]): Checked[O] = {
+      @tailrec
+      def inner(z: Checked[O], tpes: List[Type]): Checked[O] = {
+        z match {
+          case err: CompilerError => err
+          case z: O =>
+            tpes match {
+              case Nil => z
+
+              case tpe :: rest =>
+                tpe match {
+                  case AppliedType(t, tpes) => inner(f(z, tpe), t :: tpes ::: rest)
+                  case FunctionType(a1, b1) => inner(f(z, tpe), a1 :: b1 :: rest)
+
+                  case LinearFunctionType(a1, b1) =>
+                    inner(f(z, tpe), a1 :: b1 :: rest)
+
+                  case InfixAppliedType(op, a1, a2) =>
+                    inner(f(z, tpe), op :: a1 :: a2 :: rest)
+
+                  case Product(tpes)        => inner(f(z, tpe), tpes ::: rest)
+                  case _                    => inner(f(z, tpe), rest)
+                }
+            }
+        }
+      }
+      inner(z, tpe :: Nil)
+    }
+
     def (t1: Type) zipFold [O, That]
         (t2: Type)
         (z: O)
@@ -311,14 +331,16 @@ object Types {
     }
 
     def constructorEligableName(tpe: Type): Name = {
-      object Sum {
-        inline def unapply(tpe: Name) =
-          tpe == EitherTag || tpe == CoTensorTag
-      }
       tpe match {
-        case AppliedType(TypeRef(name @ Sum()), _)         => name
-        case InfixAppliedType(TypeRef(name @ Sum()), _, _) => name
-        case _                                             => EmptyName
+        case AppliedType(TypeRef(name), _)
+        if name != BangTag =>
+          name
+
+        case InfixAppliedType(TypeRef(name), _, _)
+        if name != TensorTag =>
+          name
+
+        case _ => EmptyName
       }
     }
 
@@ -433,8 +455,11 @@ object Types {
           |    TypeRef(_: Comp | VoidCompTag)
           |    Variable(_: Comp)     => true
 
-          case AppliedType(TypeRef(EitherTag), a :: b :: Nil) =>
-            inner(acc, a :: b :: tpes)
+          case AppliedType(_, args) =>
+            inner(acc, args ::: tpes)
+
+          case InfixAppliedType(_, left, right) =>
+            inner(acc, left :: right :: tpes)
 
           case FunctionType(_, body) => inner(acc, body :: tpes)
           case Product(ts)           => inner(acc, ts ::: tpes)

@@ -689,13 +689,62 @@ object Parsers {
     yield Tagged(name, typ)(uTpe)
   }
 
-  private def fromDcl(context: DclContext) given IdGen: Checked[Tree] =
-    fromPrimitiveDcl(context.primitiveDcl)
+  private def fromDcl(context: DclContext) given IdGen: Checked[Tree] = {
+    if defined(context.primitiveDcl) then
+      fromPrimitiveDcl(context.primitiveDcl)
+    else
+      fromDataDcl(context.dataDcl)
+  }
 
   private def fromPrimitiveDcl(context: PrimitiveDclContext)
                               given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     fromPrimDcl(context.primDecl).map(_.addModifiers(Set(Primitive)))
+  }
+
+  private def fromDataDcl(context: DataDclContext)
+                         given IdGen: Checked[Tree] = {
+    import CompilerErrorOps._
+    fromTypeDcl(context.typeDcl) match {
+      case Left(name, args) =>
+        for (ctors <- fromConstructors(context.constructors))
+        yield DataDcl(name, args, ctors)(uTpe)
+
+      case Right(op, left, right) =>
+        for (ctors <- fromConstructors(context.constructors))
+        yield InfixDataDcl(op, left, right, ctors)(uTpe)
+    }
+  }
+
+  private def fromTypeDcl(context: TypeDclContext)
+                         given IdGen: Either[(Name, List[Name]),(Name, Name, Name)] = {
+    val names = context.alphaId.map(_.getText.readAs)
+    if names.size == 1 then {
+      val name = names(0)
+      Left(name, Nil)
+    } else {
+      val names1 = names.toList
+      if defined(context.rassocOpId) then {
+        val op = context.rassocOpId.getText.readAs
+        Right(op, names(0), names(1))
+      } else {
+        Left(names1.head, names1.tail)
+      }
+    }
+  }
+
+  private def fromConstructors(context: ConstructorsContext)
+                              given IdGen: Checked[List[Tree]] = {
+    import CompilerErrorOps._
+    context.ctor.mapE(fromCtor).map(_.toList)
+  }
+
+  private def fromCtor(context: CtorContext)
+                      given IdGen: Checked[Tree] = {
+   import CompilerErrorOps._
+    val name = context.Patid.getText.readAs
+    for (args <- context.`type`.mapE(fromType))
+    yield CtorSig(name, args.toList)(uTpe)
   }
 
   private def fromPrimDcl(context: PrimDeclContext)

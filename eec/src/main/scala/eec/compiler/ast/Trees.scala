@@ -26,6 +26,9 @@ object Trees {
     case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case Ident(name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case PackageDef(pid: Tree, stats: List[Tree])(tpe: Type) extends Tree(tpe)
+    case DataDcl(name: Name, args: List[Name], ctors: List[Tree])(tpe: Type) extends Tree(tpe)
+    case InfixDataDcl(name: Name, left: Name, right: Name, ctors: List[Tree])(tpe: Type) extends Tree(tpe)
+    case CtorSig(name: Name, tpeArgs: List[Tree])(tpe: Type) extends Tree(tpe)
     case DefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)(tpe: Type) extends Tree(tpe)
     case DefSig(name: Name, args: List[Name])(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case LinearSig(name: Name, args: List[Name], linear: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
@@ -71,7 +74,7 @@ object Trees {
               val (args1, rest) = stack.splitAt(args.length)
               val args2 = args1.view.zip(args).map { (str, arg) =>
                 arg match {
-                  case _: Ident => str
+                  case _: (Ident | Parens) => str
                   case _ => s"($str)"
                 }
               }
@@ -178,6 +181,8 @@ object Trees {
       case tree: Select => tree.copy()(tree.id, tpe)
       case tree: Ident => tree.copy()(tree.id, tpe)
       case tree: PackageDef => tree.copy()(tpe)
+      case tree: DataDcl => tree.copy()(tpe)
+      case tree: CtorSig => tree.copy()(tpe)
       case tree: DefDef => tree.copy()(tpe)
       case tree: DefSig => tree.copy()(tree.id, tpe)
       case tree: LinearSig => tree.copy()(tree.id, tpe)

@@ -103,6 +103,47 @@ object Typers {
     }
   }
 
+  private def resolveVariablesFrom(ctor: Name, data: Name, names: List[Name])(tpe: Type) given Context: Checked[Type] = {
+    import TypeOps._
+    val assertThere = tpe.foldLeftChecked(()) { (_, t) =>
+      t match {
+        case TypeRef(`data`) => Err.recursiveData(ctor, data)
+
+        case TypeRef(name) =>
+          val lookup = firstCtx(name).flatMap { ctx1 =>
+            implied for Context = ctx1
+            getType(name)
+          }
+          lookup.fold[Type, Checked[Unit]]
+            { _   =>
+              if names.contains(name) then ()
+              else Err.unresolvedVariable(ctor, data, name)
+            }
+            { _ => () }
+        case _ => ()
+      }
+    }
+    assertThere.map { _ =>
+      tpe.mapTypeRefs { name =>
+        val lookup = firstCtx(name).flatMap { ctx1 =>
+          implied for Context = ctx1
+          getType(name)
+        }
+        lookup.fold
+          { _   =>
+            if names.contains(name) then
+              Variable(name)
+            else
+              TypeRef(name)
+          }
+          { tpe =>
+            if isDefined(tpe) then TypeRef(name)
+            else Variable(name)
+          }
+      }
+    }
+  }
+
   private def unifyFunctionTypes(tpe1: Type, tpe2: Type) = (tpe1, tpe2) match {
     case (_: FunctionType, _: FunctionType) => true
     case _                                  => false
@@ -684,6 +725,51 @@ object Typers {
     } yield PackageDef(pid1, stats1)(pid1.tpe)
   }
 
+  private def typedDataDcl(name: Name, args: List[Name], ctors: List[Tree])
+                          given Context, Mode, Stoup: Checked[Tree] = {
+    val tpe = AppliedType(TypeRef(name), args.map(Variable(_)))
+    putType(name -> tpe)
+    for {
+      ctors1 <- typeAsCtors(ctors)(name, args, tpe)
+    } yield DataDcl(name, args, ctors1)(tpe)
+  }
+
+  private def typedInfixDataDcl(name: Name, left: Name, right: Name, ctors: List[Tree])
+                               given Context, Mode, Stoup: Checked[Tree] = {
+    val tpe = InfixAppliedType(TypeRef(name), Variable(left), Variable(right))
+    putType(name -> tpe)
+    for {
+      ctors1 <- typeAsCtors(ctors)(name, left :: right :: Nil, tpe)
+    } yield InfixDataDcl(name, left, right, ctors1)(tpe)
+  }
+
+  private def typeAsCtors(ctors: List[Tree])
+                         (dataType: Name, tpeVars: List[Name], ret: Type)
+                         given Context, Mode, Stoup: Checked[List[Tree]] = {
+    ctors.mapE {
+      case CtorSig(name, args) => typedCtor(name, args)(dataType, tpeVars, ret)
+      case unknown             => Err.notCtorSig(unknown)
+    }
+  }
+
+  private def typedCtor(constructor: Name, args: List[Tree])
+                       (dataType: Name, tpeVars: List[Name], ret: Type)
+                       given Context, Mode, Stoup: Checked[Tree] = {
+    for {
+      args1 <- args.mapE(_.typedAsTyping(any))
+      args2 <- args1.mapE(a => resolveVariablesFrom(constructor, dataType, tpeVars)(a.tpe))
+      cTpe = toFunctionType(args2 :+ ret)
+      pair <- typeAsDestructor(cTpe, ret)
+      (fTpeArgs, tpe1) = pair
+      cTpe1 = toFunctionType(fTpeArgs :+ tpe1)
+      args2 <- checked(args1.zip(fTpeArgs).map(_.withTpe(_)))
+    } yield {
+      putType(constructor -> cTpe1)
+      linkPrimitive(constructor, cTpe1)
+      CtorSig(constructor, args2)(cTpe1)
+    }
+  }
+
   private def typedDefDef(modifiers: Set[Modifier], sig: Tree & Unique, tpeD: Tree, body: Tree)
                          (pt: Type)
                          given Context, Mode, Stoup: Checked[Tree] = {
@@ -788,10 +874,7 @@ object Typers {
       }
     }
     val tpe = {
-      lookup.fold(_ => TypeRef(name)) { tpe =>
-        if isDefined(tpe) then tpe
-        else TypeRef(name)
-      }
+      lookup.fold(_ => TypeRef(name))(identity)
     }
     Ident(name)(id, tpe)
   }
@@ -1087,6 +1170,8 @@ object Typers {
       case PackageDef(t,ts)         if isTerm     => typedPackageDef(t,ts)(pt)
       case Apply(t,ts)              if isTerm     => typedApplyTerm(t,ts)(pt)
       case Eval(t,c)                if isTerm     => typedEvalTerm(t,c)(pt)
+      case DataDcl(n,a,c)           if isTerm     => typedDataDcl(n,a,c)
+      case InfixDataDcl(n,l,r,c)    if isTerm     => typedInfixDataDcl(n,l,r,c)
       case DefDef(                  // DefDef
         m,                          // DefDef
         s: (DefSig | LinearSig),    // DefDef

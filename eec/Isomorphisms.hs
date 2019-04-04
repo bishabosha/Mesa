@@ -1,10 +1,12 @@
 package eec.report.example
 
-primitive Left  l     : L -> Either L R
-primitive Right r     : R -> Either L R
-primitive absurd [v]  : Void# |- A#
-primitive InL [l]     : L# |- L# +: R#
-primitive InR [r]     : R# |- L# +: R#
+primitive absurd [v] : Void# |- A#
+primitive InL [l]    : L# |- L# +: R#
+primitive InR [r]    : R# |- L# +: R#
+
+data L |: R =
+    Left L
+  | Right R
 
 fstL [p] : (A#, B#) |- A# =
   case [p] of (a, _) |- a
@@ -123,13 +125,13 @@ isomorphism_13a [t] : !Void |- Void# =
 isomorphism_13b : Void# |- !Void =
   absurd
 
-isomorphism_14a [t] : !(Either A B) |- !A +: !B =
+isomorphism_14a [t] : !(A |: B) |- !A +: !B =
   let !e = t in
   case e of
     Left a  => InL [!a];
     Right b => InR [!b];
 
-isomorphism_14b [e] : !A +: !B |- !(Either A B) =
+isomorphism_14b [e] : !A +: !B |- !(A |: B) =
   case [e] of
     InL [t] |-
       let !a = t in
@@ -145,13 +147,13 @@ isomorphism_15a [t] : !Void *: A# |- Void# =
 isomorphism_15b : Void# |- !Void *: A# =
   absurd
 
-isomorphism_16a [t] : !(Either A B) *: C# |- (!A *: C#) +: (!B *: C#) =
+isomorphism_16a [t] : !(A |: B) *: C# |- (!A *: C#) +: (!B *: C#) =
   let !e *: c = t in
   case e of
     Left a  => InL [!a *: c];
     Right b => InR [!b *: c];
 
-isomorphism_16b [e] : (!A *: C#) +: (!B *: C#) |- !(Either A B) *: C# =
+isomorphism_16b [e] : (!A *: C#) +: (!B *: C#) |- !(A |: B) *: C# =
   case [e] of
     InL [t] |-
       let !a *: c = t in
