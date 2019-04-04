@@ -1058,7 +1058,7 @@ object Typers {
               dummyBoolean :: selTpes :: selTpess
             )
 
-          case _ => constructorEligableName(selTpe) match {
+          case _ => dataDefinitionName(selTpe) match {
 
             case EmptyName =>
               val prog :: progRest = progs

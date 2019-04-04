@@ -135,13 +135,17 @@ object Trees {
 
     implied uniqName for (Tree |> Name) {
       def apply(tree: Tree) = tree match {
-        case DefSig(name, _)        => name
-        case LinearSig(name, _, _)  => name
-        case DefDef(_, sig, _, _)   => apply(sig)
-        case Tagged(name, _)        => name
-        case Bind(name, _)          => name
-        case Ident(name)            => name
-        case _                      => EmptyName
+        case DefSig(name, _)              => name
+        case LinearSig(name, _, _)        => name
+        case DefDef(_, sig, _, _)         => apply(sig)
+        case Tagged(name, _)              => name
+        case Bind(name, _)                => name
+        case Ident(name)                  => name
+        case DataDcl(name, _, _)          => name
+        case InfixDataDcl(name, _, _, _)  => name
+        case CtorSig(name, _)             => name
+        case LinearCtorSig(name, _)       => name
+        case _                            => EmptyName
       }
     }
 
@@ -179,35 +183,37 @@ object Trees {
     }
 
     def (tree: Tree) withTpe(tpe: Type): Tree = tree match {
-      case tree: Select => tree.copy()(tree.id, tpe)
-      case tree: Ident => tree.copy()(tree.id, tpe)
-      case tree: PackageDef => tree.copy()(tpe)
-      case tree: DataDcl => tree.copy()(tpe)
-      case tree: CtorSig => tree.copy()(tpe)
-      case tree: DefDef => tree.copy()(tpe)
-      case tree: DefSig => tree.copy()(tree.id, tpe)
-      case tree: LinearSig => tree.copy()(tree.id, tpe)
-      case tree: Apply => tree.copy()(tpe)
-      case tree: InfixApply => tree.copy()(tpe)
-      case tree: Eval => tree.copy()(tpe)
-      case tree: Bang => tree.copy()(tpe)
-      case tree: Tensor => tree.copy()(tpe)
-      case tree: Function => tree.copy()(tree.id, tpe)
-      case tree: LinearFunction => tree.copy()(tree.id, tpe)
-      case tree: Let => tree.copy()(tree.id, tpe)
-      case tree: LetTensor => tree.copy()(tree.id, tpe)
-      case tree: Literal => tree.copy()(tpe)
-      case tree: CaseExpr => tree.copy()(tpe)
-      case tree: CaseClause => tree.copy()(tree.id, tpe)
-      case tree: LinearCaseExpr => tree.copy()(tpe)
+      case tree: Select           => tree.copy()(tree.id, tpe)
+      case tree: Ident            => tree.copy()(tree.id, tpe)
+      case tree: PackageDef       => tree.copy()(tpe)
+      case tree: DataDcl          => tree.copy()(tpe)
+      case tree: InfixDataDcl     => tree.copy()(tpe)
+      case tree: CtorSig          => tree.copy()(tpe)
+      case tree: LinearCtorSig    => tree.copy()(tpe)
+      case tree: DefDef           => tree.copy()(tpe)
+      case tree: DefSig           => tree.copy()(tree.id, tpe)
+      case tree: LinearSig        => tree.copy()(tree.id, tpe)
+      case tree: Apply            => tree.copy()(tpe)
+      case tree: InfixApply       => tree.copy()(tpe)
+      case tree: Eval             => tree.copy()(tpe)
+      case tree: WhyNot           => tree.copy()(tpe)
+      case tree: Bang             => tree.copy()(tpe)
+      case tree: Tensor           => tree.copy()(tpe)
+      case tree: Function         => tree.copy()(tree.id, tpe)
+      case tree: LinearFunction   => tree.copy()(tree.id, tpe)
+      case tree: Let              => tree.copy()(tree.id, tpe)
+      case tree: LetTensor        => tree.copy()(tree.id, tpe)
+      case tree: Literal          => tree.copy()(tpe)
+      case tree: CaseExpr         => tree.copy()(tpe)
+      case tree: CaseClause       => tree.copy()(tree.id, tpe)
+      case tree: LinearCaseExpr   => tree.copy()(tpe)
       case tree: LinearCaseClause => tree.copy()(tree.id, tpe)
-      case tree: Alternative => tree.copy()(tpe)
-      case tree: Parens => tree.copy()(tpe)
-      case tree: Bind => tree.copy()(tpe)
-      case tree: Unapply => tree.copy()(tpe)
-      case tree: Tagged => tree.copy()(tpe)
-
-      case _ => tree
+      case tree: Alternative      => tree.copy()(tpe)
+      case tree: Parens           => tree.copy()(tpe)
+      case tree: Bind             => tree.copy()(tpe)
+      case tree: Unapply          => tree.copy()(tpe)
+      case tree: Tagged           => tree.copy()(tpe)
+      case _:TreeSeq | EmptyTree  => tree
     }
   }
 }
