@@ -3,9 +3,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0-RC1] - 2019-04-4
+### Added
+- Type checking that ensures all possible cases in a match expression or
+  linear match expression are provided.
+- `data` definitions have been added that allow the user to define non-recursive
+  sum types that may be used in match expressions and linear match expressions.
+- `DataTypes.hs` demo file added.
+
+### Changed
+- Updated `Isomorphisms.hs` with new data definitions, replacing `Either A B`
+  for `L :| R`, a new data type, and providing an implementation of `+:`.
+
+### Removed
+- `Either` and `+:` have been removed from the compiler's bootstrapped types.
+  The user may now define these data types themselves and enjoy the same
+  semantics.
+
 ## [0.1.2-RC1] - 2019-04-1
 ### Added
-- Stricter semantics for type checking of linear lambdas, variables, constants and `!` terms in linear contexts.
+- Stricter semantics for type checking of linear lambdas, variables,
+  constants and `!` terms in linear contexts.
 - Addition of `?` a.k.a "why not", to summon `A` from `Void` in linear contexts.
 
 ### Changed
@@ -28,6 +46,7 @@ All notable changes to this project will be documented in this file.
   - Source files use `.hs` suffix at present to benefit from syntax highlighting.
   - Refer to [eec/src/main/antlr4/EEC.g4](eec/src/main/antlr4/EEC.g4) for a context free grammar.
 
-[Unreleased]: https://github.com/bishabosha/EEC/compare/0.1-RC1...HEAD
+[Unreleased]: https://github.com/bishabosha/EEC/compare/0.2.0-RC1...HEAD
+[0.2.0-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.0-RC1
 [0.1.2-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.1.2-RC1
 [0.1-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.1-RC1
