@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Updated `Isomorphisms.hs` with new data definitions, replacing `Either A B`
-  for `L :| R`, a new data type, and providing an implementation of `+:`.
+  for `L |: R`, a new data type, and providing an implementation of `+:`.
 
 ### Removed
 - `Either` and `+:` have been removed from the compiler's bootstrapped types.
