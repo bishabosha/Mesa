@@ -51,14 +51,11 @@ expr:
 	| caseExpr
 	| linearCaseExpr
 	| expr1
-	| expr expr
-	| expr eval;
-
-eval: '[' expr ']';
+	| expr expr;
 
 lambda: '\\' bindings '=>' expr;
 
-linearLambda: '|' '(' binding ')' '|-' expr;
+linearLambda: '\\' '(' binding ')' '|-' expr;
 
 letExpr: 'let' '!' (Varid | Wildcard) '=' expr 'in' expr;
 
@@ -67,7 +64,7 @@ letTensorExpr:
 
 caseExpr: 'case' expr 'of' cases;
 
-linearCaseExpr: 'case' '[' expr ']' 'of' linearCases;
+linearCaseExpr: 'case' expr 'of' linearCases;
 
 expr1
    : 'if' expr 'then' expr 'else' expr
@@ -89,6 +86,7 @@ simpleExpr
    | stableId
 //   | simpleExpr1 '.' Id  // nice for records
    | exprsInParens
+	 | simpleExpr '[' expr ']'
    ;
 
 cases: caseClause (Sep? caseClause)*;
