@@ -10,8 +10,8 @@ data L |: R =
   | Right R
 
 data L# +: R# =
-    InL [L#]
-  | InR [R#]
+    InL[L#]
+  | InR[R#]
 
 data Maybe e =
     Just e

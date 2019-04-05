@@ -7,8 +7,8 @@ val preludeDefs = List(
       | Right R """,
 
   """ data L# +: R# =
-        InL [L#]
-      | InR [R#] """,
+        InL[L#]
+      | InR[R#] """,
 
   """ primitive absurd [v] : Void# |- A# """,
 )

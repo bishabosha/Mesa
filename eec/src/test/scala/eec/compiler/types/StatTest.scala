@@ -21,11 +21,11 @@ class StatTest {
   @Test def typecheckLinearSig() = typecheck(
     "A -> (R# |- L# +: R#)"
     -|: """ InRproxy _ [r] : A -> (R# |- L# +: R#) =
-              InR [r] """,
+              InR[r] """,
 
     "L# +: ()"
     -|: """ foo : L# +: () =
-              InRproxy 0 [()] """,
+              (InRproxy 0)[()] """,
 
     "() -> (() |- ())"
     -|: """ primitive ok _ [_] : () -> (() |- ()) """,
@@ -73,10 +73,10 @@ class StatTest {
    */
   @Test def noDuplicateState() = someNoType(
     """ fst [p]: (A#, B#) |- A# =
-          case [p] of (a, _) |- a """, // ok
+          case p of (a, _) |- a """, // ok
 
     """ snd [p]: (A#, B#) |- B# =
-          case [p] of (_, b) |- b """, // ok
+          case p of (_, b) |- b """, // ok
 
     """ linearEval [pair]: (!A, !A) |- () =
           let !_ = fst [pair] in
@@ -86,10 +86,10 @@ class StatTest {
 
   @Test def projectTuplesLinear() = typecheck(
     "(A#, B#) |- A#"       -|:  """ fst[pair] : (A#, B#) |- A# =
-                                      case [pair] of (a, _) |- a """,
+                                      case pair of (a, _) |- a """,
 
     "(A#, B#) |- B#"       -|:  """ snd[pair] : (A#, B#) |- B# =
-                                      case [pair] of (_, b) |- b """,
+                                      case pair of (_, b) |- b """,
 
     "(A#, B#) |- (A#, B#)" -|:  """ linearEval[pair] : (A#, B#) |- (A#, B#) =
                                       (fst[pair], snd[pair]) """
@@ -130,14 +130,14 @@ class StatTest {
 
   @Test def linearNonDuplication() = typecheck(
     "A# |- ()" -|:  """ safeDuplication [a] : A# |- () =
-                          case [(a, a)] of
+                          case (a, a) of
                             (q, _) |- ()
                             (_, r) |- () """
   )
 
   @Test def typecheckLinearLambdaEval() = typecheck(
     "Void# |- A#" -|: """ absurdProxy: Void# |- A# =
-                            | (v: Void#) |- absurd[v] """,
+                            \(v: Void#) |- absurd[v] """,
   )
 
   @Test def typecheckLambdaApply() = typecheck(
@@ -183,26 +183,26 @@ class StatTest {
   @Test def typecheckLinearMatchEitherArbitraryDepth() = typecheck(
     "(w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> ((w# +: x#) +: y# +: z# |- !u)"
     -|: """ cat4_alt0 wu xu yu zu [e] : (w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> ((w# +: x#) +: y# +: z# |- !u) =
-              case [e] of
-                InL [InL [a]] |- wu [a]
-                InL [InR [b]] |- xu [b]
-                InR [InL [c]] |- yu [c]
-                InR [InR [d]] |- zu [d] """,
+              case e of
+                InL[ InL[ a]] |- wu[a]
+                InL[ InR[ b]] |- xu[b]
+                InR[ InL[ c]] |- yu[c]
+                InR[ InR[ d]] |- zu[d] """,
 
     "(w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (((w# +: x#) +: y#) +: z# |- !u)"
     -|: """ cat4_alt1 wu xu yu zu [e]: (w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (((w# +: x#) +: y#) +: z# |- !u) =
-              case [e] of
-                InL [InL [InL [a]]] |- wu [a]
-                InL [InL [InR [b]]] |- xu [b]
-                InL [InR [c]]       |- yu [c]
-                InR [d]             |- zu [d] """,
+              case e of
+                InL[ InL[ InL[ a]]] |- wu[a]
+                InL[ InL[ InR[ b]]] |- xu[b]
+                InL[ InR[ c]]       |- yu[c]
+                InR[ d]             |- zu[d] """,
 
     "(w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (w# +: x# +: y# +: z# |- !u)"
     -|: """ cat4_alt2 wu xu yu zu [e]: (w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (w# +: x# +: y# +: z# |- !u) =
-              case [e] of
-                InL [a]             |- wu [a]
-                InR [InL [b]]       |- xu [b]
-                InR [InR [InL [c]]] |- yu [c]
-                InR [InR [InR [d]]] |- zu [d] """
+              case e of
+                InL[ a]             |- wu[a]
+                InR[ InL[ b]]       |- xu[b]
+                InR[ InR[ InL[ c]]] |- yu[c]
+                InR[ InR[ InR[ d]]] |- zu[d] """
   )
 }

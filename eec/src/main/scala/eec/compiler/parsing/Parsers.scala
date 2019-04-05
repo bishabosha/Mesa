@@ -330,19 +330,8 @@ object Parsers {
       fromLinearCaseExpr(context.linearCaseExpr)
     else if defined(context.expr1) then
       fromExpr1(context.expr1)
-    else if defined(context.eval) then
-      fromEval(context.expr(0), context.eval)
     else
       fromExprSeqAsApply(context.expr)
-  }
-
-  private def fromEval(exprContext: ExprContext, evalContext: EvalContext)
-                      given IdGen: Checked[Tree] = {
-    import CompilerErrorOps._
-    for
-      expr <- fromExpr(exprContext)
-      eval <- fromExpr(evalContext.expr)
-    yield Eval(expr, eval)(uTpe)
   }
 
   private def fromExprSeqAsApply(exprs: java.util.List[ExprContext])
@@ -500,8 +489,19 @@ object Parsers {
       fromLiteral(context.literal)
     else if defined(context.stableId) then
       fromStableId(context.stableId)
-    else
+    else if defined(context.exprsInParens) then
       fromExprsInParens(context.exprsInParens)
+    else
+      fromEval(context)
+  }
+
+  private def fromEval(context: SimpleExprContext)
+                      given IdGen: Checked[Tree] = {
+    import CompilerErrorOps._
+    for
+      expr <- fromSimpleExpr(context.simpleExpr)
+      eval <- fromExpr(context.expr)
+    yield Eval(expr, eval)(uTpe)
   }
 
   private def fromCases(context: CasesContext)

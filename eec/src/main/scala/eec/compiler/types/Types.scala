@@ -302,7 +302,7 @@ object Types {
             |    (   EmptyType,            EmptyType          )
             |    (   Untyped,              Untyped            ) => true
 
-            case (InfixAppliedType(_,_,_), InfixAppliedType(_,_,_)) =>
+            case (_: InfixAppliedType,  _: InfixAppliedType) =>
               inner(z, argRest, appsRest)
 
             case _ => false
@@ -320,7 +320,7 @@ object Types {
 
     def isBootstrapped(name: Name) = bootstrapped.view.map(_._1).contains(name)
 
-    def constructorEligableName(tpe: Type): Name = {
+    def dataDefinitionName(tpe: Type): Name = {
       tpe match {
         case AppliedType(name, _) if !isBootstrapped(name)         => name
         case InfixAppliedType(name, _, _) if !isBootstrapped(name) => name

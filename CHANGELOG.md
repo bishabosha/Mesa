@@ -3,6 +3,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.2-RC1] - 2019-04-5
+### Changed
+- Changed linear evaluation from a root expression to a simple expression.
+- Changed linear case expressions to differ from regular case expressions only
+  by the arrow.
+- Changed linear lambda expressions to differ from regular lambda expressions
+  only by the arrow.
+- Updated tests and example files to new syntax.
+
 ## [0.2.1-RC1] - 2019-04-4
 ### Added
 - Separation of scopes for data definitions and normal terms, leading to more
@@ -52,7 +61,8 @@ All notable changes to this project will be documented in this file.
   - Source files use `.hs` suffix at present to benefit from syntax highlighting.
   - Refer to [eec/src/main/antlr4/EEC.g4](eec/src/main/antlr4/EEC.g4) for a context free grammar.
 
-[Unreleased]: https://github.com/bishabosha/EEC/compare/0.2.1-RC1...HEAD
+[Unreleased]: https://github.com/bishabosha/EEC/compare/0.2.2-RC1...HEAD
+[0.2.2-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.2-RC1
 [0.2.1-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.1-RC1
 [0.2.0-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.0-RC1
 [0.1.2-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.1.2-RC1
