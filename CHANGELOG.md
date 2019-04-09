@@ -3,6 +3,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.3-RC1] - 2019-04-9
+### Added
+- Allow the use of patterns inside both `let` term forms, with the same
+  semantics as a singular case clause.
+
+### Changed
+- Update [eec/Isomorphisms.hs](eec/Isomorphisms.hs) with more idiomatic terms
+  using the new syntax.
+
 ## [0.2.2-RC1] - 2019-04-5
 ### Changed
 - Changed linear evaluation from a root expression to a simple expression.
@@ -27,8 +36,9 @@ All notable changes to this project will be documented in this file.
 - `DataTypes.hs` demo file added.
 
 ### Changed
-- Updated `Isomorphisms.hs` with new data definitions, replacing `Either A B`
-  for `L |: R`, a new data type, and providing an implementation of `+:`.
+- Updated [eec/Isomorphisms.hs](eec/Isomorphisms.hs) with new data definitions,
+  replacing `Either A B` for `L |: R`, a new data type, and providing an
+  implementation of `+:`.
 
 ### Removed
 - `Either` and `+:` have been removed from the compiler's bootstrapped types.
@@ -55,13 +65,16 @@ All notable changes to this project will be documented in this file.
   - Print the current environment of terms and types.
 
 * Linear types that enforce the *linear usage of effects*.
-  - Proof of isomorphisms in Proposition 4.1. of Egger, Ejlers and Simpson (2014) can be found in [eec/Isomorphisms.hs](eec/Isomorphisms.hs).
+  - Proof of isomorphisms in Proposition 4.1. of
+    Egger, Ejlers and Simpson (2014) can be found in
+    [eec/Isomorphisms.hs](eec/Isomorphisms.hs).
 
 * Haskell-like syntax
   - Source files use `.hs` suffix at present to benefit from syntax highlighting.
   - Refer to [eec/src/main/antlr4/EEC.g4](eec/src/main/antlr4/EEC.g4) for a context free grammar.
 
-[Unreleased]: https://github.com/bishabosha/EEC/compare/0.2.2-RC1...HEAD
+[Unreleased]: https://github.com/bishabosha/EEC/compare/0.2.3-RC1...develop
+[0.2.3-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.3-RC1
 [0.2.2-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.2-RC1
 [0.2.1-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.1-RC1
 [0.2.0-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.0-RC1
