@@ -18,8 +18,8 @@ import Name._
 import NameOps._
 import Contexts._
 import IdGen._
-import Constants.{Constant}
-import Constant._
+import Constants._
+import core.Constants.Constant._
 import Modifiers.{Modifier}
 import Modifier._
 import EECParser._
@@ -61,11 +61,11 @@ object Parsers {
     for
       pkgId <- fromPackageInfo(context.packageInfo)
       stats <- checked {
-                if defined(context.statSeq) then
-                  fromStatSeq(context.statSeq)
-                else
-                  EmptyTree
-               }
+        if defined(context.statSeq) then
+          fromStatSeq(context.statSeq)
+        else
+          EmptyTree
+      }
     yield PackageDef(pkgId, stats.convert)(uTpe)
   }
 
@@ -363,34 +363,27 @@ object Parsers {
   private def fromLetExpr(context: LetExprContext)
                          given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    var name = {
-      if defined(context.Varid) then
-        context.Varid.getText.readAs
-      else
-        Name.Wildcard
-    }
-    for exprs <- context.expr.mapE(fromExpr) yield {
+    for
+      patt  <- fromSimplePattern(context.simplePattern)
+      exprs <- context.expr.mapE(fromExpr)
+    yield {
       val value        = exprs.get(0)
       val continuation = exprs.get(1)
-      Let(name, value, continuation)(freshId(), uTpe)
+      Let(patt, value, continuation)(freshId(), uTpe)
     }
   }
 
   private def fromLetTensorExpr(context: LetTensorExprContext)
                                given IdGen: Checked[Tree] = {
-    var varids = context.Varid.map(_.getText.readAs)
-    var x = {
-      if defined(context.Wildcard) then
-        Name.Wildcard
-      else
-        varids(0)
-    }
-    val z = varids.last
     import CompilerErrorOps._
-    for exprs <- context.expr.mapE(fromExpr) yield {
+    for
+      pattX <- fromSimplePattern(context.simplePattern)
+      pattZ <- fromLinearPattern(context.linearPattern)
+      exprs <- context.expr.mapE(fromExpr)
+    yield {
       val value        = exprs.get(0)
       val continuation = exprs.get(1)
-      LetTensor(x, z, value, continuation)(freshId(), uTpe)
+      LetTensor(pattX, pattZ, value, continuation)(freshId(), uTpe)
     }
   }
 
@@ -415,10 +408,8 @@ object Parsers {
   private def fromIfElse(context: Expr1Context) given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
     for exprs <- context.expr.mapE(fromExpr) yield {
-      val patTrue   = Literal(BooleanConstant(true))(uTpe)
-      val patFalse  = Literal(BooleanConstant(false))(uTpe)
-      val caseTrue  = CaseClause(patTrue, EmptyTree, exprs(1))(freshId(), uTpe)
-      val caseFalse = CaseClause(patFalse, EmptyTree, exprs(2))(freshId(), uTpe)
+      val caseTrue  = CaseClause(litTrue, EmptyTree, exprs(1))(freshId(), uTpe)
+      val caseFalse = CaseClause(litFalse, EmptyTree, exprs(2))(freshId(), uTpe)
       val selector  = exprs(0)
       CaseExpr(selector, caseTrue :: caseFalse :: Nil)(uTpe)
     }

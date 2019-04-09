@@ -57,10 +57,10 @@ lambda: '\\' bindings '=>' expr;
 
 linearLambda: '\\' '(' binding ')' '|-' expr;
 
-letExpr: 'let' '!' (Varid | Wildcard) '=' expr 'in' expr;
+letExpr: 'let' '!' simplePattern '=' expr 'in' expr;
 
 letTensorExpr:
-	'let' '!' (Varid | Wildcard) Tensor Varid '=' expr 'in' expr;
+	'let' '!' simplePattern Tensor linearPattern '=' expr 'in' expr;
 
 caseExpr: 'case' expr 'of' cases;
 

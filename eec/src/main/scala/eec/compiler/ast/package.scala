@@ -6,10 +6,12 @@ import types.Types._
 import Type._
 import core.Names.Name._
 import core.Contexts._
+import core.Constants._
 
 object untyped {
-  type Tree       = Trees.Tree
-  val uTpe        = Untyped
+  val uTpe     = Untyped
+  val litTrue  = Literal(constTrue)(uTpe)
+  val litFalse = Literal(constFalse)(uTpe)
 }
 
 object any {

@@ -16,6 +16,7 @@ import Constant._
 import core.Modifiers._
 import ast._
 import ast.Trees._
+import untyped._
 import Tree._
 import TreeOps._
 import error._
@@ -352,6 +353,12 @@ object Typers {
     yield Parens(ts1)(ts1.map(_.tpe).convert)
   }
 
+  def unifyPattern(ctor: Name, ctorTpe: Type, sumTpe: Type): Checked[(Name, List[Type])] =
+    typeAsDestructor(ctorTpe, sumTpe).map(ctor -> _._1)
+
+  def unifyLinearPattern(ctor: Name, ctorTpe: Type, sumTpe: Type): Checked[(Name, List[Type])] =
+    typeAsLinearDestructor(ctorTpe, sumTpe).map(t => ctor -> (t._1 :: Nil))
+
   private def typeAsDestructor(fTpe: Type, pt: Type): Checked[(List[Type], Type)] = {
     toCurriedList(fTpe).reverse match {
       case ret0 :: args0 =>
@@ -440,15 +447,13 @@ object Typers {
     yield Eval(fun1, arg1)(tpe)
   }
 
-  private def unwrapCompApply(tpe: Type)
-                             (x: Name, t: Tree): Checked[Type] = tpe match {
+  private def unwrapCompApply(t: Tree): Checked[Type] = t.tpe match {
     case AppliedType(BangTag, t :: Nil) => t
-    case _                              => Err.noBangLetValue(x, t)
+    case _                              => Err.noBangLetValue(t)
   }
 
-  private def unwrapTensorType(tpe: Type)
-                              (x: Name, z: Name, s: Tree): Checked[(Type, Type)] = {
-    tpe match {
+  private def unwrapTensorType(t: Tree): Checked[(Type, Type)] = {
+    t.tpe match {
       case InfixAppliedType(
         TensorTag,
         AppliedType(BangTag, x :: Nil),
@@ -456,48 +461,69 @@ object Typers {
       ) =>
         (x, z)
 
-      case _ => Err.noTensorLetValue(x, z, s)
+      case _ => Err.noTensorLetValue(t)
     }
   }
 
-  private def typedLet(x: Name, t: Tree, u: Tree)
+  private def singletonPattern(patt: Tree, selTpe: Type)
+                              given Context, Mode, Stoup: Checked[Tree] = {
+    for
+      patt1 <- patt.typedAsPattern(selTpe)
+      _     <- assertExhaustiveSingleton(patt1, selTpe)(unifyPattern)
+    yield patt1: Tree
+  }
+
+  private def singletonLinearPattern(patt: Tree, selTpe: Type)
+                                    given Context, Mode, Stoup: Checked[Tree] = {
+    for
+      patt1 <- patt.typedAsLinearPattern(selTpe)
+      _     <- assertExhaustiveSingleton(patt1, selTpe)(unifyLinearPattern)
+    yield patt1: Tree
+  }
+
+  private def typedLet(patt: Tree, t: Tree, u: Tree)
                       (id: Id, pt: Type)
                       given Context, Mode, Stoup: Checked[Tree] = {
     for
-      lCtx  <-  lookIn(id)
-      t1    <-  t.typed(any)
-      t1U   <-  unwrapCompApply(t1.tpe)(x, t)
-      u1    <-  checked {
+      lCtx  <- lookIn(id)
+      t1    <- t.typed(any)
+      t1U   <- unwrapCompApply(t1)
+      let1  <- checked {
         implied for Context = lCtx
-        implied for Stoup   = Blank
-        putTermType(x -> t1U)
-        u.typed(pt).flatMap { u1 =>
-          if u1.tpe.isComputationType then u1
-          else Err.noCompLetContinuation
-        }
+        for
+          patt1 <- singletonPattern(patt, t1U)
+          u1    <- checked {
+            implied for Stoup = Blank
+            u.typed(pt)
+          }
+          _ <- assertLetCompContinuation(u1)
+        yield Let(patt1, t1, u1)(id, u1.tpe)
       }
-    yield Let(x, t1, u1)(id, u1.tpe)
+    yield let1
   }
 
-  private def typedLetTensor(x: Name, z: Name, s: Tree, t: Tree)
+  private def typedLetTensor(x: Tree, z: Tree, s: Tree, t: Tree)
                             (id: Id, pt: Type)
                             given Context, Mode, Stoup: Checked[Tree] = {
     for
-      lCtx <- lookIn(id)
-      s1   <- s.typed(any)
-      s1U  <- unwrapTensorType(s1.tpe)(x, z, s)
-      t1   <- checked {
+      lCtx   <- lookIn(id)
+      s1     <- s.typed(any)
+      s1U    <- unwrapTensorType(s1)
+      tensor <- checked {
         implied for Context = lCtx
-        implied for Stoup   = DependsOn(z)
-        val (xTpe, zType)   = s1U
-        putTermType(x -> xTpe)
-        putTermType(z -> zType)
-        t.typed(pt).flatMap { t1 =>
-          if t1.tpe.isComputationType then t1
-          else Err.noCompLetContinuation
-        }
+        val (xTpe, zTpe)    = s1U
+        for
+          x1    <- singletonPattern(x, xTpe)
+          z1    <- singletonLinearPattern(z, zTpe)
+          stoup <- typedLinearVariable
+          t1    <- checked {
+            implied for Stoup = DependsOn(stoup)
+            t.typed(pt)
+          }
+          _ <- assertLetCompContinuation(t1)
+        yield LetTensor(x1, z, s1, t1)(id, t1.tpe)
       }
-    yield LetTensor(x, z, s1, t1)(id, t1.tpe)
+    yield tensor
   }
 
   private def typeAsCaseClauses given Context, Mode, Stoup:
@@ -558,10 +584,7 @@ object Typers {
         implied for Stoup = Blank
         selector.typed(any)
       }
-      cases1 <- typeAsCaseClauses(cases, selector1.tpe)(pt) {
-        (name, tpe, selTpe) =>
-          typeAsDestructor(tpe, selTpe).map(name -> _._1)
-      }
+      cases1 <- typeAsCaseClauses(cases, selector1.tpe)(pt)(unifyPattern)
       tpe <- cases1.sameType(pt)
     yield CaseExpr(selector1, cases1)(tpe)
   }
@@ -584,10 +607,8 @@ object Typers {
                                  given Context, Mode, Stoup: Checked[Tree] = {
     for
       selector1 <- selector.typed(any)
-      cases1    <- typeAsLinearCaseClauses(cases, selector1.tpe)(pt) {
-        (name, tpe, selTpe) =>
-          typeAsLinearDestructor(tpe, selTpe).map(t => name -> (t._1 :: Nil))
-      }
+      cases1    <- typeAsLinearCaseClauses(cases, selector1.tpe)(pt)(
+                      unifyLinearPattern)
       tpe <- cases1.sameType(pt)
     yield LinearCaseExpr(selector1, cases1)(tpe)
   }
@@ -599,7 +620,7 @@ object Typers {
       implied for Context = ccCtx
       for
         pat1    <- pat.typedAsLinearPattern(selTpe)
-        stoup   <- uniqueLinearVariable
+        stoup   <- typedLinearVariable
         body1   <- checked {
           implied for Stoup = DependsOn(stoup)
           body.typedAsExpr(pt)
@@ -933,18 +954,39 @@ object Typers {
     case _                 => err(name)
   }
 
-  def assertIsLinear(name: Name, tpe: Type) given Context: Checked[Unit] = {
+  private def assertIsLinear(name: Name, tpe: Type) given Context: Checked[Unit] = {
     if tpe.isValueType && isLinear(name) then
       Err.illegalStoupEntry(name, tpe)
     else
       ()
   }
 
-  def assertNoneRemain(templates: List[Tree]): Checked[Unit] = {
+  private def assertNoneRemain(templates: List[Tree]): Checked[Unit] = {
     if templates.nonEmpty then
       Err.nonExhaustivePatterns(templates)
     else
       ()
+  }
+
+  private def assertLetCompContinuation(cont1: Tree): Checked[Unit] = {
+    if cont1.tpe.isComputationType then ()
+    else Err.noCompLetContinuation
+  }
+
+  private def assertExhaustiveSingleton(
+       patt1: Tree, selTpe: Type)
+      (unify: (ctor: Name, ctorTpe: Type, sumTpe: Type)
+                => Checked[(Name, List[Type])])
+      given Context: Checked[Unit] = patt1 match {
+    case _: Ident => ()
+
+    case _ =>
+      for
+        templates <- getTemplates(selTpe)(unify)
+        remaining <- checked(
+                      templates.filterNot(unifiesWithTemplate(patt1)))
+        _         <- assertNoneRemain(remaining)
+      yield ()
   }
 
   def unifiesWithTemplate(pattern: Tree)(template: Tree): Boolean = {
@@ -1045,10 +1087,10 @@ object Typers {
           case BaseType(BooleanTag) =>
             val prog :: progRest = progs
             val forTrue: StatT = { stack =>
-              Literal(BooleanConstant(true))(Untyped) :: stack
+              litTrue :: stack
             }
             val forFalse: StatT = { stack =>
-              Literal(BooleanConstant(false))(Untyped) :: stack
+              litFalse :: stack
             }
             val progs1 = (forFalse :: prog) :: (forTrue :: prog) :: progRest
             val dummyBoolean = (TypeRef(Wildcard) :: Nil)
@@ -1150,7 +1192,7 @@ object Typers {
         b)                          if isTerm     => typedDefDef(m,s,t,b)(pt)
       case u @ DefSig(n,ns)         if isTerm     => typedDefSig(n,ns)(u.id, pt)
       case u @ LinearSig(n,ns,l)    if isTerm     => typedLinearSig(n,ns,l)(u.id, pt)
-      case u @ Let(n,v,c)           if isTerm     => typedLet(n,v,c)(u.id, pt)
+      case u @ Let(p,v,c)           if isTerm     => typedLet(p,v,c)(u.id, pt)
       case u @ LetTensor(x,z,v,t)   if isTerm     => typedLetTensor(x,z,v,t)(u.id, pt)
       case u @ Function(ts,t)       if isTerm     => typedFunctionTerm(ts,t)(u.id, pt)
       case u @ LinearFunction(a,b)  if isTerm     => typedLinearFunctionTerm(a,b)(u.id, pt)

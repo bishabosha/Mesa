@@ -119,7 +119,7 @@ object Namers {
     yield ()
   }
 
-  def namedLet(letName: Name, value: Tree, continuation: Tree)
+  def namedLet(patt: Tree, value: Tree, continuation: Tree)
               (id: Id)
               given Context, Mode: Checked[Unit] = {
     for
@@ -127,14 +127,14 @@ object Namers {
       _ <- enterScope(id, anon).flatMap { ctx1 =>
         implied for Context = ctx1
         for
-          _ <- enterVariable(letName)
+          _ <- indexAsPattern(patt)
           _ <- index(continuation)
         yield ()
       }
     yield ()
   }
 
-  def namedLetTensor(x: Name, z: Name, s: Tree, t: Tree)
+  def namedLetTensor(x: Tree, z: Tree, s: Tree, t: Tree)
                     (id: Id)
                     given Context, Mode: Checked[Unit] = {
     for
@@ -142,8 +142,8 @@ object Namers {
       _ <- enterScope(id, anon).flatMap { ctx1 =>
         implied for Context = ctx1
         for
-          _ <- enterVariable(x)
-          _ <- enterLinear(z)
+          _ <- indexAsPattern(x)
+          _ <- indexAsLinearPattern(z)
           _ <- index(t)
         yield ()
       }
@@ -248,7 +248,7 @@ object Namers {
       s: (DefSig | LinearSig),    // DefDef
       t,                          // DefDef
       b)                          if isTerm     => namedDefDef(m,s)(t,b)
-    case u @ Let(n,v,c)           if isTerm     => namedLet(n,v,c)(u.id)
+    case u @ Let(p,v,c)           if isTerm     => namedLet(p,v,c)(u.id)
     case u @ LetTensor(x,z,s,t)   if isTerm     => namedLetTensor(x,z,s,t)(u.id)
     case u @ Function(ts,t)       if isTerm     => namedFunctionTerm(ts,t)(u.id)
     case u @ LinearFunction(a,b)  if isTerm     => namedLinearFunctionTerm(a,b)(u.id)

@@ -258,17 +258,13 @@ object Contexts {
          .isDefined
     }
 
-    def uniqueLinearVariable given Context: Checked[Name] = {
-      if termScopeContainsNames then {
-        CompilerError.UnexpectedType(s"Context contains non linear variables.")
+    def typedLinearVariable given Context: Checked[Name] = {
+      val linearScope = ctx.linearScope
+      if linearScope.flatMap(ctx.termTypeTable.get).isEmpty then {
+        CompilerError.UnexpectedType(
+          "Context does not contain a typed linear variable")
       } else {
-        val linearScope = ctx.linearScope
-        if linearScope.flatMap(ctx.termTypeTable.get).isEmpty then {
-          CompilerError.UnexpectedType(
-            "Context does not contain a typed linear variable")
-        } else {
-          linearScope.get
-        }
+        linearScope.get
       }
     }
 
