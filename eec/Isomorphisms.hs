@@ -77,11 +77,11 @@ isomorphism_7b p [e] : (A# |- C#, B# |- C#) -> (A# +: B# |- C#) =
 isomorphism_8a [w] : !A *: !B |- !(A, B) =
   let !x *: z = w in
   let !y      = z in
-  !(x,y)
+  !(x, y)
 
 isomorphism_8b [w] : !(A, B) |- !A *: !B =
-  let !z = w in
-  !(fst z) *: !(snd z)
+  let !(a, b) = w in
+  !a *: !b
 
 isomorphism_9a [t] : !A *: Void# |- Void# =
   let !_ *: v = t in
@@ -112,13 +112,13 @@ isomorphism_11b [a] : A# |- !() *: A# =
   !() *: a
 
 isomorphism_12a [v] : !(A, B) *: C# |- !A *: !B *: C# =
-  let !p *: z = v in
-  !(fst p) *: !(snd p) *: z
+  let !(a, b) *: z = v in
+  !a *: !b *: z
 
 isomorphism_12b [v] : !A *: !B *: C# |- !(A, B) *: C# =
   let !x *: w = v in
   let !y *: z = w in
-  !(x,y) *: z
+  !(x, y) *: z
 
 isomorphism_13a [t] : !Void |- Void# =
   let !v = t in
@@ -130,7 +130,7 @@ isomorphism_13b : Void# |- !Void =
 isomorphism_14a [t] : !(A |: B) |- !A +: !B =
   let !e = t in
   case e of
-    Left a  => InL[!a];
+    Left  a => InL[!a];
     Right b => InR[!b];
 
 isomorphism_14b [e] : !A +: !B |- !(A |: B) =

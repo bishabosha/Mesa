@@ -33,8 +33,8 @@ object Printing {
       case Tensor(value: Ast, computation: Ast)
       case Function(args: List[Ast], body: Ast)
       case LinearFunction(arg: Ast, body: Ast)
-      case Let(x: Name, value: Ast, continuation: Ast)
-      case LetTensor(x: Name, z: Name, s: Ast, t: Ast)
+      case Let(patt: Ast, value: Ast, continuation: Ast)
+      case LetTensor(x: Ast, z: Ast, s: Ast, t: Ast)
       case Literal(constant: Constant)
       case CaseExpr(selector: Ast, cases: List[Ast])
       case CaseClause(pat: Ast, guard: Ast, body: Ast)
@@ -92,11 +92,11 @@ object Printing {
         case Tree.LinearFunction(arg, body) =>
           LinearFunction(toAst(arg), toAst(body))
 
-        case Tree.Let(name, value, continuation) =>
-          Let(name, toAst(value), toAst(continuation))
+        case Tree.Let(patt, value, continuation) =>
+          Let(toAst(patt), toAst(value), toAst(continuation))
 
         case Tree.LetTensor(x, z, s, t) =>
-          LetTensor(x, z, toAst(s), toAst(t))
+          LetTensor(toAst(x), toAst(z), toAst(s), toAst(t))
 
         case Tree.Literal(constant) => Literal(constant)
 

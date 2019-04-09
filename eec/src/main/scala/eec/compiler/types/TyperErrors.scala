@@ -143,13 +143,13 @@ object TyperErrors {
     CompilerError.UnexpectedType(
       "Let body does not have computation type.")
 
-  def noTensorLetValue(x: Name, z: Name, value: Tree) =
+  def noTensorLetValue(value: Tree) =
     CompilerError.UnexpectedType(
-      s"Can not infer type of `!${x.show} *: ${x.show} = ${value.show}` as of !_ *: _ type.")
+      s"Can not infer type of `${value.show}` as of *: type.")
 
-  def noBangLetValue(name: Name, value: Tree) =
+  def noBangLetValue(value: Tree) =
     CompilerError.UnexpectedType(
-      s"Can not infer type of `!${name.show} = ${value.show}` as of ! type.")
+      s"Can not infer type of `${value.show}` as of ! type.")
 
   def notCaseClase(unknown: Tree) =
     CompilerError.IllegalState(

@@ -1,6 +1,8 @@
 package eec.compiler.core
 
 object Constants {
+  import Constant._
+
   enum Constant derives Eql {
     case StringConstant(str: String)
     case CharConstant(chr: Char)
@@ -12,4 +14,7 @@ object Constants {
     case BigDecConstant(bd: BigDecimal)
     case BooleanConstant(z: Boolean)
   }
+
+  val constTrue  = BooleanConstant(true)
+  val constFalse = BooleanConstant(false)
 }
