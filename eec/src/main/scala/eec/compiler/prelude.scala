@@ -10,5 +10,5 @@ val preludeDefs = List(
         InL[L#]
       | InR[R#] """,
 
-  """ primitive absurd [v] : Void# |- A# """,
+  """ primitive absurd [v] : Void# -○ A# """,
 )

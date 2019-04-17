@@ -24,13 +24,13 @@ maybeZero x : Integer -> Maybe Integer =
     0 => Just 0;
     _ => Nothing;
 
-tripleToEither t: Triple X Y Z -> X |: Y |: Z =
+tripleToEither t : Triple X Y Z -> X |: Y |: Z =
   case t of
     InX x => Left x;
     InY y => Right (Left y);
     InZ z => Right (Right z);
 
-eitherToTriple e: X |: Y |: Z -> Triple X Y Z =
+eitherToTriple e : X |: Y |: Z -> Triple X Y Z =
   case e of
     Left x          => InX x;
     Right (Left y)  => InY y;

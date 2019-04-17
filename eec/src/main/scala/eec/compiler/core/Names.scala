@@ -97,7 +97,7 @@ object Names {
         case "Char"     => CharTag
         case "Void"     => VoidTag
         case "Void#"    => VoidCompTag
-        case _          => From(infer[Readable[Derived]].readAs(str))
+        case _          => From(the[Readable[Derived]].readAs(str))
       }
     }
   }

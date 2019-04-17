@@ -25,7 +25,7 @@ type: infixType | func | linearFunc;
 
 func: infixType ('->' infixType)+;
 
-linearFunc: infixType '|-' infixType;
+linearFunc: infixType '-○' infixType;
 
 infixAppliedType: functorType rassocOpId infixType;
 
@@ -55,7 +55,7 @@ expr:
 
 lambda: '\\' bindings '=>' expr;
 
-linearLambda: '\\' '(' binding ')' '|-' expr;
+linearLambda: '\\' '(' binding ')' '-○' expr;
 
 letExpr: 'let' '!' simplePattern '=' expr 'in' expr;
 
@@ -95,7 +95,7 @@ linearCases: linearCaseClause (Sep? linearCaseClause)*;
 
 caseClause: pattern guard? '=>' expr;
 
-linearCaseClause: linearPattern '|-' expr;
+linearCaseClause: linearPattern '-○' expr;
 
 exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 

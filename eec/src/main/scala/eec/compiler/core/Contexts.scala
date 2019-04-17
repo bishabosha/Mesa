@@ -15,7 +15,8 @@ import types.Types
 import Types._
 import Type._
 import TypeOps._
-import util.Showable
+import util.{Showable, Utils}
+import Utils._
 
 import implied NameOps._
 import implied TypeOps._
@@ -182,7 +183,7 @@ object Contexts {
     def lookupType(name: Name) given Context: Checked[Type] = {
       firstTypeCtx(name).flatMap { ctx =>
         implied for Context = ctx
-        getDataType(name)
+        dataType(name)
       }
     }
 
@@ -194,16 +195,16 @@ object Contexts {
       }
     }
 
-    private def getConstructorType(name: Name) given Context: Checked[Type] =
+    private def constructorType(name: Name) given Context: Checked[Type] =
       if isConstructor(name) then {
-        getTermType(name)
+        termType(name)
       } else {
         CompilerError.UnexpectedType(
           s"${name.show} does not qualify to be a constructor.")
       }
 
     def lookupConstructorType(ctor: Name) given Context: Checked[Type] = {
-      inTermCtx(ctor)(getConstructorType(ctor))
+      inTermCtx(ctor)(constructorType(ctor))
     }
 
     def inTermCtx[O](name: Name)
@@ -424,7 +425,7 @@ object Contexts {
     def putTermType(pair: (Name, Type)) given Context: Unit =
       ctx.termTypeTable += pair
 
-    def getTermType(name: Name) given Context: Checked[Type] = {
+    def termType(name: Name) given Context: Checked[Type] = {
       if name == rootName && (ctx `eq` rootCtx) then
         rootPkg
       else
@@ -438,7 +439,7 @@ object Contexts {
     def putDataType(pair: (Name, Type)) given Context: Unit =
       ctx.dataTypeTable += pair
 
-    def getDataType(name: Name) given Context: Checked[Type] = {
+    def dataType(name: Name) given Context: Checked[Type] = {
       ctx.dataTypeTable.getOrElse[Checked[Type]](
         name,
         CompilerError.UnexpectedType(
@@ -460,7 +461,7 @@ object Contexts {
         CompilerError.IllegalState("Non-fresh IdGen context")
       } else {
         implied for Context = root
-        Types.bootstrapped.foreach { (name, tpe) =>
+        for ((name, tpe) <- bootstrapped.view) {
           for _ <- enterData(name)
           yield {
             putDataType(name -> tpe)
@@ -477,7 +478,7 @@ object Contexts {
       }
       val parentTpe = checked {
         implied for Context = parentCtx
-        getTermType(parent)
+        termType(parent)
       }
       parentTpe.flatMap {
         case pkg: PackageInfo =>
@@ -496,13 +497,11 @@ object Contexts {
     import Scoping._
 
     enum Scoping derives Eql {
-      case LinearVariable(name: Scoping, tpe: Scoping)
-      case Term(name: Scoping, tpe: Scoping)
-      case TermScope(name: Scoping, tpe: Scoping, scope: Seq[Scoping])
-      case Data(name: Scoping, tpe: Scoping)
+      case LinearVariable(name: String, tpe: String)
+      case Term(name: String, tpe: String)
+      case TermScope(name: String, tpe: String, scope: Seq[Scoping])
+      case Data(name: String, tpe: String)
       case AnonScope(scope: Seq[Scoping])
-      case ForName(name: String)
-      case OfType(tpe: String)
       case EmptyType
       case Empty
     }
@@ -514,15 +513,15 @@ object Contexts {
           for
             name <- ctx.linearScope
             tpe  = ctx.termTypeTable.get(name) match {
-              case Some(t) => OfType(t.show)
-              case _       => EmptyType
+              case Some(t) => t.show
+              case _       => "<notype>"
             }
-          yield LinearVariable(ForName(name.show), tpe)
+          yield LinearVariable(name.show, tpe)
         }
         val data = {
           for
             (name, tpe) <- ctx.dataTypeTable
-          yield Data(ForName(name.show), OfType(tpe.show))
+          yield Data(name.show, tpe.show)
         }
         val defs = {
           for
@@ -532,14 +531,14 @@ object Contexts {
                     }
             (sym, child)  = pair
             tpeOpt        = ctx.termTypeTable.get(sym.name)
-            tpe           = tpeOpt.fold(EmptyType)(t => OfType(t.show))
+            tpe           = tpeOpt.fold("<notype>")(t => t.show)
             name          = sym.name
           yield {
             if name.nonEmpty then {
               if child.termScope.isEmpty then
-                Term(ForName(name.show), tpe)
+                Term(name.show, tpe)
               else
-                TermScope(ForName(name.show), tpe, child.toScoping)
+                TermScope(name.show, tpe, child.toScoping)
             } else {
               AnonScope(child.toScoping)
             }
@@ -554,8 +553,11 @@ object Contexts {
       ctx match {
         case ctx: RootContext =>
           List(
-            TermScope(ForName(rootSym.name.show),
-            OfType(rootPkg.show), branch(ctx))
+            TermScope(
+              rootSym.name.show,
+              rootPkg.show,
+              branch(ctx)
+            )
           )
 
         case ctx: Fresh if ctx.hasMembers => branch(ctx)

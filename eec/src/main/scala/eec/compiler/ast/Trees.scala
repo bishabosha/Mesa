@@ -10,8 +10,10 @@ import Constant._
 import Contexts._
 import Modifiers._
 import types.Types._
+import untyped.uTpe
 import annotation._
-import util.{Showable, |>, Convert}
+import util.{Showable, |>, Convert, Utils}
+import Utils.eval
 import Convert._
 
 import implied Printing.untyped.AstOps._
@@ -53,8 +55,8 @@ object Trees {
     case Bind(name: Name, body: Tree)(tpe: Type) extends Tree(tpe)
     case Unapply(name: Name, args: List[Tree])(tpe: Type) extends Tree(tpe)
     case Tagged(arg: Name, tpeAs: Tree)(tpe: Type) extends Tree(tpe)
-    case TreeSeq(args: List[Tree]) extends Tree(Type.EmptyType)
-    case EmptyTree extends Tree(Type.EmptyType)
+    case TreeSeq(args: List[Tree]) extends Tree(uTpe)
+    case EmptyTree extends Tree(uTpe)
   }
 
   object TreeOps {
@@ -108,7 +110,9 @@ object Trees {
         }
       }
 
-      inner(Nil, tree :: Nil).foldLeft(Nil: List[String])((acc, f) => f(acc)).head
+      inner(Nil, tree :: Nil)
+        .foldLeft(List.empty[String])(eval)
+        .head
     }
 
     implied for Showable[Tree] {

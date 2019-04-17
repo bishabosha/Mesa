@@ -1,7 +1,7 @@
 # EEC 0.2.2-RC1
 
 ## Requirements
-* Dotty 0.13.0-RC1 <http://dotty.epfl.ch>
+* Dotty 0.14.0-RC1 <http://dotty.epfl.ch>
 
 ## Usage
 

@@ -17,7 +17,6 @@ object CompilerErrors {
     case UnexpectedType(msg: String)
     case IllegalState(msg: String)
     case SyntaxError(msg: String)
-    case Internal(e: Exception)
   }
 
   type Checked[O] = O | CompilerError
@@ -86,28 +85,16 @@ object CompilerErrors {
     }
 
     def (f: => O) recover[O]
-        (opt: PartialFunction[Exception, CompilerError]): Checked[O] = {
+        (opt: PartialFunction[Throwable, CompilerError]): Checked[O] = {
       try {
         f
       } catch {
-        case e: Exception if opt.isDefinedAt(e) => opt(e)
-        case e: Exception if NonFatal(e)        => Internal(e)
+        case NonFatal(e) if opt.isDefinedAt(e) => opt(e)
       }
     }
 
     implied for Showable[CompilerError] {
       def (e: CompilerError) show = e match {
-        case Internal(error) =>
-          val trace = {
-            error
-              .getStackTraceString
-              .split("\n")
-              .toSeq
-              .map("    " + _)
-              .mkString("\n")
-          }
-          s"Internal: ${e.getClass.getSimpleName}: ${error.getMessage}\nDebug trace:\n$trace"
-
         case UnexpectedType(msg)  => s"UnexpectedType: $msg"
         case IllegalState(msg)    => s"IllegalState: $msg"
         case SyntaxError(msg)     => s"SyntaxError: $msg"

@@ -30,32 +30,35 @@ object Commands {
       | :ctx            => Show the current Context
       | :q              => Quit the REPL""".stripMargin
 
-  private val resetCommand = """:reset(?:\s*)""".r
-  private val quitCommand = """:q(?:\s*)""".r
-  private val astExpr = """:ast(?:\s+?(.*))?""".r
-  private val astTop = """:astt(?:\s+?(.*))?""".r
-  private val typeExpr = """:t(?:\s+?(.*))?""".r
-  private val define = """:def(?:\s+?(.*))?""".r
-  private val astFile = """:astf(?:\s+((?:\S(?:\s*)?)*))?""".r
-  private val typeFile = """:tf(?:\s+((?:\S(?:\s*)?)*))?""".r
-  private val setPrompt = """:prompt(?:\s*?(\S*))?""".r
-  private val ctx = """:ctx(?:\s*)""".r
-  private val showHelp = """:help(?:\s*)""".r
+  def parseCommand(line: String): Command = {
 
-  def (s: String) trimOrEmpty: String = Option(s).fold("")(_.trim)
+    def (s: String) trimOrEmpty: String = Option(s).fold("")(_.trim)
 
-  def parseCommand(line: String): Command = line.trim match {
-    case quitCommand()        => Quit
-    case astExpr(code)        => AstExpr(code.trimOrEmpty)
-    case astTop(code)         => AstTop(code.trimOrEmpty)
-    case typeExpr(code)       => TypeExpr(code.trimOrEmpty)
-    case define(code)         => Define(code.trimOrEmpty)
-    case astFile(file)        => AstFile(file.trimOrEmpty)
-    case typeFile(file)       => TypeFile(file.trimOrEmpty)
-    case setPrompt(newPrompt) => SetPrompt(newPrompt.trimOrEmpty)
-    case ctx()                => Ctx
-    case showHelp()           => ShowHelp
-    case resetCommand()       => Reset
-    case _                    => Unknown
+    lazy val resetCommand = """:reset(?:\s*)""".r
+    lazy val quitCommand = """:q(?:\s*)""".r
+    lazy val astExpr = """:ast(?:\s+?(.*))?""".r
+    lazy val astTop = """:astt(?:\s+?(.*))?""".r
+    lazy val typeExpr = """:t(?:\s+?(.*))?""".r
+    lazy val define = """:def(?:\s+?(.*))?""".r
+    lazy val astFile = """:astf(?:\s+((?:\S(?:\s*)?)*))?""".r
+    lazy val typeFile = """:tf(?:\s+((?:\S(?:\s*)?)*))?""".r
+    lazy val setPrompt = """:prompt(?:\s*?(\S*))?""".r
+    lazy val ctx = """:ctx(?:\s*)""".r
+    lazy val showHelp = """:help(?:\s*)""".r
+
+    line.trim match {
+      case quitCommand()        => Quit
+      case astExpr(code)        => AstExpr(code.trimOrEmpty)
+      case astTop(code)         => AstTop(code.trimOrEmpty)
+      case typeExpr(code)       => TypeExpr(code.trimOrEmpty)
+      case define(code)         => Define(code.trimOrEmpty)
+      case astFile(file)        => AstFile(file.trimOrEmpty)
+      case typeFile(file)       => TypeFile(file.trimOrEmpty)
+      case setPrompt(newPrompt) => SetPrompt(newPrompt.trimOrEmpty)
+      case ctx()                => Ctx
+      case showHelp()           => ShowHelp
+      case resetCommand()       => Reset
+      case _                    => Unknown
+    }
   }
 }

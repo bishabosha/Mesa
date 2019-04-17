@@ -4,7 +4,7 @@ package types
 
 import core.Contexts._
 import ast.Trees._
-import parsing.EntryPoint._
+import parsing._
 import error.CompilerErrors._
 import error.CompilerErrors.CompilerError._
 import Types._
@@ -17,8 +17,6 @@ import org.junit.Test
 import org.junit.Assert._
 
 object StatBootstraps {
-
-  val any = Type.WildcardType
 
   def typecheck(seq: (String, String)*): Unit = {
     val (idGen, ctx)    = initialCtx

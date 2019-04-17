@@ -12,7 +12,8 @@ import Names._
 import Name._
 import error.CompilerErrors._
 import CompilerErrorOps._
-import util.{Showable,|>,StackMachine}
+import util.{Showable,|>,StackMachine, Utils}
+import Utils.view
 import StackMachine._
 import Program._
 
@@ -46,6 +47,7 @@ object Types {
     val StringType    = BaseType(StringTag)
     val VoidType      = BaseType(VoidTag)
     val VoidCompType  = BaseType(VoidCompTag)
+    val UnitType      = Product(Nil)
 
     val TensorType = {
       InfixAppliedType(
@@ -64,7 +66,7 @@ object Types {
   }
 
   val bootstrapped = {
-    Vector(
+    IArray(
       TensorTag   -> Bootstraps.TensorType,
       BangTag     -> Bootstraps.BangType,
       VoidCompTag -> Bootstraps.VoidCompType,
@@ -499,7 +501,7 @@ object Types {
           case _: (FunctionType | LinearFunctionType)  => s"($a2)"
           case _                                       => a2
         }
-        s"$a1Final |- $a2Final" :: rest
+        s"$a1Final -○ $a2Final" :: rest
       }
 
       private def fromInfixAppliedType(op: Name, a1: Type, a2: Type)

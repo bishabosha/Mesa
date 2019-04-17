@@ -44,9 +44,6 @@ object Parsers {
   private[parsing] val exprParser =
     genParser `andThen` { _.exprAsTop }
 
-  private val unit: Tree =
-    Parens(Nil)(uTpe)
-
   private[parsing] def fromStatAsTop(context: StatAsTopContext)
                                     given IdGen: Checked[Tree] =
     fromStat(context.stat)
@@ -75,15 +72,19 @@ object Parsers {
 
   private def freshId() given IdGen: Id = idGen.fresh()
 
-  def (o: String => O) toTreeParser[O]
-      (f: IdReader[O => Checked[Tree]])
-      (input: String) given IdGen = {
+  val fromSyntaxError: PartialFunction[Throwable, CompilerError] = {
+    case error: ParserSyntaxException =>
+      CompilerError.SyntaxError(error.getMessage)
+  }
+
+  def (parser: String => C) toTreeParser[C]
+      (toTree: IdReader[C => Checked[Tree]])
+      (input: String) given IdGen: Checked[Tree] = {
     import CompilerErrorOps._
-    val lifted = o(input).recover {
-      case e: ParserSyntaxException =>
-        CompilerError.SyntaxError(e.getMessage)
-    }
-    lifted.flatMap(f)
+    for
+      context <- parser(input).recover(fromSyntaxError)
+      tree    <- toTree(context)
+    yield tree
   }
 
   private def fromIntegerLiteral(context: LiteralContext): Checked[Tree] = {
@@ -649,9 +650,14 @@ object Parsers {
     yield parensFromBuffer(patterns)
   }
 
-  private def parensFromBuffer(trees: mutable.Buffer[Tree]): Tree =
-    if trees.size == 1 then trees(0)
-    else Parens(trees.toList)(uTpe)
+  private def parensFromBuffer(trees: mutable.Buffer[Tree]): Tree = {
+    if trees.size == 0 then
+      unit
+    else if trees.size == 1 then
+      trees(0)
+    else
+      Parens(trees.toList)(uTpe)
+  }
 
   private def fromGuard(context: GuardContext) given IdGen: Checked[Tree] =
     fromInfixExpr(context.infixExpr)

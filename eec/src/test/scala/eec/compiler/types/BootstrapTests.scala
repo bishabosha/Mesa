@@ -11,6 +11,7 @@ import Namers._
 import CompilerErrorOps._
 import Namers._
 import Types._
+import Type._
 import ast.Trees._
 import util.Convert
 import Convert._
@@ -24,8 +25,7 @@ import implied TypeOps._
 import implied NameOps._
 
 object BootstrapTests {
-
-  private val any = Type.WildcardType
+  val any = WildcardType
 
   def (str: String) -|: (other: String) = other -> str
   def (str: String) :|- (other: String) = str -> other
@@ -42,7 +42,7 @@ object BootstrapTests {
   def failIfUnparsedOrTypedStat: String => Type => Contextual[IdReader[Unit]] =
     failIfUnparsedOrTyped(parseStat)
 
-  private def typeCore(f: String => IdReader[Checked[Tree]])
+  def typeCore(f: String => IdReader[Checked[Tree]])
                       (str: String)
                       (pt: Type) given IdGen, Context: Checked[Tree] =
     for
@@ -50,7 +50,7 @@ object BootstrapTests {
       tpd <- typeAfterParse(pt)(exp)
     yield tpd
 
-  private def typeAfterParse(pt: Type)
+  def typeAfterParse(pt: Type)
                             (exp: Tree)
                             given IdGen, Context: Checked[Tree] =
     for
@@ -59,8 +59,8 @@ object BootstrapTests {
     yield tpd
 
   def failIfUnparsedOrTyped(f: String => IdReader[Checked[Tree]])
-                           (str: String)
-                           (pt: Type) given IdGen, Context: Unit = {
+                            (str: String)
+                            (pt: Type) given IdGen, Context: Unit = {
     f(str).fold
       { err => fail(err.show) }
       { tpd =>

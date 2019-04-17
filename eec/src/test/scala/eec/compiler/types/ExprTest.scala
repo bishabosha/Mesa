@@ -81,7 +81,7 @@ class ExprTest {
   @Test def failCompute() = noType(
     """ \(_: ! a b) => () """, // error: expected types [_] but got [a, b]
     """ ! () () """, // error: expected args [_: _] but got [(): (), (): ()]
-    """ \(x: A#) |- !x """, // error: `!t` can't depend on linear variable
+    """ \(x: A#) -○ !x """, // error: `!t` can't depend on linear variable
   )
 
   @Test def typecheckIf() = typecheck(
@@ -149,6 +149,9 @@ class ExprTest {
          a | _ => () """, // error: name in alternative
 
     """ case () of
+        _ if False => () """, // error: missing [()] - guard is not idempotent
+
+    """ case () of
           () => 1
           () => False """, // error: disjoint bodies
 
@@ -169,36 +172,36 @@ class ExprTest {
 
   @Test def typecheckLinearCase() = typecheck(
     """ case ((), ()) of
-          (x, _) |- x """            :|- "()",
+          (x, _) -○ x """            :|- "()",
 
     """ case ((),()) of
-          (x, ( )) |- x """          :|- "()",
+          (x, ( )) -○ x """          :|- "()",
 
     """ case InR [((), ())] of
-          InR[(x, _)] |- x
-          InL[u]      |- () """      :|- "()",
+          InR[(x, _)] -○ x
+          InL[u]      -○ () """      :|- "()",
 
     """ case (InR [()], ()) of
-          (InR[x], _) |- x
-          (InL[u], _) |- () """      :|- "()",
+          (InR[x], _) -○ x
+          (InL[u], _) -○ () """      :|- "()",
 
     """ case InL [()] of
-          InL[n] |- n
-          InR[u] |- () """          :|- "()",
+          InL[n] -○ n
+          InR[u] -○ () """          :|- "()",
   )
 
   @Test def failLinearCase() = noType(
     """ case InL [()] of
-          InL[n] |- n""", // error: missing [InR _]
+          InL[n] -○ n""", // error: missing [InR _]
 
     """ case InR [()] of
-          InR[n] |- n""", // error: missing [InL _]
+          InR[n] -○ n""", // error: missing [InL _]
 
     """ case (0, ()) of
-          (x, _) |- x """,    // error: `x: Integer` not allowed in stoup
+          (x, _) -○ x """,    // error: `x: Integer` not allowed in stoup
 
     """ case ((), ()) of
-          (x, y) |- x """,    // error: can't put x and y together in stoup
+          (x, y) -○ x """,    // error: can't put x and y together in stoup
   )
 
   @Test def typecheckLambda() = typecheck(
@@ -206,7 +209,7 @@ class ExprTest {
     """ \(_: ()) => () """                :|- "() -> ()",
     """ \(t: ()) => t """                 :|- "() -> ()",
     """ \(_: () -> ()) => () """          :|- "(() -> ()) -> ()",
-    """ \(_: () |- ()) => () """          :|- "(() |- ()) -> ()",
+    """ \(_: () -○ ()) => () """          :|- "(() -○ ()) -> ()",
     """ \(_: ()) (_: ()) => () """        :|- "() -> () -> ()",
     """ \(a: ()) (b: ()) => (a,b) """     :|- "() -> () -> ((), ())",
   )
@@ -222,20 +225,20 @@ class ExprTest {
   )
 
   @Test def typecheckLinearLambda() = typecheck(
-    """ \(a: A#) |- a """  :|- "A# |- A#",
-    """ \(b: B#) |- () """ :|- "B# |- ()",
+    """ \(a: A#) -○ a """  :|- "A# -○ A#",
+    """ \(b: B#) -○ () """ :|- "B# -○ ()",
   )
 
   @Test def failLinearLambda() = noType(
-    """ \(a: A)  |- () """, // error: a is not of computation type, so cant be in stoup
-    """ \(c: C#) |- !c """, // error: no dependency on c allowed
-    """ \(a: A#) |- \(b: B#) |- b """, // error: rhs is not computational codomain
-    """ \(a: ()) |- \(b: ()) => \(c: ()) |- a """, // error: no dependency on a allowed
-    """ \(_: A#) |- () """, // error: Illegal wildcard var name in stoup
+    """ \(a: A)  -○ () """, // error: a is not of computation type, so cant be in stoup
+    """ \(c: C#) -○ !c """, // error: no dependency on c allowed
+    """ \(a: A#) -○ \(b: B#) -○ b """, // error: rhs is not computational codomain
+    """ \(a: ()) -○ \(b: ()) => \(c: ()) -○ a """, // error: no dependency on a allowed
+    """ \(_: A#) -○ () """, // error: Illegal wildcard var name in stoup
   )
 
   @Test def typecheckEval() = typecheck(
-    """ (\(u: ()) |- u)[()] """ :|- "()"
+    """ (\(u: ()) -○ u)[()] """ :|- "()"
   )
 
   @Test def typecheckLet() = typecheck(
@@ -246,7 +249,7 @@ class ExprTest {
   @Test def failLet() = noType(
     """ let !x = () in () """,  // error: () is not ! type
     """ let !x = !0 in 0 """,   // error: 0 is not of computation type
-    """ \(u: ()) |- let !_ = !() in u """, // error: no dependency on u allowed
+    """ \(u: ()) -○ let !_ = !() in u """, // error: no dependency on u allowed
   )
 
   @Test def typecheckLetTensor() = typecheck(

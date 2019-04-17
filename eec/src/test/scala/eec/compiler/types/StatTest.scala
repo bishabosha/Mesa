@@ -19,34 +19,34 @@ class StatTest {
   )
 
   @Test def typecheckLinearSig() = typecheck(
-    "A -> (R# |- L# +: R#)"
-    -|: """ InRproxy _ [r] : A -> (R# |- L# +: R#) =
+    "A -> (R# -○ L# +: R#)"
+    -|: """ InRproxy _ [r] : A -> (R# -○ L# +: R#) =
               InR[r] """,
 
     "L# +: ()"
     -|: """ foo : L# +: () =
               (InRproxy 0)[()] """,
 
-    "() -> (() |- ())"
-    -|: """ primitive ok _ [_] : () -> (() |- ()) """,
+    "() -> (() -○ ())"
+    -|: """ primitive ok _ [_] : () -> (() -○ ()) """,
   )
 
   @Test def failLinearSig() = noType(
-    """ linearFail _ [_] : () -> (() |- ()) = () """ // error: cant put wildcard in stoup for non primitive
+    """ linearFail _ [_] : () -> (() -○ ()) = () """ // error: cant put wildcard in stoup for non primitive
   )
 
   @Test def failLinearEither() = noType(
-    """ evaluation [a]: A# |- Either () () =
+    """ evaluation [a]: A# -○ Either () () =
           Left () """ // error - `a` is not allowed to be in scope
   )
 
   @Test def failLinearBang() = noType(
-    """ evaluation [a]: A# |- !() =
+    """ evaluation [a]: A# -○ !() =
           !() """ // error - `a` is not allowed to be in scope
   )
 
   @Test def failLinearConstant() = noType(
-    """ evaluation [a]: A# |- () =
+    """ evaluation [a]: A# -○ () =
           0 """ // error - `a` is not allowed to be in scope
   )
 
@@ -72,26 +72,26 @@ class StatTest {
    *  than once
    */
   @Test def noDuplicateState() = someNoType(
-    """ fst [p]: (A#, B#) |- A# =
-          case p of (a, _) |- a """, // ok
+    """ fst[p]: (A#, B#) -○ A# =
+          case p of (a, _) -○ a """, // ok
 
-    """ snd [p]: (A#, B#) |- B# =
-          case p of (_, b) |- b """, // ok
+    """ snd[p]: (A#, B#) -○ B# =
+          case p of (_, b) -○ b """, // ok
 
-    """ linearEval [pair]: (!A, !A) |- () =
-          let !_ = fst [pair] in
-          let !_ = snd [pair] in
-          () """ // error: `snd [pair]` has illegal dependency
+    """ linearEval [pair]: (!A, !A) -○ () =
+          let !_ = fst[pair] in
+          let !_ = snd[pair] in
+          () """ // error: `snd[pair]` has illegal dependency
   )
 
   @Test def projectTuplesLinear() = typecheck(
-    "(A#, B#) |- A#"       -|:  """ fst[pair] : (A#, B#) |- A# =
-                                      case pair of (a, _) |- a """,
+    "(A#, B#) -○ A#"       -|:  """ fst[pair] : (A#, B#) -○ A# =
+                                      case pair of (a, _) -○ a """,
 
-    "(A#, B#) |- B#"       -|:  """ snd[pair] : (A#, B#) |- B# =
-                                      case pair of (_, b) |- b """,
+    "(A#, B#) -○ B#"       -|:  """ snd[pair] : (A#, B#) -○ B# =
+                                      case pair of (_, b) -○ b """,
 
-    "(A#, B#) |- (A#, B#)" -|:  """ linearEval[pair] : (A#, B#) |- (A#, B#) =
+    "(A#, B#) -○ (A#, B#)" -|:  """ linearEval[pair] : (A#, B#) -○ (A#, B#) =
                                       (fst[pair], snd[pair]) """
   )
 
@@ -99,7 +99,7 @@ class StatTest {
    *  depends on a linear variable
    */
   @Test def noDuplicateState2() = someNoType(
-    """ duplicateState [e]: A# |- (A#, A#) =
+    """ duplicateState [e]: A# -○ (A#, A#) =
           (e, e) """, // ok
 
     """ sequentialEval pair: (!A, !A) -> () =
@@ -109,7 +109,7 @@ class StatTest {
               let !_ = r in
               () """, // ok
 
-    """ cantDuplicate [e]: !A |- () =
+    """ cantDuplicate [e]: !A -○ () =
           sequentialEval (duplicateState e) """, // error: dependency on e
   )
 
@@ -129,15 +129,15 @@ class StatTest {
   )
 
   @Test def linearNonDuplication() = typecheck(
-    "A# |- ()" -|:  """ safeDuplication [a] : A# |- () =
+    "A# -○ ()" -|:  """ safeDuplication [a] : A# -○ () =
                           case (a, a) of
-                            (q, _) |- ()
-                            (_, r) |- () """
+                            (q, _) -○ ()
+                            (_, r) -○ () """
   )
 
   @Test def typecheckLinearLambdaEval() = typecheck(
-    "Void# |- A#" -|: """ absurdProxy: Void# |- A# =
-                            \(v: Void#) |- absurd[v] """,
+    "Void# -○ A#" -|: """ absurdProxy: Void# -○ A# =
+                            \(v: Void#) -○ absurd[v] """,
   )
 
   @Test def typecheckLambdaApply() = typecheck(
@@ -181,28 +181,28 @@ class StatTest {
   )
 
   @Test def typecheckLinearMatchEitherArbitraryDepth() = typecheck(
-    "(w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> ((w# +: x#) +: y# +: z# |- !u)"
-    -|: """ cat4_alt0 wu xu yu zu [e] : (w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> ((w# +: x#) +: y# +: z# |- !u) =
+    "(w# -○ !u) -> (x# -○ !u) -> (y# -○ !u) -> (z# -○ !u) -> ((w# +: x#) +: y# +: z# -○ !u)"
+    -|: """ cat4_alt0 wu xu yu zu [e] : (w# -○ !u) -> (x# -○ !u) -> (y# -○ !u) -> (z# -○ !u) -> ((w# +: x#) +: y# +: z# -○ !u) =
               case e of
-                InL[ InL[ a]] |- wu[a]
-                InL[ InR[ b]] |- xu[b]
-                InR[ InL[ c]] |- yu[c]
-                InR[ InR[ d]] |- zu[d] """,
+                InL[ InL[ a]] -○ wu[a]
+                InL[ InR[ b]] -○ xu[b]
+                InR[ InL[ c]] -○ yu[c]
+                InR[ InR[ d]] -○ zu[d] """,
 
-    "(w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (((w# +: x#) +: y#) +: z# |- !u)"
-    -|: """ cat4_alt1 wu xu yu zu [e]: (w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (((w# +: x#) +: y#) +: z# |- !u) =
+    "(w# -○ !u) -> (x# -○ !u) -> (y# -○ !u) -> (z# -○ !u) -> (((w# +: x#) +: y#) +: z# -○ !u)"
+    -|: """ cat4_alt1 wu xu yu zu [e]: (w# -○ !u) -> (x# -○ !u) -> (y# -○ !u) -> (z# -○ !u) -> (((w# +: x#) +: y#) +: z# -○ !u) =
               case e of
-                InL[ InL[ InL[ a]]] |- wu[a]
-                InL[ InL[ InR[ b]]] |- xu[b]
-                InL[ InR[ c]]       |- yu[c]
-                InR[ d]             |- zu[d] """,
+                InL[ InL[ InL[ a]]] -○ wu[a]
+                InL[ InL[ InR[ b]]] -○ xu[b]
+                InL[ InR[ c]]       -○ yu[c]
+                InR[ d]             -○ zu[d] """,
 
-    "(w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (w# +: x# +: y# +: z# |- !u)"
-    -|: """ cat4_alt2 wu xu yu zu [e]: (w# |- !u) -> (x# |- !u) -> (y# |- !u) -> (z# |- !u) -> (w# +: x# +: y# +: z# |- !u) =
+    "(w# -○ !u) -> (x# -○ !u) -> (y# -○ !u) -> (z# -○ !u) -> (w# +: x# +: y# +: z# -○ !u)"
+    -|: """ cat4_alt2 wu xu yu zu [e]: (w# -○ !u) -> (x# -○ !u) -> (y# -○ !u) -> (z# -○ !u) -> (w# +: x# +: y# +: z# -○ !u) =
               case e of
-                InL[ a]             |- wu[a]
-                InR[ InL[ b]]       |- xu[b]
-                InR[ InR[ InL[ c]]] |- yu[c]
-                InR[ InR[ InR[ d]]] |- zu[d] """
+                InL[ a]             -○ wu[a]
+                InR[ InL[ b]]       -○ xu[b]
+                InR[ InR[ InL[ c]]] -○ yu[c]
+                InR[ InR[ InR[ d]]] -○ zu[d] """
   )
 }

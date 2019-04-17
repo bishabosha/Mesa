@@ -8,7 +8,6 @@ import error.CompilerErrors.Checked
 import core.Contexts.IdReader
 
 object EntryPoint {
-
   val parseEEC: String => IdReader[Checked[Tree]] =
     eecParser `toTreeParser` fromTranslationUnit
 
@@ -17,5 +16,4 @@ object EntryPoint {
 
   val parseExpr: String => IdReader[Checked[Tree]] =
     exprParser `toTreeParser` fromExprAsTop
-
 }

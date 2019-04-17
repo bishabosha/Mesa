@@ -15,7 +15,7 @@ import core.Contexts._
 import core.Names._
 import Context._
 import ContextOps._
-import parsing.EntryPoint._
+import parsing.EntryPoint.{parseEEC, parseStat, parseExpr}
 import error.CompilerErrors._
 import CompilerErrorOps._
 import types.{Namers, Typers, Types}
@@ -26,8 +26,6 @@ import Type._
 import util.Convert
 import Convert._
 
-import pprint.pprintln
-
 import implied CompilerErrorOps._
 import implied TypeOps._
 import implied NameOps._
@@ -35,6 +33,22 @@ import implied AstOps._
 import implied TreeOps._
 
 object Repl {
+  import pprint2.pprintln
+
+  private val pprint2: pprint.PPrinter = pprint.copy(
+    defaultHeight = Int.MaxValue,
+    additionalHandlers = {
+      case s: String => pprint.Tree.Literal(s)
+    }
+  )
+
+  private case class LoopState(
+    prompt: String,
+    break: Boolean,
+    pwd: String,
+    idGen: IdGen,
+    ctx: Context
+  )
 
   private val defaultPrompt = "eec"
 
@@ -74,42 +88,17 @@ object Repl {
     for _ <- Context.enterBootstrapped yield (rootIdGen, rootCtx)
   }
 
-  private case class LoopState(prompt: String, break: Boolean, pwd: String, idGen: IdGen, ctx: Context)
-
-  private def loadFile(pwd: String, name: String): Checked[String] = {
-    var file: scala.io.BufferedSource = null
-    try {
-      file = scala.io.Source.fromFile(s"$pwd/$name")
-      return file.getLines.mkString("\n")
-    } catch {
-      case e: Exception if NonFatal(e) =>
-        CompilerError.IllegalState(e.getMessage)
-    } finally {
-      if file ne null then {
-        file.close()
-      }
-    }
-  }
-
-  private def guarded(state: LoopState, string: String)(body: => LoopState): LoopState =
-    if string.isEmpty then {
-      println(s"[ERROR] empty input")
-      state
-    } else {
-      body
-    }
-
   private def command(state: LoopState, input: String): LoopState = {
 
     implied for Context = state.ctx
     implied for IdGen   = state.idGen
 
-    def Typed(s: String)(f: String => IdReader[Checked[Tree]]): LoopState =
+    def Typed(s: String)(f: String => IdReader[Checked[Tree]]): LoopState = {
       guarded(state, s) {
         val yieldTyped = for
           expr  <- f(s)
           _     <- indexAsExpr(expr)
-          typed <- expr.typedWith(Type.WildcardType)
+          typed <- expr.typedWith(WildcardType)
         yield typed
 
         yieldTyped.fold
@@ -118,8 +107,9 @@ object Repl {
 
         state
       }
+    }
 
-    def Define(s: String): LoopState =
+    def Define(s: String): LoopState = {
       guarded(state, s) {
         val typed = for
           exp <- parseStat(s)
@@ -137,15 +127,17 @@ object Repl {
 
         state
       }
+    }
 
-    def Ast(s: String)(f: String => IdReader[Checked[Tree]]): LoopState =
+    def Ast(s: String)(f: String => IdReader[Checked[Tree]]): LoopState = {
       guarded(state, s) {
         f(s).fold
           { err => println(s"[ERROR] ${err.show}") }
-          { ast => pprintln((ast.convert: Ast), height = Int.MaxValue) }
+          { ast => pprintln((ast.convert: Ast)) }
 
         state
       }
+    }
 
     parseCommand(input) match {
       case AstExpr(code) => Ast(code)(parseExpr)
@@ -182,7 +174,7 @@ object Repl {
           { (idGen, ctx) => state.copy(idGen = idGen, ctx = ctx) }
 
       case Ctx =>
-        pprintln(ctx.toScoping, height = Int.MaxValue)
+        pprintln(ctx.toScoping)
         state
 
       case Quit =>
@@ -194,8 +186,33 @@ object Repl {
         state
 
       case Unknown =>
-        println(s"[ERROR] unrecognised command: `${trimOrEmpty(input)}`. Try `:help`")
+        println(s"[ERROR] unrecognised command: `$input`. Try `:help`")
         state
+    }
+  }
+
+  private def loadFile(pwd: String, name: String): Checked[String] = {
+    var file: scala.io.BufferedSource = null
+    try {
+      file = scala.io.Source.fromFile(s"$pwd/$name")
+      return file.getLines.mkString("\n")
+    } catch {
+      case e: Exception if NonFatal(e) =>
+        CompilerError.IllegalState(e.getMessage)
+    } finally {
+      if file ne null then {
+        file.close()
+      }
+    }
+  }
+
+  private def guarded(state: LoopState, string: String)
+                     (body: => LoopState): LoopState = {
+    if string.isEmpty then {
+      println(s"[ERROR] empty input")
+      state
+    } else {
+      body
     }
   }
 }
