@@ -26,6 +26,16 @@ data Maybe3 a b c =
   | Nothing3
 
 {-| recursive data types are not supported -}
+
+maybe_to_or m : Maybe A -> A |: () =
+  case m of
+    Just a  => Left  a;
+    _       => Right ();
+
+or_to_maybe m : A |: () -> Maybe A =
+  case m of
+    Left a  => Just a;
+    _       => Nothing;
     
 maybe_to_maybe3 m : Maybe (A, B, C) -> Maybe3 A B C =
   case m of
@@ -42,15 +52,30 @@ maybe3_to_or3 m : Maybe3 A B C -> (A, B, C) |: () =
     Just3 a b c => Left (a, b, c);
     _           => Right ();
 
+or3_to_maybe3 m : (A, B, C) |: () -> Maybe3 A B C =
+  case m of
+    Left (a, b, c) => Just3 a b c;
+    _              => Nothing3;
+
 maybe_to_or3 m : Maybe (A, B, C) -> (A, B, C) |: () =
   case m of
     Just (a, b, c) => Left (a, b, c);
     _              => Right ();
 
-maybe_to_or m : Maybe A -> A |: () =
+or3_to_maybe m : (A, B, C) |: () -> Maybe (A, B, C) =
   case m of
-    Just a  => Left a;
-    _       => Right ();
+    Left (a, b, c) => Just (a, b, c);
+    _              => Nothing;
+
+boolean_to_or b: Boolean -> () |: () =
+  case b of
+    True  => Left  ();
+    _     => Right ();
+
+or_to_boolean b: () |: () -> Boolean =
+  case b of
+    Left () => True;
+    _       => False;
 
 either3_to_stacked t : Either3 X Y Z -> X |: Y |: Z =
   case t of
