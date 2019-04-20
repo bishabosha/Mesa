@@ -186,15 +186,15 @@ object Types {
       inner(z, tpe :: Nil)
     }
 
-    def (tpe: Type) foldLeftChecked[O]
-        (z: Checked[O])
-        (f: (O, Type) => Checked[O]): Checked[O] = {
+    def (tpe: Type) foldLeftLifted[O]
+        (z: Lifted[O])
+        (f: (O, Type) => Lifted[O]): Lifted[O] = {
       @tailrec
-      def inner(z: Checked[O], tpes: List[Type]): Checked[O] = {
+      def inner(z: Lifted[O], tpes: List[Type]): Lifted[O] = {
         z match {
           case err: CompilerError => err
           case z0 =>
-            val z = unchecked(z0)
+            val z = unlift(z0)
             tpes match {
               case Nil => z
 

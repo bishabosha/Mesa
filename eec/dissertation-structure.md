@@ -73,7 +73,7 @@
   - `fst` and `snd` primitives achieved with match expressions.
     - need to show how linearity is preserved
 
-#### De-sugaring
+#### Syntactic Sugar and Reduction
   - arbitrary depth patterns to single depth
   - patterns in `let` expressions
   - infix application

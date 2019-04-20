@@ -1,6 +1,7 @@
 package eec
 package repl
 
+
 object Commands {
   import Command._
 
@@ -15,7 +16,7 @@ object Commands {
     case Reset, Quit, ShowHelp, Ctx, Unknown
   }
 
-  val helpText =
+  val helpText: String =
     """The REPL has several commands available:
       |
       | :help           => Show this help
@@ -31,20 +32,23 @@ object Commands {
       | :q              => Quit the REPL""".stripMargin
 
   def parseCommand(line: String): Command = {
+    import Parsers._
 
     def (s: String) trimOrEmpty: String = Option(s).fold("")(_.trim)
 
-    lazy val resetCommand = """:reset(?:\s*)""".r
-    lazy val quitCommand = """:q(?:\s*)""".r
-    lazy val astExpr = """:ast(?:\s+?(.*))?""".r
-    lazy val astTop = """:astt(?:\s+?(.*))?""".r
-    lazy val typeExpr = """:t(?:\s+?(.*))?""".r
-    lazy val define = """:def(?:\s+?(.*))?""".r
-    lazy val astFile = """:astf(?:\s+((?:\S(?:\s*)?)*))?""".r
-    lazy val typeFile = """:tf(?:\s+((?:\S(?:\s*)?)*))?""".r
-    lazy val setPrompt = """:prompt(?:\s*?(\S*))?""".r
-    lazy val ctx = """:ctx(?:\s*)""".r
-    lazy val showHelp = """:help(?:\s*)""".r
+    object Parsers {
+      val resetCommand  = """:reset(?:\s*)""".r
+      val quitCommand   = """:q(?:\s*)""".r
+      val astExpr       = """:ast(?:\s+?(.*))?""".r
+      val astTop        = """:astt(?:\s+?(.*))?""".r
+      val typeExpr      = """:t(?:\s+?(.*))?""".r
+      val define        = """:def(?:\s+?(.*))?""".r
+      val astFile       = """:astf(?:\s+((?:\S(?:\s*)?)*))?""".r
+      val typeFile      = """:tf(?:\s+((?:\S(?:\s*)?)*))?""".r
+      val setPrompt     = """:prompt(?:\s*?(\S*))?""".r
+      val ctx           = """:ctx(?:\s*)""".r
+      val showHelp      = """:help(?:\s*)""".r
+    }
 
     line.trim match {
       case quitCommand()        => Quit

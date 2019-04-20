@@ -35,8 +35,8 @@ class StatTest {
     """ linearFail _ [_] : () -> (() -○ ()) = () """ // error: cant put wildcard in stoup for non primitive
   )
 
-  @Test def failLinearEither() = noType(
-    """ evaluation [a]: A# -○ Either () () =
+  @Test def failLinearSum() = noType(
+    """ evaluation [a]: A# -○ () |: () =
           Left () """ // error - `a` is not allowed to be in scope
   )
 
@@ -113,11 +113,11 @@ class StatTest {
           sequentialEval (duplicateState e) """, // error: dependency on e
   )
 
-  @Test def typecheckEither() = typecheck(
-    "l: Either () q = Left ()"                    :|- "Either () q",
-    "r: Either m () = Right ()"                   :|- "Either m ()",
-    "u: Either y (Either () z) = Right (Left ())" :|- "Either y (Either () z)",
-    "v: Either (Either y ()) z = Left (Right ())" :|- "Either (Either y ()) z"
+  @Test def typecheckSum() = typecheck(
+    "l: () |: q = Left ()"                    :|- "() |: q",
+    "r: m |: () = Right ()"                   :|- "m |: ()",
+    "u: y |: () |: z = Right (Left ())" :|- "y |: () |: z",
+    "v: (y |: ()) |: z = Left (Right ())" :|- "(y |: ()) |: z"
   )
 
   @Test def typecheckLiftBind() = typecheck(
@@ -148,31 +148,49 @@ class StatTest {
   )
 
   @Test def failMatchVariable() =  noType(
-    "f e: a -> !a = case e of Left x => !x",  // error: Either l r is not a
+    "f e: a -> !a = case e of Left x => !x",  // error: Sum l r is not a
     "g e: a -> !a = case e of (x, _) => !x",  // error: Tuple is not a
     "h e: a -> !a = case e of (_, _) => !e",  // error: Tuple is not a
     "i e: a -> !a = case e of ()     => !e"   // error: Tuple is not a
   )
 
-  @Test def typecheckMatchEitherArbitraryDepth() = typecheck(
-    "Either (Either w x) (Either y z) -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
-    -|: """ cat4_alt0 e wu xu yu zu: Either (Either w x) (Either y z) -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+  @Test def typecheckMaybe() = typecheck(
+    "Maybe a" -|: """ data Maybe a = Just a | Nothing """,
+    "Maybe A -> A |: ()" -|:
+      """ maybe_to_or m : Maybe A -> A |: () =
+            case m of
+              Just a  => Left a;
+              Nothing => Right (); """
+  )
+
+  @Test def typecheckMaybeC() = typecheck(
+    "MaybeC a#" -|: """ data MaybeC a# = JustC[a#] | NothingC """,
+    "MaybeC A# -> A# +: ()" -|:
+      """ maybec_to_compsum m: MaybeC A# -> A# +: () =
+            case m of
+              JustC[a] -○ InL[a];
+              NothingC -○ InR[()]; """
+  )
+
+  @Test def typecheckMatchSumArbitraryDepth() = typecheck(
+    "(w |: x) |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
+    -|: """ cat4_alt0 e wu xu yu zu: (w |: x) |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
               case e of
                 Left  (Left a)  => wu a;
                 Left  (Right b) => xu b;
                 Right (Left c)  => yu c;
                 Right (Right d) => zu d """,
 
-    "Either (Either (Either w x) y) z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
-    -|: """ cat4_alt1 e wu xu yu zu: Either (Either (Either w x) y) z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+    "((w |: x) |: y) |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
+    -|: """ cat4_alt1 e wu xu yu zu: ((w |: x) |: y) |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
               case e of
                 Left  (Left  (Left a))  => wu a;
                 Left  (Left  (Right b)) => xu b;
                 Left  (Right c)         => yu c;
                 Right d                 => zu d """,
 
-    "Either w (Either x (Either y z)) -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
-    -|: """ cat4_alt2 e wu xu yu zu: Either w (Either x (Either y z)) -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
+    "w |: x |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
+    -|: """ cat4_alt2 e wu xu yu zu: w |: x |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
               case e of
                 Left  a                 => wu a;
                 Right (Left  b)         => xu b;
@@ -180,7 +198,7 @@ class StatTest {
                 Right (Right (Right d)) => zu d """
   )
 
-  @Test def typecheckLinearMatchEitherArbitraryDepth() = typecheck(
+  @Test def typecheckLinearMatchSumArbitraryDepth() = typecheck(
     "(w# -○ !u) -> (x# -○ !u) -> (y# -○ !u) -> (z# -○ !u) -> ((w# +: x#) +: y# +: z# -○ !u)"
     -|: """ cat4_alt0 wu xu yu zu [e] : (w# -○ !u) -> (x# -○ !u) -> (y# -○ !u) -> (z# -○ !u) -> ((w# +: x#) +: y# +: z# -○ !u) =
               case e of

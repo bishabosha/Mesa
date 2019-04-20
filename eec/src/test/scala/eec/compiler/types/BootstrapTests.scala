@@ -30,21 +30,21 @@ object BootstrapTests {
   def (str: String) -|: (other: String) = other -> str
   def (str: String) :|- (other: String) = str -> other
 
-  def typeExpr: String => Type => Contextual[IdReader[Checked[Tree]]] =
+  def typeExpr: String => Type => Contextual[IdReader[Lifted[Tree]]] =
     typeCore(parseExpr)
 
-  def typeStat: String => Type => Contextual[IdReader[Checked[Tree]]] =
-    typeCore(parseStat)
+  def typeStat: String => Type => Contextual[IdReader[Lifted[Tree]]] =
+    typeCore(parseDef)
 
   def failIfUnparsedOrTypedExpr: String => Type => Contextual[IdReader[Unit]] =
     failIfUnparsedOrTyped(parseExpr)
 
   def failIfUnparsedOrTypedStat: String => Type => Contextual[IdReader[Unit]] =
-    failIfUnparsedOrTyped(parseStat)
+    failIfUnparsedOrTyped(parseDef)
 
-  def typeCore(f: String => IdReader[Checked[Tree]])
+  def typeCore(f: String => IdReader[Lifted[Tree]])
                       (str: String)
-                      (pt: Type) given IdGen, Context: Checked[Tree] =
+                      (pt: Type) given IdGen, Context: Lifted[Tree] =
     for
       exp <- f(str)
       tpd <- typeAfterParse(pt)(exp)
@@ -52,13 +52,13 @@ object BootstrapTests {
 
   def typeAfterParse(pt: Type)
                             (exp: Tree)
-                            given IdGen, Context: Checked[Tree] =
+                            given IdGen, Context: Lifted[Tree] =
     for
-      _   <- indexAsExpr(exp)
+      _   <- indexAsTerm(exp)
       tpd <- exp.typedWith(pt)
     yield tpd
 
-  def failIfUnparsedOrTyped(f: String => IdReader[Checked[Tree]])
+  def failIfUnparsedOrTyped(f: String => IdReader[Lifted[Tree]])
                             (str: String)
                             (pt: Type) given IdGen, Context: Unit = {
     f(str).fold
@@ -68,7 +68,7 @@ object BootstrapTests {
       }
   }
 
-  def failIfParsed(f: String => IdReader[Checked[Tree]])
+  def failIfParsed(f: String => IdReader[Lifted[Tree]])
                   (str: String)
                   given IdGen: Unit = {
     f(str).fold
@@ -76,7 +76,7 @@ object BootstrapTests {
       { exp => fail(s"Parsed expr sucessfully:\n${exp.show}") }
   }
 
-  def failIfTyped(tpd: Checked[Tree]): Unit = {
+  def failIfTyped(tpd: Lifted[Tree]): Unit = {
     tpd.fold
       { err => () }
       { tpd =>
@@ -86,7 +86,7 @@ object BootstrapTests {
       }
   }
 
-  def failIfAllTyped(tpd: Checked[Iterable[Tree]]): Unit = {
+  def failIfAllTyped(tpd: Lifted[Iterable[Tree]]): Unit = {
     tpd.fold
       { err => () }
       { tpds =>
@@ -100,7 +100,7 @@ object BootstrapTests {
       }
   }
 
-  def checkTpe(parsed: Checked[Tree], checkTpe: String): Unit = {
+  def checkTpe(parsed: Lifted[Tree], checkTpe: String): Unit = {
     parsed.fold
       { err => fail(err.show) }
       { tpd => assertEquals(checkTpe, tpd.tpe.show) }

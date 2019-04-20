@@ -1,3 +1,32 @@
+/*
+ [The "BSD licence"]
+ Copyright (c) 2014 Leonardo Lucena
+ Copyright (c) 2018 Andrey Stolyarov
+ Copyright (c) 2019 James Thompson
+ All rights reserved.
+ 
+ Redistribution and use in source and binary forms, with or without modification,
+ are permitted provided that the following conditions are met: 1. Redistributions of source code
+ must retain the above copyright notice, this list of conditions and the following disclaimer. 2.
+ Redistributions in binary form must reproduce the above copyright notice, this list of conditions
+ and the following disclaimer in the documentation and/or other materials provided with the
+ distribution. 3. The name of the author may not be used to endorse or promote products derived from
+ this software without specific prior written permission.
+ 
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR
+ ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+ SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+ DAMAGE.
+ */
+/*
+ Derived from https://github.com/antlr/grammars-v4/blob/master/scala/Scala.g4
+ */
+
 grammar EEC;
 
 literal:
@@ -21,11 +50,11 @@ stableId: id | id '.' id;
 // -- Types
 //
 
-type: infixType | func | linearFunc;
+type: infixType | func | lFunc;
 
 func: infixType ('->' infixType)+;
 
-linearFunc: infixType '-○' infixType;
+lFunc: infixType '-○' infixType;
 
 infixAppliedType: functorType rassocOpId infixType;
 
@@ -45,26 +74,26 @@ simpleType: CompId | qualId | productType;
 
 expr:
 	lambda
-	| linearLambda
+	| lLambda
 	| letExpr
 	| letTensorExpr
 	| caseExpr
-	| linearCaseExpr
+	| lCaseExpr
 	| expr1
 	| expr expr;
 
 lambda: '\\' bindings '=>' expr;
 
-linearLambda: '\\' '(' binding ')' '-○' expr;
+lLambda: '\\' '(' binding ')' '-○' expr;
 
 letExpr: 'let' '!' simplePattern '=' expr 'in' expr;
 
 letTensorExpr:
-	'let' '!' simplePattern Tensor linearPattern '=' expr 'in' expr;
+	'let' '!' simplePattern Tensor lPattern '=' expr 'in' expr;
 
 caseExpr: 'case' expr 'of' cases;
 
-linearCaseExpr: 'case' expr 'of' linearCases;
+lCaseExpr: 'case' expr 'of' lCases;
 
 expr1
    : 'if' expr 'then' expr 'else' expr
@@ -91,11 +120,11 @@ simpleExpr
 
 cases: caseClause (Sep? caseClause)*;
 
-linearCases: linearCaseClause (Sep? linearCaseClause)*;
+lCases: lCaseClause (Sep? lCaseClause)*;
 
 caseClause: pattern guard? '=>' expr;
 
-linearCaseClause: linearPattern '-○' expr;
+lCaseClause: lPattern '-○' expr;
 
 exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 
@@ -103,14 +132,14 @@ exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 // -- Linear Patterns
 //
 
-linearPattern:
+lPattern:
 	Varid
 	| Wildcard
-	| Patid '[' linearPattern ']'
-	| '(' linearPatterns? ')'
+	| Patid ('[' lPattern ']')?
+	| '(' lPatterns? ')'
 	| '()';
 
-linearPatterns: linearPattern (',' linearPattern)*;
+lPatterns: lPattern (',' lPattern)*;
 
 //
 // -- Patterns
@@ -164,37 +193,37 @@ binding: (id | Wildcard) ':' type;
 // -- Declarations and Definitions
 //
 
-dcl: primitiveDcl | dataDcl | linearDataDcl;
+dcl: primitiveDcl | dataDcl | lDataDcl;
 
 primitiveDcl: 'primitive' primDecl;
 
-primDecl: (defSig | linearSig) ':' type; // still require type checking
+primDecl: (defSig | lSig) ':' type; // still require type checking
 
 dataDcl: 'data' typeDcl '=' constructors;
 
-linearDataDcl: 'data' linearTypeDcl '=' linearConstructors;
+lDataDcl: 'data' lTypeDcl '=' lConstructors;
 
 typeDcl: alphaId+ | alphaId rassocOpId alphaId;
 
-linearTypeDcl:
-	alphaId linearTpeId+
-	| linearTpeId rassocOpId linearTpeId;
+lTypeDcl:
+	alphaId lTpeId+
+	| lTpeId rassocOpId lTpeId;
 
-linearTpeId: CompId | alphaId;
+lTpeId: CompId | alphaId;
 
-linearConstructors: linearCtor (Sep? '|' linearCtor)+;
+lConstructors: lCtor (Sep? '|' lCtor)+;
 
 constructors: ctor (Sep? '|' ctor)+;
 
-linearCtor: Patid '[' type ']';
+lCtor: Patid ('[' type ']')?;
 
 ctor: Patid type*;
 
 def: defDef;
 
-defDef: (defSig | linearSig) (':' type)/*?*/ '=' expr Sep?;
+defDef: (defSig | lSig) (':' type)/*?*/ '=' expr Sep?;
 
-linearSig: alphaId paramName*? '[' paramName ']';
+lSig: alphaId paramName*? '[' paramName ']';
 
 defSig: infixDefSig | alphaId paramName*;
 

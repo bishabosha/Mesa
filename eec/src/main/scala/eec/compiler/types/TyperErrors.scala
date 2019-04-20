@@ -84,21 +84,6 @@ object TyperErrors {
       s"Check failed. Type ${typed.tpe.show} != ${pt.show} in ${mode.show}:\n${typed.show}")
   }
 
-  def hkArgsDoNotUnify(functor: Tree, args0: List[Type], args: List[Type]) = {
-    val argsOrdered = args0.reverse
-    val argsExpect  = argsOrdered.map(_.show).mkString("[", ", ", "]")
-    val argsPassed  = args.map(_.show).mkString("[", ", ", "]")
-    val hint =
-      if args0.length == 0 then {
-        val name = (functor.convert: Name).show
-        s" Perhaps functor type `$name` is unknown."
-      } else {
-        ""
-      }
-    CompilerError.UnexpectedType(
-      s"Higher kinded type args do not match. Expected $argsExpect but got $argsPassed.$hint")
-  }
-
   def recursiveData(ctor: Name, data: Name) =
     CompilerError.UnexpectedType(
       s"Recursive type reference in constructor ${ctor.show} of ${data.show}.")
@@ -183,7 +168,7 @@ object TyperErrors {
 
   def illegalStoupDependency(name: Name) =
     CompilerError.UnexpectedType(
-      s"Reference to on linear variable `${name.show}` not in scope.")
+      s"Reference to linear variable `${name.show}` not in scope.")
 
   def illegalStoupBang(name: Name) =
     CompilerError.UnexpectedType(

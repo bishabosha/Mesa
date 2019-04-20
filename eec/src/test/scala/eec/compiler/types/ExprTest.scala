@@ -213,6 +213,10 @@ class ExprTest {
     """ \(_: ()) (_: ()) => () """        :|- "() -> () -> ()",
     """ \(a: ()) (b: ()) => (a,b) """     :|- "() -> () -> ((), ())",
   )
+  
+  @Test def failLambda() = noType(
+    """ \(f: () -○ (() -○ ())) => 0 """ // error: no comp codomain in linear func
+  )
 
   @Test def typecheckApplication() = typecheck(
     """ (\(_: ()) (_: ()) (_: ()) => ()) () () () """ :|- "()",

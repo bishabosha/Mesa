@@ -16,7 +16,7 @@ import util.{Showable, |>, Convert, Utils}
 import Utils.eval
 import Convert._
 
-import implied Printing.untyped.AstOps._
+import implied Stable.TreeOps._
 import implied NameOps._
 
 object Trees {
@@ -31,7 +31,7 @@ object Trees {
     case DataDcl(name: Name, args: List[Name], ctors: List[Tree])(tpe: Type) extends Tree(tpe)
     case InfixDataDcl(name: Name, left: Name, right: Name, ctors: List[Tree])(tpe: Type) extends Tree(tpe)
     case CtorSig(name: Name, tpeArgs: List[Tree])(tpe: Type) extends Tree(tpe)
-    case LinearCtorSig(name: Name, tpeArg: Tree)(tpe: Type) extends Tree(tpe)
+    case LinearCtorSig(name: Name, tpeArg: Option[Tree])(tpe: Type) extends Tree(tpe)
     case DefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)(tpe: Type) extends Tree(tpe)
     case DefSig(name: Name, args: List[Name])(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case LinearSig(name: Name, args: List[Name], linear: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
@@ -116,7 +116,7 @@ object Trees {
     }
 
     implied for Showable[Tree] {
-      def (t: Tree) show = toAst(t).toString
+      def (t: Tree) show = (t.convert: Stable.Tree).toString
     }
 
     implied for (Tree |> List[Tree]) {

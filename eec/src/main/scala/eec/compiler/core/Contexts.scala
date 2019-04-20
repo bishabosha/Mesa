@@ -92,10 +92,10 @@ object Contexts {
 
   case class Sym(id: Id, name: Name)
 
-  private val rootPkg =
+  val rootPkg =
     PackageInfo(BaseType(rootName), rootName)
 
-  private val rootSym =
+  val rootSym =
     Sym(Id.rootId, rootName)
 
   sealed trait Context (
@@ -142,9 +142,9 @@ object Contexts {
       inner(ctx)
     }
 
-    private def firstTermCtx(name: Name) given Context: Checked[Context] = {
+    private def firstTermCtx(name: Name) given Context: Lifted[Context] = {
       @tailrec
-      def inner(current: Context): Checked[Context] = {
+      def inner(current: Context): Lifted[Context] = {
         implied for Context = current
         if isLinearOrInScope(name) then
           ctx
@@ -161,9 +161,9 @@ object Contexts {
         inner(ctx)
     }
 
-    private def firstTypeCtx(name: Name) given Context: Checked[Context] = {
+    private def firstTypeCtx(name: Name) given Context: Lifted[Context] = {
       @tailrec
-      def inner(current: Context): Checked[Context] = {
+      def inner(current: Context): Lifted[Context] = {
         implied for Context = current
         if isData(name) then
           ctx
@@ -180,14 +180,14 @@ object Contexts {
         inner(ctx)
     }
 
-    def lookupType(name: Name) given Context: Checked[Type] = {
+    def lookupType(name: Name) given Context: Lifted[Type] = {
       firstTypeCtx(name).flatMap { ctx =>
         implied for Context = ctx
         dataType(name)
       }
     }
 
-    def lookupConstructors(data: Name) given Context: Checked[List[(Name, Type)]] = {
+    def lookupConstructors(data: Name) given Context: Lifted[List[(Name, Type)]] = {
       firstTypeCtx(data).flatMap { ctx =>
         implied for Context = ctx
         if constructorsExistFor(data) then constructorsFor(data)
@@ -195,7 +195,7 @@ object Contexts {
       }
     }
 
-    private def constructorType(name: Name) given Context: Checked[Type] =
+    private def constructorType(name: Name) given Context: Lifted[Type] =
       if isConstructor(name) then {
         termType(name)
       } else {
@@ -203,16 +203,16 @@ object Contexts {
           s"${name.show} does not qualify to be a constructor.")
       }
 
-    def lookupConstructorType(ctor: Name) given Context: Checked[Type] = {
+    def lookupConstructorType(ctor: Name) given Context: Lifted[Type] = {
       inTermCtx(ctor)(constructorType(ctor))
     }
 
     def inTermCtx[O](name: Name)
-                     (onFound: given Context => Checked[O])
-                     given Context: Checked[O] = {
+                     (onFound: given Context => Lifted[O])
+                     given Context: Lifted[O] = {
       for
         cCtx <- firstTermCtx(name)
-        o    <- checked {
+        o    <- lift {
           implied for Context = cCtx
           onFound
         }
@@ -259,31 +259,30 @@ object Contexts {
          .isDefined
     }
 
-    def typedLinearVariable given Context: Checked[Name] = {
+    def typedLinearVariable given Context: Name = {
       val linearScope = ctx.linearScope
       if linearScope.flatMap(ctx.termTypeTable.get).isEmpty then {
-        CompilerError.UnexpectedType(
-          "Context does not contain a typed linear variable")
+        EmptyName
       } else {
         linearScope.get
       }
     }
 
     def termScopeContainsNames given Context: Boolean = {
-      ctx.termScope.collectFirst[Checked[Context]] {
+      ctx.termScope.collectFirst[Lifted[Context]] {
         case (Sym(_, name), c) if name.nonEmpty => c
       }.isDefined
     }
 
-    def lookIn(id: Id) given Context: Checked[Context] = {
-      ctx.termScope.collectFirst[Checked[Context]] {
+    def lookIn(id: Id) given Context: Lifted[Context] = {
+      ctx.termScope.collectFirst[Lifted[Context]] {
         case (Sym(`id`, _), c) => c
       }.getOrElse {
         CompilerError.IllegalState(s"No context found for Id(${id})")
       }
     }
 
-    def lookForInScope(name: Name) given Context: Checked[Unit] = {
+    def lookForInScope(name: Name) given Context: Lifted[Unit] = {
       if name != Wildcard && !inScope(name) then {
         CompilerError.IllegalState(
           s"No variable in immediate scope found for name `${name.show}`")
@@ -292,7 +291,7 @@ object Contexts {
       }
     }
 
-    def lookForInLinear(name: Name) given Context: Checked[Unit] = {
+    def lookForInLinear(name: Name) given Context: Lifted[Unit] = {
       if name != Wildcard && !isLinear(name) then {
         CompilerError.IllegalState(
           s"No variable in immediate linear scope found for name `${name.show}`")
@@ -308,10 +307,10 @@ object Contexts {
       ctx.constructorTable.keySet.contains(name)
 
     def constructorsFor(name: Name)
-                       given Context: Checked[List[(Name, Type)]] =
+                       given Context: Lifted[List[(Name, Type)]] =
       for
         ctors <- ctx.constructorTable
-                    .getOrElse[Checked[mutable.Set[(Name, Type)]]](
+                    .getOrElse[Lifted[mutable.Set[(Name, Type)]]](
                       name, CompilerError.UnexpectedType(
                         s"Could not find constructors for ${name.show}"))
       yield ctors.toList
@@ -340,7 +339,7 @@ object Contexts {
       }
     }
 
-    def enterScope(id: Id, name: Name) given Context: Checked[Context] = {
+    def enterScope(id: Id, name: Name) given Context: Lifted[Context] = {
       guardContainsDeep(name) {
         val newCtx = new Fresh(ctx)
         ctx.termScope += Sym(id, name) -> newCtx
@@ -348,7 +347,7 @@ object Contexts {
       }
     }
 
-    def enterVariable(name: Name) given Context: Checked[Unit] = {
+    def enterVariable(name: Name) given Context: Lifted[Unit] = {
       name.foldWildcard(()) {
         guardContainsDeep(_) {
           ctx.termScope += Sym(noId, name) -> new Fresh(ctx)
@@ -357,7 +356,7 @@ object Contexts {
       }
     }
 
-    def enterData(name: Name) given Context: Checked[Unit] = {
+    def enterData(name: Name) given Context: Lifted[Unit] = {
       name.foldWildcard(()) {
         guardContainsData(_) {
           ctx.dataTypeTable += name -> Untyped
@@ -366,7 +365,7 @@ object Contexts {
       }
     }
 
-    def enterLinear(name: Name) given Context: Checked[Unit] = {
+    def enterLinear(name: Name) given Context: Lifted[Unit] = {
       guardContainsForLinear(name) {
         name.foldWildcard
           { CompilerError.UnexpectedType(
@@ -378,23 +377,23 @@ object Contexts {
     }
 
     private def guardContainsForLinear[O](name: Name)
-                                        (f: given Context => Checked[O])
-                                        given Context = {
+                                         (f: given Context => Lifted[O])
+                                         given Context = {
       guardContainsImpl(name)(containsForLinear)(f){ n =>
         s"Illegal attempt to put multiple variables in linear context with name: ${n.show}"
       }
     }
 
     private def guardContainsDeep[O](name: Name)
-                                (f: given Context => Checked[O])
-                                given Context = {
+                                    (f: given Context => Lifted[O])
+                                    given Context = {
       guardContainsImpl(name)(containsDeep)(f) { n =>
         s"Illegal shadowing in scope of variable: ${n.show}"
       }
     }
 
     private def guardContainsData[O](name: Name)
-                                    (f: given Context => Checked[O])
+                                    (f: given Context => Lifted[O])
                                     given Context = {
       guardContainsImpl(name)(containsDataDeep)(f) { n =>
         s"Illegal shadowing of imported data type ${n.show}"
@@ -403,9 +402,9 @@ object Contexts {
 
     private def guardContainsImpl[O](name: Name)
                                     (check: Name => given Context => Boolean)
-                                    (f: given Context => Checked[O])
+                                    (f: given Context => Lifted[O])
                                     (msg: Name => String)
-                                    given Context: Checked[O] = {
+                                    given Context: Lifted[O] = {
       if check(name) then {
         CompilerError.UnexpectedType(msg(name))
       } else {
@@ -425,11 +424,11 @@ object Contexts {
     def putTermType(pair: (Name, Type)) given Context: Unit =
       ctx.termTypeTable += pair
 
-    def termType(name: Name) given Context: Checked[Type] = {
+    def termType(name: Name) given Context: Lifted[Type] = {
       if name == rootName && (ctx `eq` rootCtx) then
         rootPkg
       else
-        ctx.termTypeTable.getOrElse[Checked[Type]](
+        ctx.termTypeTable.getOrElse[Lifted[Type]](
           name,
           CompilerError.UnexpectedType(
             s"no type found for term: ${name.show}")
@@ -439,8 +438,8 @@ object Contexts {
     def putDataType(pair: (Name, Type)) given Context: Unit =
       ctx.dataTypeTable += pair
 
-    def dataType(name: Name) given Context: Checked[Type] = {
-      ctx.dataTypeTable.getOrElse[Checked[Type]](
+    def dataType(name: Name) given Context: Lifted[Type] = {
+      ctx.dataTypeTable.getOrElse[Lifted[Type]](
         name,
         CompilerError.UnexpectedType(
           s"no data definition found for type: ${name.show}")
@@ -453,7 +452,7 @@ object Contexts {
       }
     }
 
-    def enterBootstrapped given Context, IdGen: Checked[Unit] = {
+    def enterBootstrapped given Context, IdGen: Lifted[Unit] = {
       val root = rootCtx
       if root.termScope.nonEmpty then {
         CompilerError.IllegalState("Non-fresh _root_ context")
@@ -471,12 +470,12 @@ object Contexts {
     }
 
     def declarePackage(parent: Name, name: Name)
-                      given Context: Checked[Type] = {
+                      given Context: Lifted[Type] = {
       val parentCtx = ctx match {
         case ctx: RootContext => ctx
         case ctx: Fresh       => ctx.outer
       }
-      val parentTpe = checked {
+      val parentTpe = lift {
         implied for Context = parentCtx
         termType(parent)
       }
@@ -489,79 +488,6 @@ object Contexts {
         case _ =>
           CompilerError.UnexpectedType(
             s"name `${parent.show}` does not refer to a package")
-      }
-    }
-  }
-
-  object ContextOps {
-    import Scoping._
-
-    enum Scoping derives Eql {
-      case LinearVariable(name: String, tpe: String)
-      case Term(name: String, tpe: String)
-      case TermScope(name: String, tpe: String, scope: Seq[Scoping])
-      case Data(name: String, tpe: String)
-      case AnonScope(scope: Seq[Scoping])
-      case EmptyType
-      case Empty
-    }
-
-    def (ctx: Context) toScoping: Seq[Scoping] = {
-
-      def branch(ctx: Context): Seq[Scoping] = {
-        val linearScopeOpt = {
-          for
-            name <- ctx.linearScope
-            tpe  = ctx.termTypeTable.get(name) match {
-              case Some(t) => t.show
-              case _       => "<notype>"
-            }
-          yield LinearVariable(name.show, tpe)
-        }
-        val data = {
-          for
-            (name, tpe) <- ctx.dataTypeTable
-          yield Data(name.show, tpe.show)
-        }
-        val defs = {
-          for
-            pair <- ctx.termScope.filter { pair =>
-                      val (Sym(_, name), child) = pair
-                      child.termScope.nonEmpty || child.linearScope.nonEmpty || name.nonEmpty
-                    }
-            (sym, child)  = pair
-            tpeOpt        = ctx.termTypeTable.get(sym.name)
-            tpe           = tpeOpt.fold("<notype>")(t => t.show)
-            name          = sym.name
-          yield {
-            if name.nonEmpty then {
-              if child.termScope.isEmpty then
-                Term(name.show, tpe)
-              else
-                TermScope(name.show, tpe, child.toScoping)
-            } else {
-              AnonScope(child.toScoping)
-            }
-          }
-        }
-        linearScopeOpt.toList ++ data.toList ++ defs
-      }
-
-      def (ctx: Fresh) hasMembers =
-        ctx.termScope.nonEmpty || ctx.termTypeTable.nonEmpty || ctx.linearScope.isDefined
-
-      ctx match {
-        case ctx: RootContext =>
-          List(
-            TermScope(
-              rootSym.name.show,
-              rootPkg.show,
-              branch(ctx)
-            )
-          )
-
-        case ctx: Fresh if ctx.hasMembers => branch(ctx)
-        case _                            => Nil
       }
     }
   }

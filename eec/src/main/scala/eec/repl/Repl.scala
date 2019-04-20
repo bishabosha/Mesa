@@ -9,13 +9,13 @@ import Command._
 import compiler._
 import ast.Trees._
 import Tree._
-import core.Printing.untyped._
-import AstOps._
-import core.Contexts._
-import core.Names._
+import core.{Stable, Contexts, Names}
+import Stable.TreeOps._
+import Stable.ContextOps._
+import Contexts._
+import Names._
 import Context._
-import ContextOps._
-import parsing.EntryPoint.{parseEEC, parseStat, parseExpr}
+import parsing.EntryPoint.{parseEEC, parseDef, parseExpr}
 import error.CompilerErrors._
 import CompilerErrorOps._
 import types.{Namers, Typers, Types}
@@ -27,10 +27,11 @@ import util.Convert
 import Convert._
 
 import implied CompilerErrorOps._
+import implied TreeOps._
 import implied TypeOps._
 import implied NameOps._
-import implied AstOps._
-import implied TreeOps._
+import implied Stable.TreeOps._
+import implied Stable.ContextOps._
 
 object Repl {
   import pprint2.pprintln
@@ -80,7 +81,7 @@ object Repl {
       }
   }
 
-  private def newContext: Checked[(IdGen, Context)] = {
+  private def newContext: Lifted[(IdGen, Context)] = {
     val rootCtx   = new RootContext()
     val rootIdGen = new IdGen
     implied for Context = rootCtx
@@ -93,11 +94,11 @@ object Repl {
     implied for Context = state.ctx
     implied for IdGen   = state.idGen
 
-    def Typed(s: String)(f: String => IdReader[Checked[Tree]]): LoopState = {
+    def Typed(s: String)(f: String => IdReader[Lifted[Tree]]): LoopState = {
       guarded(state, s) {
         val yieldTyped = for
           expr  <- f(s)
-          _     <- indexAsExpr(expr)
+          _     <- indexAsTerm(expr)
           typed <- expr.typedWith(WildcardType)
         yield typed
 
@@ -112,8 +113,8 @@ object Repl {
     def Define(s: String): LoopState = {
       guarded(state, s) {
         val typed = for
-          exp <- parseStat(s)
-          _   <- indexAsExpr(exp)
+          exp <- parseDef(s)
+          _   <- indexAsTerm(exp)
           tpd <- exp.typedWith(WildcardType)
         yield tpd
 
@@ -129,11 +130,11 @@ object Repl {
       }
     }
 
-    def Ast(s: String)(f: String => IdReader[Checked[Tree]]): LoopState = {
+    def Ast(s: String)(f: String => IdReader[Lifted[Tree]]): LoopState = {
       guarded(state, s) {
         f(s).fold
           { err => println(s"[ERROR] ${err.show}") }
-          { ast => pprintln((ast.convert: Ast)) }
+          { ast => pprintln((ast.convert: Stable.Tree)) }
 
         state
       }
@@ -141,7 +142,7 @@ object Repl {
 
     parseCommand(input) match {
       case AstExpr(code) => Ast(code)(parseExpr)
-      case AstTop(code)  => Ast(code)(parseStat)
+      case AstTop(code)  => Ast(code)(parseDef)
 
       case AstFile(name) =>
         Ast(name) { n =>
@@ -174,7 +175,7 @@ object Repl {
           { (idGen, ctx) => state.copy(idGen = idGen, ctx = ctx) }
 
       case Ctx =>
-        pprintln(ctx.toScoping)
+        pprintln(ctx.convert: Seq[Stable.Context])
         state
 
       case Quit =>
@@ -191,7 +192,7 @@ object Repl {
     }
   }
 
-  private def loadFile(pwd: String, name: String): Checked[String] = {
+  private def loadFile(pwd: String, name: String): Lifted[String] = {
     var file: scala.io.BufferedSource = null
     try {
       file = scala.io.Source.fromFile(s"$pwd/$name")
@@ -209,7 +210,7 @@ object Repl {
   private def guarded(state: LoopState, string: String)
                      (body: => LoopState): LoopState = {
     if string.isEmpty then {
-      println(s"[ERROR] empty input")
+      println("[ERROR] empty input")
       state
     } else {
       body

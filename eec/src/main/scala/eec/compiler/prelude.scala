@@ -2,7 +2,7 @@ package eec
 package compiler
 
 val preludeDefs = List(
-  """ data Either L R =
+  """ data L |: R =
         Left L
       | Right R """,
 
