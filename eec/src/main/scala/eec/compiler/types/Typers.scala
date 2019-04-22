@@ -838,7 +838,6 @@ object Typers {
 
   private def typedDefDef(
        modifiers: Set[Modifier], sig: Tree & Unique, tpeD: Tree, body: Tree)
-      (pt: Type)
       given Context, Mode, Stoup: Lifted[Tree] = {
     val typeTpeAs = {
       if modifiers.contains(Modifier.Primitive) then
@@ -929,15 +928,15 @@ object Typers {
     Err.memberSelection
 
   private def typedIdentType(name: Name)
-                            (id: Id, pt: Type)
+                            (id: Id)
                             given Context: Lifted[Tree] = {
     val tpe = lookupType(name).fold(_ => TypeRef(name))(identity)
     Ident(name)(id, tpe)
   }
 
   private def typedIdentPat(name: Name)
-                   (id: Id, pt: Type)
-                   given Context, Mode: Lifted[Tree] = {
+                           (id: Id, pt: Type)
+                           given Context, Mode: Lifted[Tree] = {
     if mode == PatAlt && name != Wildcard then {
       Err.nameInPattAlt(name)
     } else {
@@ -952,7 +951,7 @@ object Typers {
   }
 
   private def typedIdentTerm(name: Name)
-                            (id: Id, pt: Type)
+                            (id: Id)
                             given Context, Mode, Stoup: Lifted[Tree] = {
     for
       tpe <- inTermCtx(name) {
@@ -1203,15 +1202,15 @@ object Typers {
     def inner(tree: Tree, pt: Type) = tree match {
       // Types
       case _: Select                if isType     => typedSelectType
-      case u @ Ident(n)             if isType     => typedIdentType(n)(u.id,pt)
+      case u @ Ident(n)             if isType     => typedIdentType(n)(u.id)
       case Apply(t,ts)              if isType     => typedApplyType(t,ts)
       case InfixApply(f,a,b)        if isType     => typedInfixApply(f,a,b)
-      case u @ Function(ts,t)       if isType     => typedFunctionType(ts,t)(u.id, pt)
-      case u @ LinearFunction(a,b)  if isType     => typedLinearFunctionType(a,b)(u.id, pt)
+      case u @ Function(ts,t)       if isType     => typedFunctionType(ts,t)(u.id,pt)
+      case u @ LinearFunction(a,b)  if isType     => typedLinearFunctionType(a,b)(u.id,pt)
       // Linear patterns
       case Unapply(f,ts)            if isLPattern => typedLinearUnapply(f,ts)(pt)
       // Patterns
-      case u @ Ident(n)             if isPattern  => typedIdentPat(n)(u.id, pt)
+      case u @ Ident(n)             if isPattern  => typedIdentPat(n)(u.id,pt)
       case Bind(n,t)                if isPattern  => typedBind(n,t)(pt)
       case Alternative(ts)          if isPattern  => typedAlternative(ts)(pt)
       case Unapply(f,ts)            if isPattern  => typedUnapply(f,ts)(pt)
@@ -1225,13 +1224,13 @@ object Typers {
         m,                          // DefDef
         s: (DefSig | LinearSig),    // DefDef
         t,                          // DefDef
-        b)                          if isTerm     => typedDefDef(m,s,t,b)(pt)
-      case u @ DefSig(n,ns)         if isTerm     => typedDefSig(n,ns)(u.id, pt)
-      case u @ LinearSig(n,ns,l)    if isTerm     => typedLinearSig(n,ns,l)(u.id, pt)
+        b)                          if isTerm     => typedDefDef(m,s,t,b)
+      case u @ DefSig(n,ns)         if isTerm     => typedDefSig(n,ns)(u.id,pt)
+      case u @ LinearSig(n,ns,l)    if isTerm     => typedLinearSig(n,ns,l)(u.id,pt)
       case u @ Let(p,v,c)           if isTerm     => typedLet(p,v,c)(u.id, pt)
-      case u @ LetTensor(x,z,v,t)   if isTerm     => typedLetTensor(x,z,v,t)(u.id, pt)
-      case u @ Function(ts,t)       if isTerm     => typedFunctionTerm(ts,t)(u.id, pt)
-      case u @ LinearFunction(a,b)  if isTerm     => typedLinearFunctionTerm(a,b)(u.id, pt)
+      case u @ LetTensor(x,z,v,t)   if isTerm     => typedLetTensor(x,z,v,t)(u.id,pt)
+      case u @ Function(ts,t)       if isTerm     => typedFunctionTerm(ts,t)(u.id,pt)
+      case u @ LinearFunction(a,b)  if isTerm     => typedLinearFunctionTerm(a,b)(u.id,pt)
       case WhyNot(t)                if isTerm     => typedWhyNotTerm(t)(pt)
       case Bang(t)                  if isTerm     => typedBangTerm(t)(pt)
       case Tensor(t,u)              if isTerm     => typedTensorTerm(t,u)(pt)
@@ -1239,7 +1238,7 @@ object Typers {
       case CaseExpr(t,ts)           if isTerm     => typedCaseExpr(t,ts)(pt)
       case LinearCaseExpr(t,ts)     if isTerm     => typedLinearCaseExpr(t,ts)(pt)
       case _: Select                if isTerm     => typedSelectTerm
-      case u @ Ident(n)             if isTerm     => typedIdentTerm(n)(u.id, pt)
+      case u @ Ident(n)             if isTerm     => typedIdentTerm(n)(u.id)
       // Any
       case Literal(c)                             => typedLiteral(c)
       case Parens(ts)                             => typedParens(ts)(pt)
