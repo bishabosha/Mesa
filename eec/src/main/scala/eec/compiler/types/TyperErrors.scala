@@ -21,34 +21,32 @@ import implied NameOps._
 object TyperErrors {
 
   def functorNotMatch(functor: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
-    val functorTyp1Str  = functorTyp1.show
-    val proto1Str       = proto1.show
-    val functorNameStr  = functor.show
     CompilerError.UnexpectedType(
-      s"Functor definition `$functorNameStr: ${fTpe.show}` does not match args. Expected `$functorTyp1Str` but was `$proto1Str` in type tree.")
+      s"Functor definition `${functor.show}` of type `${fTpe.show}` does not match args. Expected `${functorTyp1.show}` but was `${proto1.show}` in type tree.")
   }
 
   def functionNotMatch(fun: Tree, arg1: Type, argProto: Type) = {
-    val argProtoStr = argProto.show
-    val arg1Str     = arg1.show
-    val funNameStr  = uniqName(fun).show
     CompilerError.UnexpectedType(
-      s"Function definition `$funNameStr: ${fun.tpe.show}` does not match args. Expected `$arg1Str` but was `$argProtoStr` in application expr.")
+      s"Function definition `${uniqName(fun).show}` of type `${fun.tpe.show}` does not match args. Expected `${arg1.show}` but was `${argProto.show}` in application expr.")
   }
 
   def linearFunctionNotMatch(fun: Tree, arg1: Type, argProto: Type) = {
-    val argProtoStr = argProto.show
-    val arg1Str     = arg1.show
-    val funNameStr  = uniqName(fun).show
     CompilerError.UnexpectedType(
-      s"Linear function definition `$funNameStr: ${fun.tpe.show}` does not match args. Expected `$arg1Str` but was `$argProtoStr` in evaluation expr.")
+      s"Linear function definition `${uniqName(fun).show}` of type `${fun.tpe.show}` does not match args. Expected `${arg1.show}` but was `${argProto.show}` in evaluation expr.")
   }
 
   def emptyFunctorLinearCtx(fTpe: Type) =
     CompilerError.UnexpectedType(s"Empty Linear Context for Functor Type ${fTpe.show}")
 
-  def emptyFunctor(fTpe: Type) =
-    CompilerError.UnexpectedType(s"Empty Functor Type ${fTpe.show}")
+  def emptyFunctor(name: Name, fTpe: Type) =
+    CompilerError.UnexpectedType(s"Tried to unapply empty sum constructor ${name.show} of type ${fTpe.show}.")
+
+  def emptyLinearFunctor(name: Name, fTpe: Type) =
+    CompilerError.UnexpectedType(s"Tried to unapply empty linear coproduct constructor ${name.show} of type ${fTpe.show}.")
+
+  def functionInLinearUnapply(name: Name, fTpe: Type) =
+    CompilerError.UnexpectedType(
+      s"Tried to use sum constructor `${name.show}` of type `${fTpe.show}` as a linear coproduct constructor.")
 
   def tupleNoMatch(pt: Type, ptAsTuple: List[_]) = {
     if ptAsTuple.length == 1 then
@@ -73,8 +71,9 @@ object TyperErrors {
   def tupleNotMatchLength =
     CompilerError.UnexpectedType("Tuple lengths do not match.")
 
-  def argsNotMatchLength =
-    CompilerError.UnexpectedType("Arg lengths do not match.")
+  def sumCtorArgsNotMatchLengthPattern(name: Name, in: Int, out: Int) =
+    CompilerError.UnexpectedType(
+      s"Constructor `${name.show}` has $in function arguments, but an attempt was made to extract $out in a pattern.")
 
   def linearUnapplyArgLengthGT1 =
     CompilerError.UnexpectedType("Linear case clause must have a single path.")

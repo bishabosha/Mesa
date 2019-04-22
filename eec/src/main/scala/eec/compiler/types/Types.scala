@@ -52,7 +52,7 @@ object Types {
     val TensorType = {
       InfixAppliedType(
         TensorTag,
-        Variable("A".readAs),
+        Variable("A#".readAs),
         Variable("B#".readAs)
       )
     }

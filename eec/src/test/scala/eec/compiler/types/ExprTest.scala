@@ -188,6 +188,10 @@ class ExprTest {
     """ case InL [()] of
           InL[n] -○ n
           InR[u] -○ () """          :|- "()",
+
+    """ case 0 of
+          0 -○ ()
+          _ -○ () """          :|- "()",
   )
 
   @Test def failLinearCase() = noType(

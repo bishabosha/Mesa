@@ -13,6 +13,7 @@ import Trees.{Tree, TreeOps}
 import Tree._
 import TreeOps._
 import untyped._
+import any._
 import Names._
 import Name._
 import NameOps._
@@ -414,7 +415,7 @@ object Parsers {
     import CompilerErrorOps._
     for exprs <- context.expr.asScala.mapE(fromExpr) yield {
       val caseTrue  = CaseClause(litTrue, EmptyTree, exprs(1))(freshId(), uTpe)
-      val caseFalse = CaseClause(litFalse, EmptyTree, exprs(2))(freshId(), uTpe)
+      val caseFalse = CaseClause(wildcardIdent, EmptyTree, exprs(2))(freshId(), uTpe)
       val selector  = exprs(0)
       CaseExpr(selector, caseTrue :: caseFalse :: Nil)(uTpe)
     }
@@ -546,11 +547,13 @@ object Parsers {
   }
 
   private def fromLPattern(context: LPatternContext)
-                          given IdGen: Tree = {
+                          given IdGen: Lifted[Tree] = {
     if defined(context.Wildcard) then
-      any.wildcardIdent
+      wildcardIdent
     else if defined(context.Varid) then
       fromVaridLPattern(context)
+    else if defined(context.literal) then
+      fromLiteral(context.literal)
     else if defined(context.Patid) then
       fromLUnapply(context)
     else if defined(context.lPatterns) then
@@ -560,17 +563,18 @@ object Parsers {
   }
 
   private def fromLUnapply(context: LPatternContext)
-                          given IdGen: Tree = {
+                          given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
     val functor = context.Patid.getText.readAs
-    val binding = Option(context.lPattern).map(fromLPattern)
-    Unapply(functor, binding.toList)(uTpe)
+    for binding <- Option(context.lPattern).mapE(fromLPattern)
+    yield Unapply(functor, binding.toList)(uTpe)
   }
 
   private def fromLPatterns(context: LPatternsContext)
-                           given IdGen: Tree = {
-    val patterns = context.lPattern.asScala.map(fromLPattern)
-    parensFromBuffer(patterns)
+                           given IdGen: Lifted[Tree] = {
+    import CompilerErrorOps._
+    for patterns <- context.lPattern.asScala.mapE(fromLPattern)
+    yield parensFromBuffer(patterns)
   }
 
   private def fromVaridLPattern(context: LPatternContext)
@@ -634,7 +638,7 @@ object Parsers {
   private def fromSimplePattern(context: SimplePatternContext)
                                given IdGen: Lifted[Tree] = {
     if defined(context.Wildcard) then
-      any.wildcardIdent
+      wildcardIdent
     else if context.getText == "()" then
       unit
     else if defined(context.Varid) then

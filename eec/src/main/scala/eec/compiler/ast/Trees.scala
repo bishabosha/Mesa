@@ -18,11 +18,12 @@ import Convert._
 
 import implied Stable.TreeOps._
 import implied NameOps._
+import implied TypeOps._
 
 object Trees {
   import Tree._
 
-  trait Unique(val id: Id)
+  trait Unique(val id: Id) { self: Tree => }
 
   enum Tree(val tpe: Type) derives Eql {
     case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
@@ -100,7 +101,7 @@ object Trees {
             }
             inner(prog :: acc, args ::: patts)
 
-          case Ident(name) => inner((name.show :: _) :: acc, patts)
+          case t @ Ident(name) => inner((s"${name.show} : ${t.tpe.show}" :: _) :: acc, patts)
 
           case Literal(BooleanConstant(b)) =>
             val str = if b then "True" else "False"

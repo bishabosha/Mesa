@@ -365,13 +365,13 @@ object Typers {
 
   private def unifyPattern(
       ctor: Name, ctorTpe: Type, sumTpe: Type): Lifted[(Name, List[Type])] =
-    typeAsDestructor(ctorTpe, sumTpe).map(ctor -> _._1)
+    typeAsDestructor(ctor, ctorTpe, sumTpe).map(ctor -> _._1)
 
   private def unifyLinearPattern(
       ctor: Name, ctorTpe: Type, sumTpe: Type): Lifted[(Name, List[Type])] =
-    typeAsLinearDestructor(ctorTpe, sumTpe).map(t => ctor -> (t._1.toList))
+    typeAsLinearDestructor(ctor, ctorTpe, sumTpe).map(t => ctor -> (t._1.toList))
 
-  private def typeAsDestructor(fTpe: Type, pt: Type): Lifted[(List[Type], Type)] = {
+  private def typeAsDestructor(name: Name, fTpe: Type, pt: Type): Lifted[(List[Type], Type)] = {
     toCurriedList(fTpe).reverse match {
       case ret0 :: args0 =>
         val unifications  = ret0.unifications(pt)
@@ -379,12 +379,14 @@ object Typers {
         val fTpeArgs      = args0.reverse.map(_.unifyFromAll(unifications))
         (fTpeArgs, ret)
 
-      case _ => Err.emptyFunctor(fTpe)
+      case _ => Err.emptyFunctor(name, fTpe)
     }
   }
 
-  private def typeAsLinearDestructor(fTpe: Type, pt: Type): Lifted[(Option[Type], Type)] = {
+  private def typeAsLinearDestructor(name: Name, fTpe: Type, pt: Type): Lifted[(Option[Type], Type)] = {
     toCurriedList(fTpe).reverse match {
+      case Nil => Err.emptyLinearFunctor(name, fTpe)
+
       case linearFType :: Nil =>
         linearFType match {
           case LinearFunctionType(linearArg, ret) =>
@@ -396,15 +398,15 @@ object Typers {
           case ret => (None, ret.unify(pt))
         }
 
-      case _ => Err.emptyFunctor(fTpe)
+      case _ => Err.functionInLinearUnapply(name, fTpe)
     }
   }
 
-  private def typeAsFunctorArgs(
+  private def typeAsSumPatternArgs(
        functor: Name, ts: List[Tree], fTpeArgs: List[Type])
       given Context, Mode, Stoup: Lifted[List[Tree]] = {
     if ts.length != fTpeArgs.length then
-      Err.argsNotMatchLength
+      Err.sumCtorArgsNotMatchLengthPattern(functor, fTpeArgs.length, ts.length)
     else
       ts.zip(fTpeArgs).mapE(_.typed(_))
   }
@@ -682,9 +684,9 @@ object Typers {
                           given Context, Mode, Stoup: Lifted[Tree] = {
     for
       cTpe <- lookupConstructorType(constructor)
-      pair <- typeAsDestructor(cTpe, pt)
+      pair <- typeAsDestructor(constructor, cTpe, pt)
       (fTpeArgs, tpe) = pair
-      args1 <- typeAsFunctorArgs(constructor, args, fTpeArgs)
+      args1 <- typeAsSumPatternArgs(constructor, args, fTpeArgs)
     yield Unapply(constructor, args1)(tpe)
   }
 
@@ -700,7 +702,7 @@ object Typers {
     for
       args1  <- assertMaxSingleArg(args)
       cTpe <- lookupConstructorType(constructor)
-      pair <- typeAsLinearDestructor(cTpe, pt)
+      pair <- typeAsLinearDestructor(constructor, cTpe, pt)
       (linearArg, tpe) = pair
       args2 <- linearArg.mapE(tpe => args1.headOption.mapE(_.typed(tpe)))
     yield Unapply(constructor, args2.flatten.toList)(tpe)
@@ -790,7 +792,7 @@ object Typers {
         resolveVariablesCtor(constructor, dataType, tpeVars)(a.tpe)
       }
       cTpe =  toFunctionType(args2 :+ ret)
-      pair <- typeAsDestructor(cTpe, ret)
+      pair <- typeAsDestructor(constructor, cTpe, ret)
       (fTpeArgs, tpe1) = pair
       cTpe1 =  toFunctionType(fTpeArgs :+ tpe1)
       args2 <- lift(args1.zip(fTpeArgs).map(_.withTpe(_)))
@@ -822,7 +824,7 @@ object Typers {
         _    <- assertLinearCtorIsComp(constructor, dataType, arg1.tpe)
         argT <- resolveVariablesCtor(constructor, dataType, tpeVars)(arg1.tpe)
         cTpe =  LinearFunctionType(argT, ret)
-        pair <- typeAsLinearDestructor(cTpe, ret)
+        pair <- typeAsLinearDestructor(constructor, cTpe, ret)
         (Some(fTpeArg), tpe1) = pair
         cTpe1 =  LinearFunctionType(fTpeArg, tpe1)
         arg2  <- arg1.withTpe(fTpeArg)
@@ -1135,7 +1137,7 @@ object Typers {
             case EmptyName =>
               val prog :: progRest = progs
               val forBaseType: StatT = { stack =>
-                Ident(Wildcard)(Id.noId, Untyped) :: stack
+                Ident(Wildcard)(Id.noId, selTpe) :: stack
               }
               inner(
                 acc,

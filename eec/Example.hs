@@ -27,6 +27,8 @@ ma >>= f : !A -> (A -> !B) -> !B =
 f =<< ma : (A -> !B) -> !A -> !B =
   ma >>= f
 
+makeState a [s] : a -> (S# -○ (!a *: S#)) = !a *: s
+
 succ x : Integer -> Integer =
   x + 1
 

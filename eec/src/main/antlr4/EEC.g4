@@ -135,6 +135,7 @@ exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 lPattern:
 	Varid
 	| Wildcard
+	| literal
 	| Patid ('[' lPattern ']')?
 	| '(' lPatterns? ')'
 	| '()';
