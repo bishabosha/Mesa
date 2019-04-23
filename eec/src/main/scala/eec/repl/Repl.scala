@@ -1,6 +1,8 @@
 package eec
 package repl
 
+import scala.language.implicitConversions
+
 import scala.util.control.NonFatal
 import scala.annotation.tailrec
   
@@ -23,8 +25,6 @@ import Namers._
 import Typers._
 import Types._
 import Type._
-import util.Convert
-import Convert._
 
 import implied CompilerErrorOps._
 import implied TreeOps._
@@ -98,8 +98,8 @@ object Repl {
       guarded(state, s) {
         val yieldTyped = for
           expr  <- f(s)
-          _     <- indexAsTerm(expr)
-          typed <- expr.typedWith(WildcardType)
+          _     <- indexed(expr)
+          typed <- expr.typed
         yield typed
 
         yieldTyped.fold
@@ -114,15 +114,15 @@ object Repl {
       guarded(state, s) {
         val typed = for
           exp <- parseDef(s)
-          _   <- indexAsTerm(exp)
-          tpd <- exp.typedWith(WildcardType)
+          _   <- indexed(exp)
+          tpd <- exp.typed
         yield tpd
 
         typed.fold
           { err => println(s"[ERROR] ${err.show}") }
           { tpd =>
             val DefDef(_, sig, _, _) = tpd
-            val name: Name = sig.convert
+            val name: Name = sig
             println(s"defined ${name.show} : ${tpd.tpe.show}")
           }
 
@@ -134,7 +134,7 @@ object Repl {
       guarded(state, s) {
         f(s).fold
           { err => println(s"[ERROR] ${err.show}") }
-          { ast => pprintln((ast.convert: Stable.Tree)) }
+          { ast => pprintln((ast: Stable.Tree)) }
 
         state
       }
@@ -175,7 +175,7 @@ object Repl {
           { (idGen, ctx) => state.copy(idGen = idGen, ctx = ctx) }
 
       case Ctx =>
-        pprintln(ctx.convert: Seq[Stable.Context])
+        pprintln(ctx: Seq[Stable.Context])
         state
 
       case Quit =>

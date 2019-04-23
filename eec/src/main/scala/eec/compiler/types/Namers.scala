@@ -2,6 +2,8 @@ package eec
 package compiler
 package types
 
+import scala.language.implicitConversions
+
 import ast.Trees._
 import Tree._
 import TreeOps._
@@ -15,8 +17,6 @@ import Name._
 import NameOps._
 import Context._
 import Mode._
-import util.Convert
-import Convert._
 
 import implied NameOps._
 import implied TreeOps._
@@ -25,7 +25,7 @@ object Namers {
 
   private val anon = EmptyName
 
-  def indexAsTerm(tree: Tree) given Context: Lifted[Unit] = {
+  def indexed(tree: Tree) given Context: Lifted[Unit] = {
     implied for Mode = Mode.Term
     index(tree)
   }
@@ -88,7 +88,7 @@ object Namers {
     enterScope(id, anon).flatMap { ctx1 =>
       implied for Context = ctx1
       for
-        _ <- args.foldLeftE(())((_, n) => enterVariable(n.convert))
+        _ <- args.foldLeftE(())((_, n) => enterVariable(n))
         _ <- index(body)
       yield ()
     }
@@ -100,7 +100,7 @@ object Namers {
     enterScope(id, anon).flatMap { ctx1 =>
       implied for Context = ctx1
       for
-        _ <- enterLinear(arg.convert)
+        _ <- enterLinear(arg)
         _ <- index(body)
       yield ()
     }

@@ -1,26 +1,18 @@
 package eec.report.example
 
+--- Supporting Definitions for the File ---
+
 primitive absurd [v] : Void# -○ A#
 
-data L# +: R# =
-    InL[L#]
-  | InR[R#]
+data L# +: R# = InL[L#] | InR[R#]
+data L |: R   = Left L | Right R
 
-data L |: R =
-    Left L
-  | Right R
+fstL [p] : (A#, B#) -○ A# = case p of (a, _) -○ a
+sndL [p] : (A#, B#) -○ B# = case p of (_, b) -○ b
+fst p    : (A, B) -> A    = case p of (a, _) => a
+snd p    : (A, B) -> B    = case p of (_, b) => b
 
-fstL [p] : (A#, B#) -○ A# =
-  case p of (a, _) -○ a
-
-sndL [p] : (A#, B#) -○ B# =
-  case p of (_, b) -○ b
-
-fst p : (A, B) -> A =
-  case p of (a, _) => a
-
-snd p : (A, B) -> B =
-  case p of (_, b) => b
+------------------------------------
 
 isomorphism_2a f [t] : (A -> B#) -> (!A -○ B#) =
   let !x = t in f x

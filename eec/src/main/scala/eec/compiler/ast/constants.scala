@@ -12,10 +12,10 @@ import core.Contexts._
 import core.Constants._
 
 object untyped {
-  val uTpe     = Untyped
-  val litTrue  = Literal(constTrue)(uTpe)
-  val litFalse = Literal(constFalse)(uTpe)
-  val unit     = Parens(Nil)(uTpe)
+  val nt       = EmptyType
+  val litTrue  = Literal(constTrue)(nt)
+  val litFalse = Literal(constFalse)(nt)
+  val unit     = Parens(Nil)(nt)
 }
 
 object typed {

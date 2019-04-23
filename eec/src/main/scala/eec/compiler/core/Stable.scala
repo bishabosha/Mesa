@@ -2,6 +2,8 @@ package eec
 package compiler
 package core
 
+import scala.language.implicitConversions
+
 import ast.Trees
 import core.{Names, Modifiers, Constants, Contexts}
 import Names._
@@ -10,8 +12,6 @@ import Modifiers._
 import Constants._
 import Contexts._
 import types.Types._
-import util.{|>, Convert}
-import Convert._
 
 import implied TypeOps._
 import implied NameOps._
@@ -65,55 +65,56 @@ object Stable {
 
   object ContextOps {
 
-    implied for (Contexts.Context |> Seq[Context]) {
-      def apply(ctx: Contexts.Context): Seq[Context] = {
-        def branch(ctx: Contexts.Context): Seq[Context] = {
-          val linearScopeOpt = {
-            for
-              name <- ctx.linearScope
-              tpe  = ctx.termTypeTable.get(name) match {
-                case Some(t) => t.show
-                case _       => "<notype>"
-              }
-            yield LinearVariable(name.show, tpe)
-          }
-          val data = {
-            for
-              (name, tpe) <- ctx.dataTypeTable
-            yield Data(name.show, tpe.show)
-          }
-          val defs = {
-            for
-              pair <- ctx.termScope.filter { pair =>
-                        val (Sym(_, name), child) = pair
-                        child.termScope.nonEmpty ||
-                        child.linearScope.nonEmpty ||
-                        name.nonEmpty
-                      }
-              (sym, child)  = pair
-              tpeOpt        = ctx.termTypeTable.get(sym.name)
-              tpe           = tpeOpt.fold("<notype>")(t => t.show)
-              name          = sym.name
-            yield {
-              if name.nonEmpty then {
-                if child.termScope.isEmpty then
-                  Term(name.show, tpe)
-                else
-                  TermScope(name.show, tpe, child.convert)
-              } else {
-                AnonScope(child.convert)
-              }
+    implied for Conversion[Contexts.Context, Seq[Context]] {
+
+      def branch(ctx: Contexts.Context): Seq[Context] = {
+        val linearScopeOpt = {
+          for
+            name <- ctx.linearScope
+            tpe  = ctx.termTypeTable.get(name) match {
+              case Some(t) => t.show
+              case _       => "<notype>"
+            }
+          yield LinearVariable(name.show, tpe)
+        }
+        val data = {
+          for
+            (name, tpe) <- ctx.dataTypeTable
+          yield Data(name.show, tpe.show)
+        }
+        val defs = {
+          for
+            pair <- ctx.termScope.filter { pair =>
+                      val (Sym(_, name), child) = pair
+                      child.termScope.nonEmpty ||
+                      child.linearScope.nonEmpty ||
+                      name.nonEmpty
+                    }
+            (sym, child)  = pair
+            tpeOpt        = ctx.termTypeTable.get(sym.name)
+            tpe           = tpeOpt.fold("<notype>")(t => t.show)
+            name          = sym.name
+          yield {
+            if name.nonEmpty then {
+              if child.termScope.isEmpty then
+                Term(name.show, tpe)
+              else
+                TermScope(name.show, tpe, child)
+            } else {
+              AnonScope(child)
             }
           }
-          linearScopeOpt.toList ++ data.toList ++ defs
         }
+        linearScopeOpt.toList ++ data.toList ++ defs
+      }
 
-        def (ctx: Fresh) hasMembers = {
-          ctx.termScope.nonEmpty ||
-          ctx.termTypeTable.nonEmpty ||
-          ctx.linearScope.isDefined
-        }
+      def (ctx: Fresh) hasMembers = {
+        ctx.termScope.nonEmpty ||
+        ctx.termTypeTable.nonEmpty ||
+        ctx.linearScope.isDefined
+      }
 
+      def apply(ctx: Contexts.Context): Seq[Context] = {
         ctx match {
           case ctx: RootContext =>
             List(
@@ -132,7 +133,7 @@ object Stable {
   }
 
   object TreeOps {
-    implied toTree for (Trees.Tree |> Tree) = {
+    implied toTree for Conversion[Trees.Tree, Tree] = {
       case Trees.Tree.Select(tree, name)  => Select(toTree(tree), name)
       case Trees.Tree.Ident(name)         => Ident(name)
 

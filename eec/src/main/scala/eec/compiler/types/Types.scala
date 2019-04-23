@@ -12,7 +12,7 @@ import Names._
 import Name._
 import error.CompilerErrors._
 import CompilerErrorOps._
-import util.{Showable,|>,StackMachine, Utils}
+import util.{Showable,StackMachine, Utils}
 import Utils.view
 import StackMachine._
 import Program._
@@ -35,7 +35,6 @@ object Types {
     case AppliedType(op: Name, args: List[Type])
     case InfixAppliedType(op: Name, a1: Type, a2: Type)
     case WildcardType
-    case Untyped
     case EmptyType
   }
 
@@ -301,8 +300,7 @@ object Types {
             |    ( _:Variable
                 |    WildcardType,       _                    )
             |    ( _:PackageInfo,        _:PackageInfo        )
-            |    (   EmptyType,            EmptyType          )
-            |    (   Untyped,              Untyped            ) => true
+            |    (   EmptyType,            EmptyType          ) => true
 
             case (_: InfixAppliedType,  _: InfixAppliedType) =>
               inner(z, argRest, appsRest)
@@ -471,9 +469,8 @@ object Types {
         case BaseType(t)                    => t.show :: _
         case Variable(t)                    => t.show :: _
         case PackageInfo(parent, name)      => showPackage(parent, name) :: _
-        case WildcardType                   => "<anytype>" :: _
-        case Untyped                        => "<untyped>" :: _
-        case EmptyType                      => "<emptytype>" :: _
+        case WildcardType                   => "<any>" :: _
+        case EmptyType                      => "<nothing>" :: _
       }
 
       private def fromFunctionType(arg: Type, body: Type)
@@ -565,18 +562,14 @@ object Types {
       }
     }
 
-    implied for (List[Type] |> Type) {
-      def apply(ts: List[Type]) = ts match {
-        case tpe :: Nil => tpe
-        case types      => Product(types)
-      }
+    implied for Conversion[List[Type], Type] = {
+      case tpe :: Nil => tpe
+      case types      => Product(types)
     }
 
-    implied for (Type |> List[Type]) {
-      def apply(t: Type) = t match {
-        case Product(ls)  => ls
-        case tpe          => tpe :: Nil
-      }
+    implied for Conversion[Type, List[Type]] = {
+      case Product(ls)  => ls
+      case tpe          => tpe :: Nil
     }
   }
 }

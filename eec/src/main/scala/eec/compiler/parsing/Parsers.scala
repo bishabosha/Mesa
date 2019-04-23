@@ -25,8 +25,6 @@ import Modifiers.{Modifier}
 import Modifier._
 import EECParser._
 import types.Types.TypeOps._
-import util.{Convert, |>}
-import Convert._
 import error.CompilerErrors._
 
 import org.antlr.v4.runtime._
@@ -64,7 +62,7 @@ object Parsers {
         else
           EmptyTree
       }
-    yield PackageDef(pkgId, stats.convert)(uTpe)
+    yield PackageDef(pkgId, stats)(nt)
   }
 
   private class ParserSyntaxException(msg: String) extends Exception(msg)
@@ -93,7 +91,7 @@ object Parsers {
     if txt.endsWith("l") || txt.endsWith("L") then
       CompilerError.SyntaxError(s"unexpected Long literal `$txt`")
     else
-      Literal(BigIntConstant(BigInt(txt)))(uTpe)
+      Literal(BigIntConstant(BigInt(txt)))(nt)
   }
 
   private def fromFloatingPointLiteral(
@@ -104,7 +102,7 @@ object Parsers {
     else if txt.endsWith("d") || txt.endsWith("D") then
       CompilerError.SyntaxError(s"unexpected Double literal `$txt`")
     else
-      Literal(BigDecConstant(BigDecimal(txt)))(uTpe)
+      Literal(BigDecConstant(BigDecimal(txt)))(nt)
   }
 
   private def fromBooleanLiteral(context: LiteralContext): Tree = {
@@ -112,7 +110,7 @@ object Parsers {
       case "True" => true
       case _      => false
     }
-    Literal(BooleanConstant(bool))(uTpe)
+    Literal(BooleanConstant(bool))(nt)
   }
 
   private def charText(context: LiteralContext): String = {
@@ -131,13 +129,13 @@ object Parsers {
   private def fromCharacterLiteral(context: LiteralContext): Tree = {
     val charStr = charText(context)
     val char    = if charStr.length == 0 then 0 else charStr.charAt(0)
-    Literal(CharConstant(char))(uTpe)
+    Literal(CharConstant(char))(nt)
   }
 
   private def fromStringLiteral(context: LiteralContext): Tree = {
     val text    = context.StringLiteral.getText
     val string  = formatString(text)
-    Literal(StringConstant(string))(uTpe)
+    Literal(StringConstant(string))(nt)
   }
 
   private def fromLiteral(context: LiteralContext): Lifted[Tree] = {
@@ -162,17 +160,17 @@ object Parsers {
 
   private def fromOpId(context: IdContext) given IdGen: Tree = {
     val name = context.OpId.getText.readAs
-    Ident(name)(freshId(), uTpe)
+    Ident(name)(freshId(), nt)
   }
 
   private def fromAlphaId(context: AlphaIdContext) given IdGen: Tree = {
     val name = context.getText.readAs
-    Ident(name)(freshId(), uTpe)
+    Ident(name)(freshId(), nt)
   }
 
   private def namesToTree(lst: List[Name]) given IdGen: Tree = lst match {
-    case n :: Nil   => Ident(n)(freshId(), uTpe)
-    case n :: tail  => Select(namesToTree(tail), n)(freshId(), uTpe)
+    case n :: Nil   => Ident(n)(freshId(), nt)
+    case n :: tail  => Select(namesToTree(tail), n)(freshId(), nt)
     case Nil        => EmptyTree
   }
 
@@ -197,7 +195,7 @@ object Parsers {
     if ids.size == 1 then
       ids(0)
     else
-      namesToTree(ids.toList.reverse.map(_.convert: Name))
+      namesToTree(ids.toList.reverse.map(t => t: Name))
   }
 
   private def fromType(context: TypeContext)
@@ -222,7 +220,7 @@ object Parsers {
                                   given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
     val name = context.rassocOpId.getText.readAs
-    val functor = Ident(name)(freshId(), uTpe)
+    val functor = Ident(name)(freshId(), nt)
     for
       functor1 <- fromFunctorType(context.functorType)
       iat      <- fromInfixType(context.infixType)
@@ -233,7 +231,7 @@ object Parsers {
             s"Non associative rhs `${other.show}` to infix type `${name.show}`")
 
       case _ =>
-        InfixApply(functor, functor1, iat)(uTpe)
+        InfixApply(functor, functor1, iat)(nt)
     }
   }
 
@@ -247,7 +245,7 @@ object Parsers {
           .asScala
           .mapE(fromInfixType)
       }
-    yield LinearFunction(infixes(0), infixes(1))(freshId(), uTpe)
+    yield LinearFunction(infixes(0), infixes(1))(freshId(), nt)
   }
 
   private def fromFunc(context: FuncContext) given IdGen: Lifted[Tree] = {
@@ -261,7 +259,7 @@ object Parsers {
       }
     yield {
       val head :: rest = infixes.toList.reverse
-      rest.foldLeft(head)((acc, t) => Function(t :: Nil, acc)(freshId(), uTpe))
+      rest.foldLeft(head)((acc, t) => Function(t :: Nil, acc)(freshId(), nt))
     }
   }
 
@@ -294,17 +292,17 @@ object Parsers {
     for simpleTypes <- context.simpleType.asScala.mapE(fromSimpleType) yield {
       val tag  = fromQualId(context.qualId)
       val args = simpleTypes.toList
-      Apply(tag, args)(uTpe)
+      Apply(tag, args)(nt)
     }
   }
 
   private def fromBangType(context: PrefixTypeContext)
                           given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
-    val tag = Ident(Name.BangTag)(freshId(), uTpe)
+    val tag = Ident(Name.BangTag)(freshId(), nt)
     for simpleTypes <- context.simpleType.asScala.mapE(fromSimpleType) yield {
       val args = simpleTypes.toList
-      Apply(tag, args)(uTpe)
+      Apply(tag, args)(nt)
     }
   }
 
@@ -319,7 +317,7 @@ object Parsers {
   }
 
   private def fromCompId(context: SimpleTypeContext) given IdGen: Tree =
-    Ident(context.CompId.getText.readAs.promoteComp)(freshId(), uTpe)
+    Ident(context.CompId.getText.readAs.promoteComp)(freshId(), nt)
 
   private def fromExpr(context: ExprContext) given IdGen: Lifted[Tree] = {
     if defined(context.lambda) then
@@ -346,7 +344,7 @@ object Parsers {
     for
       exprs <- exprs.asScala.mapE(fromExpr)
       Seq(expr, arg) = exprs
-    yield Apply(expr, arg.convert)(uTpe)
+    yield Apply(expr, arg)(nt)
   }
 
   private def fromLambda(context: LambdaContext) given IdGen: Lifted[Tree] = {
@@ -354,7 +352,7 @@ object Parsers {
     for
       body     <- fromExpr(context.expr)
       bindings <- fromBindings(context.bindings)
-    yield Function(bindings.convert, body)(freshId(), uTpe)
+    yield Function(bindings, body)(freshId(), nt)
   }
 
   private def fromLLambda(context: LLambdaContext)
@@ -363,7 +361,7 @@ object Parsers {
     for
       body    <- fromExpr(context.expr)
       binding <- fromBinding(context.binding)
-    yield LinearFunction(binding, body)(freshId(), uTpe)
+    yield LinearFunction(binding, body)(freshId(), nt)
   }
 
   private def fromLetExpr(context: LetExprContext)
@@ -375,7 +373,7 @@ object Parsers {
     yield {
       val value        = exprs(0)
       val continuation = exprs(1)
-      Let(patt, value, continuation)(freshId(), uTpe)
+      Let(patt, value, continuation)(freshId(), nt)
     }
   }
 
@@ -389,7 +387,7 @@ object Parsers {
     yield {
       val value        = exprs(0)
       val continuation = exprs(1)
-      LetTensor(pattX, pattZ, value, continuation)(freshId(), uTpe)
+      LetTensor(pattX, pattZ, value, continuation)(freshId(), nt)
     }
   }
 
@@ -399,7 +397,7 @@ object Parsers {
     for
       selector <- fromExpr(context.expr)
       cases    <- fromCases(context.cases)
-    yield CaseExpr(selector, cases.convert)(uTpe)
+    yield CaseExpr(selector, cases)(nt)
   }
 
   private def fromLCaseExpr(context: LCaseExprContext)
@@ -408,16 +406,16 @@ object Parsers {
     for
       selector <- fromExpr(context.expr)
       cases    <- fromLCases(context.lCases)
-    yield LinearCaseExpr(selector, cases.convert)(uTpe)
+    yield LinearCaseExpr(selector, cases)(nt)
   }
 
   private def fromIfElse(context: Expr1Context) given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
     for exprs <- context.expr.asScala.mapE(fromExpr) yield {
-      val caseTrue  = CaseClause(litTrue, EmptyTree, exprs(1))(freshId(), uTpe)
-      val caseFalse = CaseClause(wildcardIdent, EmptyTree, exprs(2))(freshId(), uTpe)
+      val caseTrue  = CaseClause(litTrue, EmptyTree, exprs(1))(freshId(), nt)
+      val caseFalse = CaseClause(wildcardIdent, EmptyTree, exprs(2))(freshId(), nt)
       val selector  = exprs(0)
-      CaseExpr(selector, caseTrue :: caseFalse :: Nil)(uTpe)
+      CaseExpr(selector, caseTrue :: caseFalse :: Nil)(nt)
     }
   }
 
@@ -433,13 +431,13 @@ object Parsers {
     import CompilerErrorOps._
     val id = {
       if defined(context.OpId) then
-        Ident(context.OpId.getText.readAs)(freshId(), uTpe)
+        Ident(context.OpId.getText.readAs)(freshId(), nt)
       else
         fromAlphaId(context.alphaId)
     }
     for infixes <- context.infixExpr.asScala.mapE(fromInfixExpr) yield {
-      val firstApply = Apply(id, infixes(0) :: Nil)(uTpe)
-      Apply(firstApply, infixes(1) :: Nil)(uTpe)
+      val firstApply = Apply(id, infixes(0) :: Nil)(nt)
+      Apply(firstApply, infixes(1) :: Nil)(nt)
     }
   }
 
@@ -454,10 +452,10 @@ object Parsers {
   }
 
   private def wrapBang(tree: Tree): Lifted[Tree] =
-    Tree.Bang(tree)(uTpe)
+    Tree.Bang(tree)(nt)
 
   private def wrapWhyNot(tree: Tree): Lifted[Tree] =
-    Tree.WhyNot(tree)(uTpe)
+    Tree.WhyNot(tree)(nt)
 
   private def fromTensorExpr(context: TensorExprContext)
                             given IdGen: Lifted[Tree] = {
@@ -465,7 +463,7 @@ object Parsers {
     for
       x <- fromSimpleExpr(context.simpleExpr)
       z <- fromInfixExpr(context.infixExpr)
-    yield Tree.Tensor(x, z)(uTpe)
+    yield Tree.Tensor(x, z)(nt)
   }
 
   private def fromPrefixExpr(context: PrefixExprContext)
@@ -498,21 +496,21 @@ object Parsers {
     for
       expr <- fromSimpleExpr(context.simpleExpr)
       eval <- fromExpr(context.expr)
-    yield Eval(expr, eval)(uTpe)
+    yield Eval(expr, eval)(nt)
   }
 
   private def fromCases(context: CasesContext)
                        given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
     for caseClauses <- context.caseClause.asScala.mapE(fromCaseClause)
-    yield caseClauses.toList.convert
+    yield caseClauses.toList: Tree
   }
 
   private def fromLCases(context: LCasesContext)
                         given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
     for caseClauses <- context.lCaseClause.asScala.mapE(fromLCaseClause)
-    yield caseClauses.toList.convert
+    yield caseClauses.toList: Tree
   }
 
   private def fromCaseClause(context: CaseClauseContext)
@@ -527,7 +525,7 @@ object Parsers {
           EmptyTree
       }
       body <- fromExpr(context.expr)
-    yield CaseClause(pat, guard, body)(freshId(), uTpe)
+    yield CaseClause(pat, guard, body)(freshId(), nt)
   }
 
   private def fromLCaseClause(context: LCaseClauseContext)
@@ -536,7 +534,7 @@ object Parsers {
     for
       pat  <- fromLPattern(context.lPattern)
       body <- fromExpr(context.expr)
-    yield LinearCaseClause(pat, body)(freshId(), uTpe)
+    yield LinearCaseClause(pat, body)(freshId(), nt)
   }
 
   private def fromExprsInParens(context: ExprsInParensContext)
@@ -567,7 +565,7 @@ object Parsers {
     import CompilerErrorOps._
     val functor = context.Patid.getText.readAs
     for binding <- Option(context.lPattern).mapE(fromLPattern)
-    yield Unapply(functor, binding.toList)(uTpe)
+    yield Unapply(functor, binding.toList)(nt)
   }
 
   private def fromLPatterns(context: LPatternsContext)
@@ -580,7 +578,7 @@ object Parsers {
   private def fromVaridLPattern(context: LPatternContext)
                                given IdGen: Tree = {
     val name = context.Varid.getText.readAs
-    Ident(name)(freshId(), uTpe)
+    Ident(name)(freshId(), nt)
   }
 
   private def fromPattern(context: PatternContext)
@@ -590,7 +588,7 @@ object Parsers {
       if patterns.size == 1 then
         patterns(0)
       else
-        Alternative(patterns.toList)(uTpe)
+        Alternative(patterns.toList)(nt)
     }
   }
 
@@ -603,9 +601,9 @@ object Parsers {
     val name = context.Varid.getText.readAs
     if defined(context.pattern3) then {
       for patt3 <- fromPattern3(context.pattern3)
-      yield Bind(name, patt3)(uTpe)
+      yield Bind(name, patt3)(nt)
     } else {
-      Ident(name)(freshId(), uTpe)
+      Ident(name)(freshId(), nt)
     }
   }
 
@@ -624,7 +622,7 @@ object Parsers {
   private def fromVaridPattern(context: SimplePatternContext)
                               given IdGen: Tree = {
     val name = context.Varid.getText.readAs
-    Ident(name)(freshId(), uTpe)
+    Ident(name)(freshId(), nt)
   }
 
   private def fromFunctorPattern(context: SimplePatternContext)
@@ -632,7 +630,7 @@ object Parsers {
     import CompilerErrorOps._
     val functor = context.Patid.getText.readAs
     for args <- context.pattern.asScala.mapE(fromPattern)
-    yield Unapply(functor, args.toList)(uTpe)
+    yield Unapply(functor, args.toList)(nt)
   }
 
   private def fromSimplePattern(context: SimplePatternContext)
@@ -664,7 +662,7 @@ object Parsers {
     else if trees.size == 1 then
       trees(0)
     else
-      Parens(trees.toList)(uTpe)
+      Parens(trees.toList)(nt)
   }
 
   private def fromGuard(context: GuardContext) given IdGen: Lifted[Tree] =
@@ -678,7 +676,7 @@ object Parsers {
                                 given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
     for bindings <- context.binding.asScala.mapE(fromBinding)
-    yield bindings.toList.convert
+    yield bindings.toList: Tree
   }
 
   private def fromBinding(context: BindingContext)
@@ -686,12 +684,12 @@ object Parsers {
     import CompilerErrorOps._
     val name: Name  = {
       if defined(context.id) then
-        fromId(context.id).convert
+        fromId(context.id)
       else
         Name.Wildcard
     }
     for typ <- fromType(context.`type`)
-    yield Tagged(name, typ)(uTpe)
+    yield Tagged(name, typ)(nt)
   }
 
   private def fromDcl(context: DclContext) given IdGen: Lifted[Tree] = {
@@ -715,11 +713,11 @@ object Parsers {
     fromTypeDcl(context.typeDcl) match {
       case Left(name, args) =>
         for ctors <- fromConstructors(context.constructors)
-        yield DataDcl(name, args, ctors)(uTpe)
+        yield DataDcl(name, args, ctors)(nt)
 
       case Right(op, left, right) =>
         for ctors <- fromConstructors(context.constructors)
-        yield InfixDataDcl(op, left, right, ctors)(uTpe)
+        yield InfixDataDcl(op, left, right, ctors)(nt)
     }
   }
 
@@ -729,11 +727,11 @@ object Parsers {
     fromLTypeDcl(context.lTypeDcl) match {
       case Left(name, args) =>
         for ctors <- fromLConstructors(context.lConstructors)
-        yield DataDcl(name, args, ctors)(uTpe)
+        yield DataDcl(name, args, ctors)(nt)
 
       case Right(op, left, right) =>
         for ctors <- fromLConstructors(context.lConstructors)
-        yield InfixDataDcl(op, left, right, ctors)(uTpe)
+        yield InfixDataDcl(op, left, right, ctors)(nt)
     }
   }
 
@@ -790,7 +788,7 @@ object Parsers {
    import CompilerErrorOps._
     val name = context.Patid.getText.readAs
     for args <- context.`type`.asScala.mapE(fromType)
-    yield CtorSig(name, args.toList)(uTpe)
+    yield CtorSig(name, args.toList)(nt)
   }
 
   private def fromLCtor(context: LCtorContext)
@@ -799,9 +797,9 @@ object Parsers {
     val name = context.Patid.getText.readAs
     if defined(context.`type`) then {
       for arg <- fromType(context.`type`)
-      yield LinearCtorSig(name, Some(arg))(uTpe)
+      yield LinearCtorSig(name, Some(arg))(nt)
     } else {
-      LinearCtorSig(name, None)(uTpe)
+      LinearCtorSig(name, None)(nt)
     }
   }
 
@@ -815,16 +813,16 @@ object Parsers {
         fromLSig(context.lSig)
     }
     for typ <- fromType(context.`type`)
-    yield DefDef(Set(), sig, typ, EmptyTree)(uTpe)
+    yield DefDef(Set(), sig, typ, EmptyTree)(nt)
   }
 
   private def fromLSig(context: LSigContext) given IdGen: Tree = {
-    var name     = (fromAlphaId(context.alphaId).convert: Name)
+    var name     = (fromAlphaId(context.alphaId): Name)
     val paramids = context.paramName.asScala.map(fromParamName)
     if paramids.size == 1 then
-      LinearSig(name, Nil, paramids(0))(freshId(), uTpe)
+      LinearSig(name, Nil, paramids(0))(freshId(), nt)
     else
-      LinearSig(name, paramids.init.toList, paramids.last)(freshId(), uTpe)
+      LinearSig(name, paramids.init.toList, paramids.last)(freshId(), nt)
   }
 
   private def fromParamName(context: ParamNameContext): Name =
@@ -845,7 +843,7 @@ object Parsers {
         else
           fromLSig(context.lSig)
       }
-    yield DefDef(Set(), sig, typ, expr)(uTpe)
+    yield DefDef(Set(), sig, typ, expr)(nt)
   }
 
   private def fromDefSig(context: DefSigContext) given IdGen: Tree = {
@@ -856,9 +854,9 @@ object Parsers {
   }
 
   private def fromPrefixDefSig(context: DefSigContext) given IdGen: Tree = {
-    var name      = (fromAlphaId(context.alphaId).convert: Name)
+    var name      = (fromAlphaId(context.alphaId): Name)
     var paramids  = context.paramName.asScala.map(fromParamName).toList
-    DefSig(name, paramids)(freshId(), uTpe)
+    DefSig(name, paramids)(freshId(), nt)
   }
 
   private def fromInfixDefSig(context: InfixDefSigContext) given IdGen: Tree = {
@@ -873,20 +871,20 @@ object Parsers {
   private def fromInfixOpSig(context: InfixDefSigContext) given IdGen: Tree = {
     var args = context.paramName.asScala.map(fromParamName).toList
     var name = context.OpId.getText.readAs
-    DefSig(name, args)(freshId(), uTpe)
+    DefSig(name, args)(freshId(), nt)
   }
 
   private def fromInfixAlphaSig(context: InfixDefSigContext)
                                given IdGen: Tree = {
     var args  = context.paramName.asScala.map(fromParamName).toList
-    val name  = (fromAlphaId(context.alphaId).convert: Name)
-    DefSig(name, args)(freshId(), uTpe)
+    val name  = (fromAlphaId(context.alphaId): Name)
+    DefSig(name, args)(freshId(), nt)
   }
 
   private def fromPrefixOpSig(context: PrefixOpSigContext) given IdGen: Tree = {
     var args = context.paramName.asScala.map(fromParamName).toList
     val name = context.OpId.getText.readAs
-    DefSig(name, args)(freshId(), uTpe)
+    DefSig(name, args)(freshId(), nt)
   }
 
   private def fromPackageInfo(context: PackageInfoContext) given IdGen: Tree =
@@ -896,7 +894,7 @@ object Parsers {
                          given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
     for stats <- context.stat.asScala.mapE(fromStat)
-    yield stats.toList.convert
+    yield stats.toList: Tree
   }
 
   private def fromStat(context: StatContext) given IdGen: Lifted[Tree] = {

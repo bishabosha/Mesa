@@ -2,6 +2,8 @@ package eec
 package compiler
 package types
 
+import scala.language.implicitConversions
+
 import scala.collection.mutable
 import scala.annotation.tailrec
 
@@ -25,10 +27,9 @@ import CompilerErrors._
 import CompilerErrorOps._
 import core.Contexts._
 import Context._
-import util.{Convert, Showable, Utils}
+import util.{Showable, Utils}
 import Utils.{foldMap, eval}
 import Mode._
-import Convert._
 
 import implied NameOps._
 import implied TypeOps._
@@ -49,9 +50,9 @@ object Typers {
     def stoup given (stoup: Stoup): Stoup = stoup
   }
 
-  def (tree: Tree) typedWith(pt: Type) given Context: Lifted[Tree] = {
+  def (tree: Tree) typed given Context: Lifted[Tree] = {
     implied for Stoup = Blank
-    tree.typedAsExpr(pt)
+    tree.typedAsExpr(any)
   }
 
   private def (tree: Tree) typedAsExpr(pt: Type)
@@ -234,25 +235,25 @@ object Typers {
       for
         _     <- assertStoupEmpty(Err.illegalStoupLinearLambda)
         arg1  <- arg.typed(any)
-        name  =  (arg.convert: Name)
+        name  =  arg: Name
         _     <- assertIsLinear(name, arg1.tpe)
         body1 <- lift {
           implied for Stoup = DependsOn(name)
           body.typed(any)
         }
-        fTpe  <- linearFunctionTypeTpe(arg1, body1)
+        fTpe  <- linearFunctionTypnt(arg1, body1)
         fTpe1 <- checkLinearFunctionWithProto(EmptyName, fTpe, pt)
       yield LinearFunction(arg1, body1)(id, fTpe1)
     }
   }
 
-  private def functionTypeTpe(args1: List[Tree], body1: Tree)
+  private def functionTypnt(args1: List[Tree], body1: Tree)
                              given Mode: Lifted[Type] = {
-    val argTpe = args1.map(_.tpe).convert
+    val argTpe = args1.map(_.tpe)
     FunctionType(argTpe, body1.tpe)
   }
 
-  private def linearFunctionTypeTpe(arg1: Tree, body1: Tree)
+  private def linearFunctionTypnt(arg1: Tree, body1: Tree)
                                    given Mode: Lifted[Type] = {
     if arg1.tpe.isValueType then
       Err.noCompArg
@@ -268,7 +269,7 @@ object Typers {
     for
       args1 <- args.mapE(_.typed(any))
       body1 <- body.typed(any)
-      fTpe  <- functionTypeTpe(args1, body1)
+      fTpe  <- functionTypnt(args1, body1)
     yield Function(args1, body1)(id, fTpe)
   }
 
@@ -278,7 +279,7 @@ object Typers {
     for
       arg1  <- arg.typed(any)
       body1 <- body.typed(any)
-      fTpe  <- linearFunctionTypeTpe(arg1, body1)
+      fTpe  <- linearFunctionTypnt(arg1, body1)
     yield LinearFunction(arg1, body1)(id, fTpe)
   }
 
@@ -346,7 +347,7 @@ object Typers {
     if pt == any then {
       ts.mapE(_.typed(any))
     } else {
-      val ptAsTuple = pt.convert
+      val ptAsTuple = pt: List[Type]
       if ts.length != ptAsTuple.length then
         Err.tupleNoMatch(pt, ptAsTuple)
       else
@@ -359,7 +360,7 @@ object Typers {
                          given Context, Mode, Stoup: Lifted[Tree] = {
     ts.foldMap(unit) { ts =>
       for ts1 <- typeAsTuple(ts, pt)
-      yield Parens(ts1)(ts1.map(_.tpe).convert)
+      yield Parens(ts1)(ts1.map[Type, List[Type]](_.tpe))
     }
   }
 
@@ -443,7 +444,7 @@ object Typers {
         implied for Stoup = Blank
         args.mapE(_.typed(any))
       }
-      argsProto <- args1.map(_.tpe).convert
+      argsProto <- args1.map[Type, List[Type]](_.tpe): Type
       tpe       <- checkFunWithProto(fun1, argsProto)(pt)
     yield Apply(fun1, args1)(tpe)
   }
@@ -839,14 +840,14 @@ object Typers {
   private def typedDefDef(
        modifiers: Set[Modifier], sig: Tree & Unique, tpeD: Tree, body: Tree)
       given Context, Mode, Stoup: Lifted[Tree] = {
-    val typeTpeAs = {
+    val typntAs = {
       if modifiers.contains(Modifier.Primitive) then
         typedAsPrimitive
       else
         typedAsTyping
     }
     for
-      tpeD1    <- typeTpeAs(tpeD)(any)
+      tpeD1    <- typntAs(tpeD)(any)
       tpe      =  tpeD1.tpe
       sig1     <- sig.typed(tpe)
       ret      =  toBodyType(sig1, tpe)
@@ -858,9 +859,8 @@ object Typers {
         body.typed(ret)
       }
     yield {
-      val name     = (sig1.convert: Name)
       val freshTpe = resolveVariables(tpe)
-      putTermType(name, freshTpe)
+      putTermType(sig1, freshTpe)
       DefDef(modifiers, sig1, tpeD1, body1)(tpe)
     }
   }
@@ -1106,7 +1106,7 @@ object Typers {
             val program: StatT = { stack =>
               ts.foldMap(unit :: stack) { ts =>
                 val (ts1, rest) = stack.splitAt(ts.length)
-                Parens(ts1)(Untyped) :: rest
+                Parens(ts1)(EmptyType) :: rest
               }
             }
             inner(
@@ -1124,7 +1124,7 @@ object Typers {
               litFalse :: stack
             }
             val progs1 = (forTrue :: prog) :: (forFalse :: prog) :: progRest
-            val dummyBoolean = (TypeRef(Wildcard) :: Nil)
+            val dummyBoolean = (EmptyType :: Nil)
             inner(
               acc,
               progs1,

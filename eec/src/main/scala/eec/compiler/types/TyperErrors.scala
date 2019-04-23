@@ -2,6 +2,8 @@ package eec
 package compiler
 package types
 
+import scala.language.implicitConversions
+
 import error.CompilerErrors._
 import ast.Trees._
 import TreeOps._
@@ -10,8 +12,6 @@ import types.Typers._
 import core.Names._
 import core.Contexts._
 import Mode._
-import util.Convert
-import Convert._
 
 import implied ModeOps._
 import implied TreeOps._
@@ -93,7 +93,7 @@ object TyperErrors {
 
   def typingMissing(tree: Tree) given Mode =
     CompilerError.IllegalState(
-      s"Typing not implemented for <${mode.show}, ${tree.show}>")
+      s"Tree given by `${tree.show}` has no implementation for typing in mode ${mode.show}.")
 
   def noApplyNonFunctionType =
     CompilerError.IllegalState(s"Can not apply to non function type.")
@@ -117,10 +117,10 @@ object TyperErrors {
       "Linear function does not have computational co-domain.")
 
   def noTensorCompCodomain(comp1: Tree) = {
-    val name = (comp1.convert: Name).show
+    val name = (comp1: Name).show
     val tpe = comp1.tpe.show
     CompilerError.UnexpectedType(
-      s"Linear tensor does not have computational second argument. Given `$name: $tpe`")
+      s"Linear tensor does not have computational second argument. Given `$name` of type `$tpe`")
   }
 
   def noCompLetContinuation =
@@ -137,15 +137,15 @@ object TyperErrors {
 
   def notCaseClase(unknown: Tree) =
     CompilerError.IllegalState(
-      s"$unknown is not Tree.CaseClause")
+      s"${unknown.show} is not Tree.CaseClause")
 
   def notGenCtorSig(unknown: Tree) =
     CompilerError.IllegalState(
-      s"$unknown is not constructor signature")
+      s"${unknown.show} is not constructor signature")
 
   def notLinearCaseClase(unknown: Tree) =
     CompilerError.IllegalState(
-      s"$unknown is not Tree.LinearCaseClause")
+      s"${unknown.show} is not Tree.LinearCaseClause")
 
   def nameInPattAlt(name: Name) =
     CompilerError.IllegalState(

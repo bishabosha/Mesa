@@ -2,6 +2,8 @@ package eec
 package compiler
 package ast
 
+import scala.language.implicitConversions
+
 import core._
 import Names._
 import Name._
@@ -10,11 +12,10 @@ import Constant._
 import Contexts._
 import Modifiers._
 import types.Types._
-import untyped.uTpe
+import untyped.nt
 import annotation._
-import util.{Showable, |>, Convert, Utils}
+import util.{Showable, Utils}
 import Utils.eval
-import Convert._
 
 import implied Stable.TreeOps._
 import implied NameOps._
@@ -56,8 +57,8 @@ object Trees {
     case Bind(name: Name, body: Tree)(tpe: Type) extends Tree(tpe)
     case Unapply(name: Name, args: List[Tree])(tpe: Type) extends Tree(tpe)
     case Tagged(arg: Name, tpeAs: Tree)(tpe: Type) extends Tree(tpe)
-    case TreeSeq(args: List[Tree]) extends Tree(uTpe)
-    case EmptyTree extends Tree(uTpe)
+    case TreeSeq(args: List[Tree]) extends Tree(nt)
+    case EmptyTree extends Tree(nt)
   }
 
   object TreeOps {
@@ -117,46 +118,44 @@ object Trees {
     }
 
     implied for Showable[Tree] {
-      def (t: Tree) show = (t.convert: Stable.Tree).toString
+      def (t: Tree) show =
+        pprint.apply(
+          x = (t: Stable.Tree),
+          height = Int.MaxValue
+        ).render
     }
 
-    implied for (Tree |> List[Tree]) {
-      def apply(t: Tree) = t match {
-        case EmptyTree          => Nil
-        case TreeSeq(args)      => args
-        case Parens(args)       => args
-        case Alternative(args)  => args
-        case t                  => t :: Nil
-      }
+    implied for Conversion[Tree, List[Tree]] = {
+      case EmptyTree          => Nil
+      case TreeSeq(args)      => args
+      case Parens(args)       => args
+      case Alternative(args)  => args
+      case t                  => t :: Nil
     }
 
-    implied for (List[Tree] |> Tree) {
-      def apply(ts: List[Tree]) = ts match {
-        case Nil      => EmptyTree
-        case t :: Nil => t
-        case ts       => TreeSeq(ts)
-      }
+    implied for Conversion[List[Tree], Tree] = {
+      case Nil      => EmptyTree
+      case t :: Nil => t
+      case ts       => TreeSeq(ts)
     }
 
-    implied uniqName for (Tree |> Name) {
-      def apply(tree: Tree) = tree match {
-        case DefSig(name, _)              => name
-        case LinearSig(name, _, _)        => name
-        case DefDef(_, sig, _, _)         => apply(sig)
-        case Tagged(name, _)              => name
-        case Bind(name, _)                => name
-        case Ident(name)                  => name
-        case DataDcl(name, _, _)          => name
-        case InfixDataDcl(name, _, _, _)  => name
-        case CtorSig(name, _)             => name
-        case LinearCtorSig(name, _)       => name
-        case _                            => EmptyName
-      }
+    implied uniqName for Conversion[Tree, Name] = {
+      case DefSig(name, _)              => name
+      case LinearSig(name, _, _)        => name
+      case DefDef(_, sig, _, _)         => sig
+      case Tagged(name, _)              => name
+      case Bind(name, _)                => name
+      case Ident(name)                  => name
+      case DataDcl(name, _, _)          => name
+      case InfixDataDcl(name, _, _, _)  => name
+      case CtorSig(name, _)             => name
+      case LinearCtorSig(name, _)       => name
+      case _                            => EmptyName
     }
 
     def (tree: Tree) linearArg: Name = tree match {
       case LinearSig(_, _, linearArg) => linearArg
-      case LinearFunction(arg,_)      => arg.convert
+      case LinearFunction(arg,_)      => arg
       case _                          => EmptyName
     }
 

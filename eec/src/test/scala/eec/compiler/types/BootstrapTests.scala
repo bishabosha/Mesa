@@ -2,6 +2,8 @@ package eec
 package compiler
 package types
 
+import scala.language.implicitConversions
+
 import core.Contexts._
 import core.Names._
 import error.CompilerErrors._
@@ -13,8 +15,6 @@ import Namers._
 import Types._
 import Type._
 import ast.Trees._
-import util.Convert
-import Convert._
 
 import org.junit.Test
 import org.junit.Assert._
@@ -54,8 +54,8 @@ object BootstrapTests {
                             (exp: Tree)
                             given IdGen, Context: Lifted[Tree] =
     for
-      _   <- indexAsTerm(exp)
-      tpd <- exp.typedWith(pt)
+      _   <- indexed(exp)
+      tpd <- exp.typed
     yield tpd
 
   def failIfUnparsedOrTyped(f: String => IdReader[Lifted[Tree]])
@@ -91,7 +91,7 @@ object BootstrapTests {
       { err => () }
       { tpds =>
         val tpes = tpds.map { t =>
-          val nameStr = (t.convert: Name).show
+          val nameStr = (t: Name).show
           val tpeStr  = t.tpe.show
           s"$nameStr: $tpeStr"
         }

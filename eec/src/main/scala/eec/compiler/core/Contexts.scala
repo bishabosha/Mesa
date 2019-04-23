@@ -90,7 +90,7 @@ object Contexts {
     def idGen given (gen: IdGen) = gen
   }
 
-  case class Sym(id: Id, name: Name)
+  final case class Sym(id: Id, name: Name)
 
   val rootPkg =
     PackageInfo(BaseType(rootName), rootName)
@@ -359,7 +359,7 @@ object Contexts {
     def enterData(name: Name) given Context: Lifted[Unit] = {
       name.foldWildcard(()) {
         guardContainsData(_) {
-          ctx.dataTypeTable += name -> Untyped
+          ctx.dataTypeTable += name -> EmptyType
           ()
         }
       }

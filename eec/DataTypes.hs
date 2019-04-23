@@ -30,16 +30,6 @@ maybe3_to_maybe m : Maybe3 A B C -> Maybe (A, B, C) =
     Just3 a b c => Just (a, b, c);
     _           => Nothing;
 
-maybe3_to_or m : Maybe3 A B C -> (A, B, C) |: () =
-  case m of
-    Just3 a b c => Left (a, b, c);
-    _           => Right ();
-
-or_to_maybe3 m : (A, B, C) |: () -> Maybe3 A B C =
-  case m of
-    Left (a, b, c) => Just3 a b c;
-    _              => Nothing3;
-
 boolean_to_or b: Boolean -> () |: () =
   if b then Left () else Right ()
 
