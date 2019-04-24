@@ -498,7 +498,7 @@ object Types {
           case _: (FunctionType | LinearFunctionType)  => s"($a2)"
           case _                                       => a2
         }
-        s"$a1Final -○ $a2Final" :: rest
+        s"$a1Final ->. $a2Final" :: rest
       }
 
       private def fromInfixAppliedType(op: Name, a1: Type, a2: Type)

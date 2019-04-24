@@ -54,7 +54,7 @@ type: infixType | func | lFunc;
 
 func: infixType ('->' infixType)+;
 
-lFunc: infixType '-○' infixType;
+lFunc: infixType '->.' infixType;
 
 infixAppliedType: functorType rassocOpId infixType;
 
@@ -84,7 +84,7 @@ expr:
 
 lambda: '\\' bindings '=>' expr;
 
-lLambda: '\\' '(' binding ')' '-○' expr;
+lLambda: '\\' '(' binding ')' '=>.' expr;
 
 letExpr: 'let' '!' simplePattern '=' expr 'in' expr;
 
@@ -124,7 +124,7 @@ lCases: lCaseClause (Sep? lCaseClause)*;
 
 caseClause: pattern guard? '=>' expr;
 
-lCaseClause: lPattern '-○' expr;
+lCaseClause: lPattern '=>.' expr;
 
 exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 

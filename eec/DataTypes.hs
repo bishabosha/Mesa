@@ -50,27 +50,27 @@ or_to_either3 e : X |: Y |: Z -> Either3 X Y Z =
     Right (Left y)  => In2 y;
     Right (Right z) => In3 z;
 
-either3c_to_orC [t] : Either3C X# Y# Z# -○ X# +: Y# +: Z# =
+either3c_to_orC [t] : Either3C X# Y# Z# ->. X# +: Y# +: Z# =
   case t of
-    In1C[x] -○ InL[x];
-    In2C[y] -○ InR[InL[y]];
-    In3C[z] -○ InR[InR[z]];
+    In1C[x] =>. InL[x];
+    In2C[y] =>. InR[InL[y]];
+    In3C[z] =>. InR[InR[z]];
 
-orC_to_either3c [e] : X# +: Y# +: Z# -○ Either3C X# Y# Z# =
+orC_to_either3c [e] : X# +: Y# +: Z# ->. Either3C X# Y# Z# =
   case e of
-    InL[x]      -○ In1C[x];
-    InR[InL[y]] -○ In2C[y];
-    InR[InR[z]] -○ In3C[z];
+    InL[x]      =>. In1C[x];
+    InR[InL[y]] =>. In2C[y];
+    InR[InR[z]] =>. In3C[z];
 
-maybec_to_orC [m]: MaybeC A# -○ A# +: () =
+maybec_to_orC [m]: MaybeC A# ->. A# +: () =
   case m of
-    JustC[a] -○ InL[a];
-    _        -○ InR[()];
+    JustC[a] =>. InL[a];
+    _        =>. InR[()];
 
-orC_to_maybec [s]: A# +: () -○ MaybeC A# =
+orC_to_maybec [s]: A# +: () ->. MaybeC A# =
   case s of
-    InL[a] -○ JustC[a];
-    _      -○ NothingC;
+    InL[a] =>. JustC[a];
+    _      =>. NothingC;
 
 orV_to_a e: Void |: A -> A =
   case e of
