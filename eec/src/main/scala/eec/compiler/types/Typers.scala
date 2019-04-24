@@ -458,6 +458,8 @@ object Typers {
         fun.typed(any)
       }
       arg1 <- arg.typed(any)
+      _    <- assertLinearFuncValid(fun1.tpe)
+      _    <- assertCompEvalArg(arg1)
       tpe  <- checkLinearFunWithProto(fun1, arg1.tpe)(pt)
     yield Eval(fun1, arg1)(tpe)
   }
@@ -474,7 +476,10 @@ object Typers {
         AppliedType(BangTag, x :: Nil),
         z
       ) =>
-        (x, z)
+        if z.isValueType then
+          Err.noTensorCompCodomainTpe(z)
+        else
+          (x, z)
 
       case _ => Err.noTensorLetValue(t)
     }
@@ -650,6 +655,7 @@ object Typers {
           implied for Stoup = stoup
           body.typedAsExpr(pt)
         }
+        _ <- assertLinearCaseCompContinuation(body1)
       yield LinearCaseClause(pat1, body1)(id, body1.tpe)
     }
   }
@@ -880,8 +886,10 @@ object Typers {
 
   private def mapLinearArg(arg: Name, tpe: Type)
                           given Context: Lifted[Unit] = tpe match {
-    case LinearFunctionType(argTpe, _) =>
-      for _ <- lookForInLinear(arg)
+    case t @ LinearFunctionType(argTpe, _) =>
+      for
+        _ <- assertLinearFuncValid(t)
+        _ <- lookForInLinear(arg)
       yield {
         putTermType(arg, argTpe)
       }
@@ -997,9 +1005,31 @@ object Typers {
       ()
   }
 
+  private def assertLinearFuncValid(fun1: Type): Lifted[Unit] = fun1 match {
+    case LinearFunctionType(t1, t2) =>
+      if t1.isValueType then
+        Err.noCompArg
+      else if t2.isValueType then
+        Err.noLinearCompCodomain
+      else
+        ()
+
+    case _ => ()
+  }
+
+  private def assertCompEvalArg(arg1: Tree): Lifted[Unit] = {
+    if arg1.tpe.isComputationType then ()
+    else Err.noCompEvalArg
+  }
+
   private def assertLetCompContinuation(cont1: Tree): Lifted[Unit] = {
     if cont1.tpe.isComputationType then ()
     else Err.noCompLetContinuation
+  }
+
+  private def assertLinearCaseCompContinuation(cont1: Tree): Lifted[Unit] = {
+    if cont1.tpe.isComputationType then ()
+    else Err.noCompLinearCaseContinuation
   }
 
   private def assertExhaustiveSingleton(

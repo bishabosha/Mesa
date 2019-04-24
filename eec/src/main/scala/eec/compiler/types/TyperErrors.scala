@@ -108,13 +108,13 @@ object TyperErrors {
     CompilerError.UnexpectedType(
       "Linear function does not have computational domain.")
 
-  def noCompArgCtor(ctor: Name, data: Name, tpe: Type) =
-    CompilerError.UnexpectedType(
-      s"Argument of value type ${tpe.show} in linear constructor ${ctor.show} of ${data.show}.")
-
   def noLinearCompCodomain =
     CompilerError.UnexpectedType(
       "Linear function does not have computational co-domain.")
+
+  def noCompArgCtor(ctor: Name, data: Name, tpe: Type) =
+    CompilerError.UnexpectedType(
+      s"Argument of value type ${tpe.show} in linear constructor ${ctor.show} of ${data.show}.")
 
   def noTensorCompCodomain(comp1: Tree) = {
     val name = (comp1: Name).show
@@ -123,9 +123,22 @@ object TyperErrors {
       s"Linear tensor does not have computational second argument. Given `$name` of type `$tpe`")
   }
 
+  def noTensorCompCodomainTpe(tpe: Type) = {
+    CompilerError.UnexpectedType(
+      s"Linear tensor does not have computational second argument. Given `${tpe.show}`")
+  }
+
+  def noCompEvalArg =
+    CompilerError.UnexpectedType(
+      "Linear evaluation argument does not have computation type.")
+
   def noCompLetContinuation =
     CompilerError.UnexpectedType(
       "Let body does not have computation type.")
+
+  def noCompLinearCaseContinuation =
+    CompilerError.UnexpectedType(
+      "Linear case clause body does not have computation type.")
 
   def noTensorLetValue(value: Tree) =
     CompilerError.UnexpectedType(
