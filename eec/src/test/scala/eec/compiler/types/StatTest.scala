@@ -29,10 +29,9 @@ class StatTest {
 
     "() -> (() ->. ())"
     -|: """ primitive ok _ [_] : () -> (() ->. ()) """,
-  )
 
-  @Test def failLinearSig() = noType(
-    """ linearFail _ [_] : () -> (() ->. ()) = () """ // error: cant put wildcard in stoup for non primitive
+    "() -> (() ->. ())"
+    -|: """ linearFail _ [_] : () -> (() ->. ()) = () """,
   )
 
   @Test def failLinearSum() = noType(
@@ -47,7 +46,9 @@ class StatTest {
 
   @Test def failLinearConstant() = noType(
     """ evaluation [a]: A# ->. () =
-          0 """ // error - `a` is not allowed to be in scope
+          0 """, // error - `a` is not allowed to be in scope
+    """ evaluation [_]: A# ->. () =
+          0 """ // error - `_` is not allowed to be in scope
   )
 
   @Test def failRecursion() = noType(

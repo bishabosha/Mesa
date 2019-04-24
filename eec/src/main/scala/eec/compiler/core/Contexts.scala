@@ -368,8 +368,7 @@ object Contexts {
     def enterLinear(name: Name) given Context: Lifted[Unit] = {
       guardContainsForLinear(name) {
         name.foldWildcard
-          { CompilerError.UnexpectedType(
-            "Illegal anonymous variable in linear context.") }
+          { () }
           { name =>
             ctx.linearScope = Some(name)
           }

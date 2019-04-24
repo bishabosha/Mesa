@@ -2,7 +2,7 @@ package eec.report.example
 
 --- Supporting Definitions for the File ---
 
-primitive absurd [v] : Void# ->. A#
+primitive absurd : Void# ->. A#
 
 data L# +: R# = InL[L#] | InR[R#]
 data L |: R   = Left L | Right R
@@ -43,7 +43,7 @@ isomorphism_3_3b f [t] : (B# ->. (A -> C#)) -> (!A *: B# ->. C#) =
 isomorphism_4a _ : (A# ->. ()) -> () =
   ()
 
-isomorphism_4b _ [a] : () -> (A# ->. ()) =
+isomorphism_4b _ [_] : () -> (A# ->. ()) =
   ()
 
 isomorphism_5a f : (A# ->. (B#, C#)) -> (A# ->. B#, A# ->. C#) =

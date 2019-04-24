@@ -234,7 +234,8 @@ class ExprTest {
 
   @Test def typecheckLinearLambda() = typecheck(
     """ \(a: A#) =>. a """  :|- "A# ->. A#",
-    """ \(b: B#) =>. () """ :|- "B# ->. ()",
+    """ \(a: A#) =>. () """ :|- "A# ->. ()",
+    """ \(_: A#) =>. () """ :|- "A# ->. ()",
   )
 
   @Test def failLinearLambda() = noType(
@@ -242,7 +243,7 @@ class ExprTest {
     """ \(c: C#) =>. !c """, // error: no dependency on c allowed
     """ \(a: A#) =>. \(b: B#) =>. b """, // error: rhs is not computational codomain
     """ \(a: ()) =>. \(b: ()) => \(c: ()) =>. a """, // error: no dependency on a allowed
-    """ \(_: A#) =>. () """, // error: Illegal wildcard var name in stoup
+    """ \(_: A#) =>. 0 """ // error: `_` can not be in linear scope
   )
 
   @Test def typecheckEval() = typecheck(
