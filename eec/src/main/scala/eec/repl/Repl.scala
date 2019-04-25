@@ -126,7 +126,7 @@ object Repl {
           { tpd =>
             val DefDef(_, sig, _, _) = tpd
             val name: Name = sig
-            println(s"defined ${name.show} : ${tpd.tpe.show}")
+            println(s"defined ${name.define} : ${tpd.tpe.show}")
           }
 
         state

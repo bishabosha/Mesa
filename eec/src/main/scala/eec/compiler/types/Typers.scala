@@ -870,7 +870,7 @@ object Typers {
     yield {
       val freshTpe = tpe.mapTypeRefs(Variable(_))
       putTermType(sig1, freshTpe)
-      DefDef(modifiers, sig1, tpeD1, body1)(tpe)
+      DefDef(modifiers, sig1, tpeD1, body1)(freshTpe)
     }
   }
 

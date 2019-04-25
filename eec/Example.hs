@@ -7,9 +7,6 @@ primitive putStrLn : String -> !()
 primitive readInteger : !Integer
 primitive (==) : A -> A -> Boolean
 
-liftD f x : (A -> B#) -> !A -> B# =
-  let !y = x in f y
-
 liftC f x : (A -> B) -> A -> !B =
   !(f x)
 
@@ -21,15 +18,15 @@ snd p: (A, B) -> B =
 
 pairEq : Boolean = (fst (0,""), snd (0,"")) == (0,"")
 
-ma >>= f : !A -> (A -> !B) -> !B =
-  liftD f ma
+x >>= f : !A -> (A -> !B) -> !B = let !y = x in f y
 
-f =<< ma : (A -> !B) -> !A -> !B =
-  ma >>= f
+fmap f x : (A -> B) -> !A -> !B =
+  x >>= (liftC f)
 
 makeState a [s] : a -> (s# ->. (!a *: s#)) = !a *: s
 
 -- x >>= f : !a -> (a -> !b) -> !b = let !y = x in f y
+-- !0 >>= (\(i: Integer) => !(i + 1))
 
 g <<< f : (B -> C) -> (A -> B) -> A -> C = \(a: A) => g (f a)
 
@@ -57,5 +54,5 @@ main : !() =
   if isZero x then
     putStrLn "Entered Zero"
   else
-    let !y = (liftC succ) =<< readInteger in
+    let !y = readInteger >>= (liftC succ) in
     putStrLn ("paired: " ++ (debug (x, y)))

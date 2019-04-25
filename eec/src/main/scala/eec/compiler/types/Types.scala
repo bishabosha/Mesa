@@ -12,7 +12,7 @@ import Names._
 import Name._
 import error.CompilerErrors._
 import CompilerErrorOps._
-import util.{Show,StackMachine, Utils}
+import util.{Show, StackMachine, Utils}
 import Utils.view
 import StackMachine._
 import Program._
@@ -459,7 +459,7 @@ object Types {
 
     implied for Show[Type] {
 
-      def (tpe: Type) show: String = tpe.compute {
+      private def (tpe: Type) showImpl: String = tpe.compute {
         case FunctionType(arg, body)        => fromFunctionType(arg, body)
         case LinearFunctionType(arg, body)  => fromLinearFunctionType(arg, body)
         case InfixAppliedType(op, a1, a2)   => fromInfixAppliedType(op,a1,a2)
@@ -471,6 +471,22 @@ object Types {
         case PackageInfo(parent, name)      => showPackage(parent, name) :: _
         case WildcardType                   => "<any>" :: _
         case EmptyType                      => "<nothing>" :: _
+      }
+
+      def (tpe: Type) show: String = {
+        val body = tpe.showImpl
+        val variableStrings = tpe.foldLeft(List.empty[String]) { (acc, t) =>
+          t match {
+            case t: Variable => t.showImpl :: acc
+            case _           => acc
+          }
+        }.distinct.sorted
+        val quantification = {
+          Some(variableStrings)
+            .filter(_.nonEmpty)
+            .fold("")(_.mkString("forall ", " ", " . "))
+        }
+        s"$quantification$body"
       }
 
       private def fromFunctionType(arg: Type, body: Type)

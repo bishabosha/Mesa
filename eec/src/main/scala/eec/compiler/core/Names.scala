@@ -5,7 +5,7 @@ package core
 import types.Types._
 import Type._
 import Contexts.Id
-import util.{Show, Read}
+import util.{Show, Read, Define}
 
 object Names {
   import Name._
@@ -34,11 +34,15 @@ object Names {
   object DerivedOps {
     private[Names] val OpId = """([!#/%&*+-:<=>?@\\^|~]+)""".r
 
+    implied for Define[Derived] = {
+      case Str(OpId(str))     => s"($str)"
+      case Str(str)           => str
+      case Synthetic(id, str) => s"<$str:$id>"
+    }
+
     implied for Show[Derived] = {
-      case Str(OpId(str))           => s"($str)"
-      case Str(str)                 => str
-      case Synthetic(id, OpId(str)) => s"<($str):$id>"
-      case Synthetic(id, str)       => s"<$str:$id>"
+      case Str(str)           => str
+      case Synthetic(id, str) => s"<$str:$id>"
     }
 
     implied for Read[Derived] = Str(_)
@@ -88,6 +92,12 @@ object Names {
       case CharTag        => "Char"
       case Wildcard       => "_"
       case EmptyName      => "<empty>"
+    }
+
+    implied for Define[Name] = {
+      case Comp(n)  => n.define
+      case From(n)  => n.define
+      case other    => other.show
     }
 
     implied for Read[Name] = {
