@@ -71,9 +71,9 @@ object Parsers {
 
   private def freshId() given IdGen: Id = idGen.fresh()
 
-  private val fromSyntaxError: PartialFunction[Throwable, CompilerError] = {
+  private val fromSyntax: PartialFunction[Throwable, CompilerError] = {
     case error: ParserSyntaxException =>
-      CompilerError.SyntaxError(error.getMessage)
+      CompilerError.Syntax(error.getMessage)
   }
 
   def (parser: String => C) toTreeParser[C]
@@ -81,7 +81,7 @@ object Parsers {
       (input: String) given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
     for
-      context <- parser(input).recover(fromSyntaxError)
+      context <- parser(input).recover(fromSyntax)
       tree    <- toTree(context)
     yield tree
   }
@@ -89,7 +89,7 @@ object Parsers {
   private def fromIntegerLiteral(context: LiteralContext): Lifted[Tree] = {
     val txt = context.IntegerLiteral.getText
     if txt.endsWith("l") || txt.endsWith("L") then
-      CompilerError.SyntaxError(s"unexpected Long literal `$txt`")
+      CompilerError.Syntax(s"unexpected Long literal `$txt`")
     else
       Literal(BigIntConstant(BigInt(txt)))(nt)
   }
@@ -98,9 +98,9 @@ object Parsers {
       context: LiteralContext): Lifted[Tree] = {
     val txt = context.FloatingPointLiteral.getText
     if txt.endsWith("f") || txt.endsWith("F") then
-      CompilerError.SyntaxError(s"unexpected Float literal `$txt`")
+      CompilerError.Syntax(s"unexpected Float literal `$txt`")
     else if txt.endsWith("d") || txt.endsWith("D") then
-      CompilerError.SyntaxError(s"unexpected Double literal `$txt`")
+      CompilerError.Syntax(s"unexpected Double literal `$txt`")
     else
       Literal(BigDecConstant(BigDecimal(txt)))(nt)
   }
@@ -159,8 +159,7 @@ object Parsers {
   }
 
   private def fromOpId(context: IdContext) given IdGen: Tree = {
-    val name = context.OpId.getText.readAs
-    Ident(name)(freshId(), nt)
+    Ident(context.OpId.getText.readAs)(freshId(), nt)
   }
 
   private def fromAlphaId(context: AlphaIdContext) given IdGen: Tree = {
@@ -186,16 +185,11 @@ object Parsers {
   }
 
   private def fromStableId(context: StableIdContext) given IdGen: Tree = {
-    val ids = {
-      context
-        .id
-        .asScala
-        .map(fromId)
-    }
-    if ids.size == 1 then
-      ids(0)
+    val alpha = fromAlphaId(context.alphaId)
+    if defined(context.id) then
+      Select(alpha, context.id.getText.readAs)(freshId(), nt)
     else
-      namesToTree(ids.toList.reverse.map(t => t: Name))
+      alpha
   }
 
   private def fromType(context: TypeContext)
@@ -227,7 +221,7 @@ object Parsers {
     yield iat match {
       case InfixApply(Ident(other),_,_)
         if other != name && !context.infixType.getText.startsWith("(") =>
-          CompilerError.SyntaxError(
+          CompilerError.Syntax(
             s"Non associative rhs `${other.show}` to infix type `${name.show}`")
 
       case _ =>
@@ -482,6 +476,8 @@ object Parsers {
                             given IdGen: Lifted[Tree] = {
     if defined(context.literal) then
       fromLiteral(context.literal)
+    else if defined(context.OpId) then
+      fromOpIdExpr(context)
     else if defined(context.stableId) then
       fromStableId(context.stableId)
     else if defined(context.exprsInParens) then
@@ -489,6 +485,9 @@ object Parsers {
     else
       fromEval(context)
   }
+
+  private def fromOpIdExpr(context: SimpleExprContext): Tree =
+    Ident(context.OpId.getText.readAs)(Id.noId, nt)
 
   private def fromEval(context: SimpleExprContext)
                       given IdGen: Lifted[Tree] = {

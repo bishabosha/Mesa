@@ -236,9 +236,10 @@ class ExprTest {
   )
 
   @Test def typecheckLinearLambda() = typecheck(
-    """ \(a: A#) =>. a """  :|- "A# ->. A#",
-    """ \(a: A#) =>. () """ :|- "A# ->. ()",
-    """ \(_: A#) =>. () """ :|- "A# ->. ()",
+    """ \(a: A#) =>. a """                            :|- "A# ->. A#",
+    """ \(a: A#) =>. () """                           :|- "A# ->. ()",
+    """ \(_: A#) =>. () """                           :|- "A# ->. ()",
+    """ \(a: !A) =>. let !_ = a in \(a: ()) => a """  :|- "!A ->. (() -> ())",
   )
 
   @Test def failLinearLambda() = noType(
@@ -246,7 +247,9 @@ class ExprTest {
     """ \(c: C#) =>. !c """, // error: no dependency on c allowed
     """ \(a: A#) =>. \(b: B#) =>. b """, // error: rhs is not computational codomain
     """ \(a: ()) =>. \(b: ()) => \(c: ()) =>. a """, // error: no dependency on a allowed
-    """ \(_: A#) =>. 0 """ // error: `_` can not be in linear scope
+    """ \(a: ()) =>. \(a: ()) => a """, // error: shadowing of linear a not allowed.
+    """ \(_: A#) =>. 0 """, // error: `_` can not be in linear scope
+    """ \(f: A -> B#) =>. \(x: !A) => let !y = x in f y """ // example from paper that wont type
   )
 
   @Test def typecheckEval() = typecheck(

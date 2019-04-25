@@ -53,6 +53,9 @@ object Repl {
 
   private val defaultPrompt = "eec"
 
+  private def (msg: String) wrapErr =
+    Console.RED + "[ERROR] " + msg + Console.RESET
+
   def loop(): Unit = {
 
     def (prompt: String) asPrompt: String = s"$prompt> "
@@ -70,7 +73,7 @@ object Repl {
     }
 
     newContext.fold
-      { err => println(s"[ERROR] ${err.show}. Quitting...") }
+      { err => println(s"${err.show}. Quitting...".wrapErr) }
       { (idGen, ctx) =>
         val pwd = System.getProperty("user.dir")
         val initial = LoopState(defaultPrompt, false, pwd, idGen, ctx)
@@ -103,7 +106,7 @@ object Repl {
         yield typed
 
         yieldTyped.fold
-          { error => println(s"[ERROR] ${error.show}") }
+          { error => println(error.show.wrapErr) }
           { typed => println(typed.tpe.show) }
 
         state
@@ -119,7 +122,7 @@ object Repl {
         yield tpd
 
         typed.fold
-          { err => println(s"[ERROR] ${err.show}") }
+          { err => println(err.show.wrapErr) }
           { tpd =>
             val DefDef(_, sig, _, _) = tpd
             val name: Name = sig
@@ -133,7 +136,7 @@ object Repl {
     def Ast(s: String)(f: String => IdReader[Lifted[Tree]]): LoopState = {
       guarded(state, s) {
         f(s).fold
-          { err => println(s"[ERROR] ${err.show}") }
+          { err => println(err.show.wrapErr) }
           { ast => pprintln((ast: Stable.Tree)) }
 
         state
@@ -170,7 +173,7 @@ object Repl {
         println("Loading a new context")
         newContext.fold
           { err =>
-            println(s"[ERROR] ${err.show}. Quitting...")
+            println(s"${err.show}. Quitting...".wrapErr)
             state.copy(break = true) }
           { (idGen, ctx) => state.copy(idGen = idGen, ctx = ctx) }
 
@@ -187,7 +190,7 @@ object Repl {
         state
 
       case Unknown =>
-        println(s"[ERROR] unrecognised command: `$input`. Try `:help`")
+        println(s"unrecognised command: `$input`. Try `:help`".wrapErr)
         state
     }
   }
@@ -199,7 +202,7 @@ object Repl {
       return file.getLines.mkString("\n")
     } catch {
       case e: Exception if NonFatal(e) =>
-        CompilerError.IllegalState(e.getMessage)
+        CompilerError.IllegalInput(e.getMessage)
     } finally {
       if file ne null then {
         file.close()
@@ -210,7 +213,7 @@ object Repl {
   private def guarded(state: LoopState, string: String)
                      (body: => LoopState): LoopState = {
     if string.isEmpty then {
-      println("[ERROR] empty input")
+      println("empty input".wrapErr)
       state
     } else {
       body

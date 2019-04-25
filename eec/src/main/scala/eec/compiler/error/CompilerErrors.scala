@@ -13,15 +13,31 @@ object CompilerErrors {
   import CompilerError._
   import CompilerErrorOps._
 
-  enum CompilerError derives Eql {
-    case UnexpectedType(msg: String)
-    case IllegalState(msg: String)
-    case SyntaxError(msg: String)
-  }
-
   type Lifted[O] = O | CompilerError
 
+  enum CompilerError derives Eql {
+    case NameCollision(msg: String)
+    case LinearScope(msg: String)
+    case UnknownIdentifier(msg: String)
+    case UnexpectedType(msg: String)
+    case IllegalState(msg: String)
+    case Internal(msg: String)
+    case IllegalInput(msg: String)
+    case Syntax(msg: String)
+  }
+
   object CompilerErrorOps {
+
+    implied for Showable[CompilerError] = {
+      case e @ NameCollision(msg)     => s"${e.productPrefix}: $msg"
+      case e @ LinearScope(msg)       => s"${e.productPrefix}: $msg"
+      case e @ UnknownIdentifier(msg) => s"${e.productPrefix}: $msg"
+      case e @ UnexpectedType(msg)    => s"${e.productPrefix}: $msg"
+      case e @ IllegalState(msg)      => s"${e.productPrefix}: $msg"
+      case e @ Internal(msg)          => s"${e.productPrefix}: $msg"
+      case e @ IllegalInput(msg)      => s"${e.productPrefix}: $msg"
+      case e @ Syntax(msg)            => s"${e.productPrefix}: $msg"
+    }
 
     def lift[O](o: Lifted[O]): Lifted[O] = o
 
@@ -100,14 +116,6 @@ object CompilerErrors {
         f
       } catch {
         case NonFatal(e) if opt.isDefinedAt(e) => opt(e)
-      }
-    }
-
-    implied for Showable[CompilerError] {
-      def (e: CompilerError) show = e match {
-        case UnexpectedType(msg)  => s"UnexpectedType: $msg"
-        case IllegalState(msg)    => s"IllegalState: $msg"
-        case SyntaxError(msg)     => s"SyntaxError: $msg"
       }
     }
   }

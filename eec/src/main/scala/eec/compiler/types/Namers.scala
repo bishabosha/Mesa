@@ -17,6 +17,7 @@ import Name._
 import NameOps._
 import Context._
 import Mode._
+import types.{NamerErrors => Err}
 
 import implied NameOps._
 import implied TreeOps._
@@ -264,6 +265,6 @@ object Namers {
             | Bang | WhyNot)
        | EmptyTree                              => // atomic
     /* error case */
-    case _                                      => NamerErrors.namingMissing(tree)
+    case _                                      => Err.namingMissing(tree)
   }
 }

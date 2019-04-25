@@ -10,6 +10,7 @@ import TreeOps._
 import types.Types._
 import types.Typers._
 import core.Names._
+import Name._
 import core.Contexts._
 import Mode._
 
@@ -88,18 +89,18 @@ object TyperErrors {
       s"Recursive type reference in constructor ${ctor.show} of ${data.show}.")
 
   def unresolvedVariable(ctor: Name, data: Name, name: Name) =
-    CompilerError.UnexpectedType(
+    CompilerError.UnknownIdentifier(
       s"Unresolved type variable ${name.show} in constructor ${ctor.show} of ${data.show}.")
 
   def typingMissing(tree: Tree) given Mode =
-    CompilerError.IllegalState(
+    CompilerError.Internal(
       s"Tree given by `${tree.show}` has no implementation for typing in mode ${mode.show}.")
 
   def noApplyNonFunctionType =
-    CompilerError.IllegalState(s"Can not apply to non function type.")
+    CompilerError.UnexpectedType(s"Can not apply to non function type.")
 
   def noEvalNonLinearFunctionType =
-    CompilerError.IllegalState(s"Can not eval a non linear function type.")
+    CompilerError.UnexpectedType(s"Can not eval a non-linear function type.")
 
   def tpesNotUnifyTo(tpe: Type) =
     CompilerError.UnexpectedType(s"Types do not unify to ${tpe.show}")
@@ -142,27 +143,27 @@ object TyperErrors {
 
   def noTensorLetValue(value: Tree) =
     CompilerError.UnexpectedType(
-      s"Can not infer type of `${value.show}` as of *: type.")
+      s"Can not infer type of `${value.show}` as of ${TensorTag.show} type.")
 
   def noBangLetValue(value: Tree) =
     CompilerError.UnexpectedType(
-      s"Can not infer type of `${value.show}` as of ! type.")
+      s"Can not infer type of `${value.show}` as of ${BangTag.show} type.")
 
-  def notCaseClase(unknown: Tree) =
-    CompilerError.IllegalState(
-      s"${unknown.show} is not Tree.CaseClause")
+  def notCaseClause(unknown: Tree) =
+    CompilerError.Internal(
+      s"${unknown.show} is not a case clause.")
 
   def notGenCtorSig(unknown: Tree) =
-    CompilerError.IllegalState(
-      s"${unknown.show} is not constructor signature")
+    CompilerError.Internal(
+      s"${unknown.show} is not a constructor signature.")
 
-  def notLinearCaseClase(unknown: Tree) =
-    CompilerError.IllegalState(
-      s"${unknown.show} is not Tree.LinearCaseClause")
+  def notLinearCaseClause(unknown: Tree) =
+    CompilerError.Internal(
+      s"${unknown.show} is not a linear case clause.")
 
   def nameInPattAlt(name: Name) =
-    CompilerError.IllegalState(
-      s"Illegal variable ${name.show} in pattern alternative")
+    CompilerError.NameCollision(
+      s"Illegal variable ${name.show} in pattern alternative.")
 
   def declArgsNotMatchType(name: Name) = {
     CompilerError.UnexpectedType(
@@ -171,34 +172,38 @@ object TyperErrors {
 
   def linearArgNotMatchType(name: Name) = {
     CompilerError.UnexpectedType(
-      s"No linear context found to bind function declaration argument ${name.show}.")
+      s"No linear context found to bind linear argument ${name.show}.")
   }
 
-  def illegalStoupEntry(name: Name, tpe: Type) =
-    CompilerError.UnexpectedType(
-        s"name `${name.show}` of value type: `${tpe.show}` is not allowed in the linear context.")
+  def memberSelection given Mode =
+    CompilerError.Syntax(
+      s"Member selections do not exist for ${mode.show}.")
 
   def illegalStoupDependency(name: Name) =
-    CompilerError.UnexpectedType(
+    CompilerError.UnknownIdentifier(
       s"Reference to linear variable `${name.show}` not in scope.")
 
+  def illegalStoupEntry(name: Name, tpe: Type) =
+    CompilerError.LinearScope(
+        s"name `${name.show}` of value type `${tpe.show}` is not allowed in the linear context.")
+
   def illegalStoupBang(name: Name) =
-    CompilerError.UnexpectedType(
+    CompilerError.LinearScope(
       s"linear variable `${name.show}` can not be in scope when evaluating ! terms.")
 
   def illegalStoupLinearLambda(name: Name) =
-    CompilerError.UnexpectedType(
-      s"linear variable `${name.show}` can not be in scope when evaluating linear lambda terms.")
+    CompilerError.LinearScope(
+      s"linear variable `${name.show}` must not be in scope when introducing a new linear lambda term.")
 
   def illegalStoupValueIdent(z: Name, name: Name, tpe: Type) =
-    CompilerError.UnexpectedType(
-      s"linear variable `${z.show}` can not be in scope when evaluating variable `${name.show}: ${tpe.show}` of value type.")
+    CompilerError.LinearScope(
+      s"linear variable `${z.show}` can not be in scope when evaluating variable `${name.show}` of type `${tpe.show}`.")
 
   def illegalStoupValueLiteral(name: Name) =
-    CompilerError.UnexpectedType(
+    CompilerError.LinearScope(
       s"linear variable `${name.show}` can not be in scope when evaluating a constant literal.")
 
-  def memberSelection given Mode =
-    CompilerError.SyntaxError(
-      s"Member selections do not exist for ${mode.show}.")
+  def illegalStoupLambda(name: Name) =
+    CompilerError.NameCollision(
+      s"linear variable `${name.show}` would be illegally shadowed by lambda argument whilst in scope.")
 }

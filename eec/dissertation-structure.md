@@ -1,5 +1,6 @@
 # [witty title]: Towards a Practical Type System [hopefully replace with programming language] for the Enriched Effects Calculus.
 
+<!-- pandoc -o dissertation-structure.pdf dissertation-structure.md  -->
 ## Abstract
 
 ## Introduction
@@ -139,6 +140,8 @@
 
 ## Examples and Evaluation
 * Isomorphisms from Proposition 4.1 in Egger, Ejlers and Simpson (2014).
+* Pick good examples from testing, e.g. why
+`\(f: A -> B#) =>. \(x: !A) => let !y = x in f y is bad`
 * Create some encodings of effects and sample programs to use them.
 
 ### Missed Goals

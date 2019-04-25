@@ -29,6 +29,19 @@ f =<< ma : (A -> !B) -> !A -> !B =
 
 makeState a [s] : a -> (s# ->. (!a *: s#)) = !a *: s
 
+g <<< f : (B -> C) -> (A -> B) -> A -> C = \(a: A) => g (f a)
+
+{-
+eec> :def g <<< f : (B -> C) -> (A -> B) -> A -> C = \(a: A) => g (f a)
+defined <<< : (B -> C) -> (A -> B) -> A -> C
+
+eec> :t (<<<)
+(<B:1> -> <C:2>) -> (<A:3> -> <B:1>) -> <A:3> -> <C:2>
+
+-}
+
+idL[x] : A# ->. A# = x
+
 succ x : Integer -> Integer =
   x + 1
 

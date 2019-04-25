@@ -44,7 +44,7 @@ alphaId: Patid | Varid;
 
 qualId: id ('.' id)*;
 
-stableId: id | id '.' id;
+stableId: alphaId | alphaId '.' id;
 
 //
 // -- Types
@@ -112,6 +112,7 @@ prefixExpr: (Bang | WhyNot)? simpleExpr;
 
 simpleExpr
    : literal
+	 | '(' OpId ')'
    | stableId
 //   | simpleExpr1 '.' Id  // nice for records
    | exprsInParens

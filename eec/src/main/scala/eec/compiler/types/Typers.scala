@@ -97,10 +97,6 @@ object Typers {
     case _ => EmptyType
   }
 
-  private def resolveVariables(tpe: Type) given Context: Type = {
-    tpe.mapTypeRefs(Variable(_))
-  }
-
   private def resolveVariablesCtor(ctor: Name, data: Name, names: List[Name])
                                   (tpe: Type)
                                   given Context: Lifted[Type] = {
@@ -220,6 +216,10 @@ object Typers {
       implied for Context = fCtx
       for
         args1 <- args.mapE(_.typed(any))
+        _ <- args1.foldLeftE(()) { (_, arg) =>
+          val name: Name = arg
+          name.foldEmptyName(())(assertStoupIsNot(_)(Err.illegalStoupLambda))
+        }
         body1 <- body.typed(any)
         fTpe  <- functionTermTpe(args1, body1)
         fTpe1 <- checkFunctionWithProto(EmptyName, fTpe, pt)
@@ -565,7 +565,7 @@ object Typers {
             remaining.filterNot(guardIdempotent(g) && unifiesWithTemplate(p)(_))
           )
 
-        case unknown => Err.notCaseClase(unknown)
+        case unknown => Err.notCaseClause(unknown)
       }
     }
   }
@@ -582,7 +582,7 @@ object Typers {
           for c1 <- typedLinearCaseClause(p,b,selTpe)(t.id, pt)
           yield (c1 :: ts1, remaining.filterNot(unifiesWithTemplate(p)))
 
-        case unknown => Err.notLinearCaseClase(unknown)
+        case unknown => Err.notLinearCaseClause(unknown)
       }
     }
   }
@@ -865,7 +865,7 @@ object Typers {
         body.typed(ret)
       }
     yield {
-      val freshTpe = resolveVariables(tpe)
+      val freshTpe = tpe.mapTypeRefs(Variable(_))
       putTermType(sig1, freshTpe)
       DefDef(modifiers, sig1, tpeD1, body1)(tpe)
     }
@@ -989,6 +989,12 @@ object Typers {
                            given Stoup: Lifted[Unit] = stoup match {
     case DependsOn(`name`) => ()
     case _                 => err(name)
+  }
+
+  private def assertStoupIsNot(name: Name)(err: Name => CompilerError)
+                              given Stoup, Context: Lifted[Unit] = stoup match {
+    case DependsOn(`name`) => err(name)
+    case _                 => ()
   }
 
   private def assertIsLinear(name: Name, tpe: Type) given Context: Lifted[Unit] = {
