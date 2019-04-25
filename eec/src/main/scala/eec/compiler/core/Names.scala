@@ -10,6 +10,7 @@ import util.{Show, Read}
 object Names {
   import Name._
   import Derived._
+  import DerivedOps._
 
   import implied NameOps._
   import implied DerivedOps._
@@ -31,7 +32,7 @@ object Names {
   val rootName: Name = "_root_".readAs
 
   object DerivedOps {
-    private val OpId = """([!#/%&*+-:<=>?@\\^|~]+)""".r
+    private[Names] val OpId = """([!#/%&*+-:<=>?@\\^|~]+)""".r
 
     implied for Show[Derived] = {
       case Str(OpId(str))           => s"($str)"
@@ -44,6 +45,12 @@ object Names {
   }
 
   object NameOps {
+
+    def (name: Name) isOperator = name match {
+      case From(Str(OpId(_))) | From(Synthetic(_, OpId(_))) => true
+      case Comp(Str(OpId(_))) | Comp(Synthetic(_, OpId(_))) => true
+      case _                                                => false
+    }
 
     def (name: Name) nonEmpty = name != EmptyName
 

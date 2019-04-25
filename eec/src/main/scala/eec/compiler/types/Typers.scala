@@ -906,6 +906,8 @@ object Typers {
     val pts = toCurriedList(pt)
     if pts.length <= args.length then {
       Err.declArgsNotMatchType(name)
+    } else if name.isOperator && pts.length < 3 then {
+      Err.declArgsInfixNotBinary(name)
     } else {
       lookIn(id).flatMap { bodyCtx =>
         implied for Context = bodyCtx

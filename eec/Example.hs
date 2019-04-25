@@ -1,11 +1,11 @@
 package eec.report.example
 
-primitive x + y : Integer -> Integer -> Integer
-primitive s1 ++ s2 : String -> String -> String
-primitive debug x : A -> String
-primitive putStrLn s : String -> !()
+primitive (+) : Integer -> Integer -> Integer
+primitive (++) : String -> String -> String
+primitive debug : A -> String
+primitive putStrLn : String -> !()
 primitive readInteger : !Integer
-primitive a == b : A -> A -> Boolean
+primitive (==) : A -> A -> Boolean
 
 liftD f x : (A -> B#) -> !A -> B# =
   let !y = x in f y
@@ -28,6 +28,8 @@ f =<< ma : (A -> !B) -> !A -> !B =
   ma >>= f
 
 makeState a [s] : a -> (s# ->. (!a *: s#)) = !a *: s
+
+-- x >>= f : !a -> (a -> !b) -> !b = let !y = x in f y
 
 g <<< f : (B -> C) -> (A -> B) -> A -> C = \(a: A) => g (f a)
 

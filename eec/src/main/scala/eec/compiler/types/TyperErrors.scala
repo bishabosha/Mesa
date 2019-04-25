@@ -188,6 +188,11 @@ object TyperErrors {
       s"Function declaration arguments do not match declared type for declaration ${name.show}.")
   }
 
+  def declArgsInfixNotBinary(name: Name) = {
+    CompilerError.UnexpectedType(
+      s"Infix function declaration ${name.show} does not have at least two arguments.")
+  }
+
   def linearArgNotMatchType(name: Name) = {
     CompilerError.UnexpectedType(
       s"No linear context found to bind linear argument ${name.show}.")

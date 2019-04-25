@@ -233,7 +233,7 @@ infixDefSig:
 	paramName (OpId | '`' alphaId '`') paramName
 	| prefixOpSig;
 
-prefixOpSig: '(' OpId ')' paramName paramName;
+prefixOpSig: '(' OpId ')' paramName*;
 
 paramName: Wildcard | Varid;
 
