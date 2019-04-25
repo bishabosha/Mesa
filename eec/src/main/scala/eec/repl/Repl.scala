@@ -124,8 +124,7 @@ object Repl {
         typed.fold
           { err => println(err.show.wrapErr) }
           { tpd =>
-            val DefDef(_, sig, _, _) = tpd
-            val name: Name = sig
+            val name: Name = tpd
             println(s"defined ${name.define} : ${tpd.tpe.show}")
           }
 

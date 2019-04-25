@@ -53,7 +53,6 @@ object Typers {
   def (tree: Tree) typed given Context: Lifted[Tree] = {
     implied for Stoup = Blank
     val res = tree.typedAsExpr(any)
-    resetLocalCtx
     res.doOnError(_ => removeFromCtx(tree.uniqId))
     res
   }
@@ -174,11 +173,14 @@ object Typers {
                                        (fun: Name, fTpe: Type, proto: Type): Lifted[Type] = {
     if proto == WildcardType then {
       fTpe
-    } else if canUnify(fTpe, proto) then {
-      unifiesThen[Lifted[Type]](fTpe, proto)(identity)(
-        onNoArgUnify(fun, fTpe, _, _))
     } else {
-      Err.noApplyNonFunctionType
+      val proto0 = proto.fancyVariables
+      if canUnify(fTpe, proto0) then {
+        unifiesThen[Lifted[Type]](fTpe, proto0)(identity)(
+          onNoArgUnify(fun, fTpe, _, _))
+      } else {
+        Err.noApplyNonFunctionType
+      }
     }
   }
 
@@ -189,11 +191,12 @@ object Typers {
                                    (pt: Type): Lifted[Type] = {
     for
       arg         <- arg(fun.tpe)
-      (arg1, ret) =  unifyf(fun.tpe.unifyFrom(arg)(argProto))
-      argProto1   =  argProto.unify(arg1)
+      argProto0   = argProto.fancyVariables
+      (arg1, ret) =  unifyf(fun.tpe.unifyFrom(arg)(argProto0))
+      argProto1   =  argProto0.unify(arg1)
       ret1        <- lift {
         if arg1 =!= argProto1 then ret.unify(pt)
-        else onNoArgUnify(fun, arg1, argProto)
+        else onNoArgUnify(fun, arg1, argProto0)
       }
     yield ret1
   }
@@ -973,7 +976,7 @@ object Typers {
           _   <- assertInScope(name, tpe)
         yield tpe: Type
       }
-    yield Ident(name)(id, tpe.freshVariables)
+    yield Ident(name)(id, tpe.fancyVariables)
   }
 
   private def assertInScope(name: Name, tpe: Type)
@@ -1231,7 +1234,7 @@ object Typers {
       case _                      => false
     }
     if ignoreType(typed) || unifies(typed.tpe, pt) then
-      typed
+      typed.withTpe(typed.tpe.fancyVariables)
     else
       Err.typecheckFail(typed)(typed.tpe, pt)
   }

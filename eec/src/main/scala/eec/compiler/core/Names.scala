@@ -9,20 +9,12 @@ import util.{Show, Read, Define}
 
 object Names {
   import Name._
-  import Derived._
-  import DerivedOps._
 
   import implied NameOps._
-  import implied DerivedOps._
-
-  enum Derived derives Eql {
-    case Str(str: String)
-    case Synthetic(id: Id, str: String)
-  }
 
   enum Name derives Eql {
-    case From(derived: Derived)
-    case Comp(derived: Derived)
+    case From(derived: String)
+    case Comp(derived: String)
     case BangTag, TensorTag, IntegerTag, DecimalTag, VoidTag, VoidCompTag,
       BooleanTag, StringTag, CharTag
     case Wildcard
@@ -31,29 +23,14 @@ object Names {
 
   val rootName: Name = "_root_".readAs
 
-  object DerivedOps {
-    private[Names] val OpId = """([!#/%&*+-:<=>?@\\^|~]+)""".r
-
-    implied for Define[Derived] = {
-      case Str(OpId(str))     => s"($str)"
-      case Str(str)           => str
-      case Synthetic(id, str) => s"<$str:$id>"
-    }
-
-    implied for Show[Derived] = {
-      case Str(str)           => str
-      case Synthetic(id, str) => s"<$str:$id>"
-    }
-
-    implied for Read[Derived] = Str(_)
-  }
-
   object NameOps {
 
+    private[Names] val OpId = """([!#/%&*+-:<=>?@\\^|~]+)""".r
+
     def (name: Name) isOperator = name match {
-      case From(Str(OpId(_))) | From(Synthetic(_, OpId(_))) => true
-      case Comp(Str(OpId(_))) | Comp(Synthetic(_, OpId(_))) => true
-      case _                                                => false
+      case From(OpId(_)) => true
+      case Comp(OpId(_)) => true
+      case _             => false
     }
 
     def (name: Name) nonEmpty = name != EmptyName
@@ -71,16 +48,9 @@ object Names {
       case _        => name
     }
 
-    def (name: Name) updateDerivedStr(f: String => Derived): Option[Name] =
-      name match {
-        case From(Str(str)) => Some(From(f(str)))
-        case Comp(Str(str)) => Some(Comp(f(str)))
-        case _              => None
-      }
-
     implied for Show[Name] = {
-      case Comp(n)        => n.show
-      case From(n)        => n.show
+      case Comp(s)        => s
+      case From(s)        => s
       case BangTag        => "!"
       case TensorTag      => "*:"
       case VoidTag        => "Void"
@@ -95,11 +65,13 @@ object Names {
     }
 
     implied for Define[Name] = {
-      case Comp(n)    => n.define
-      case From(n)    => n.define
-      case BangTag    => s"(${BangTag.show})"
-      case TensorTag  => s"(${TensorTag.show})"
-      case other    => other.show
+      case Comp(OpId(op)) => s"($op)"
+      case From(OpId(op)) => s"($op)"
+      case Comp(s)        => s
+      case From(s)        => s
+      case BangTag        => s"(${BangTag.show})"
+      case TensorTag      => s"(${TensorTag.show})"
+      case other          => other.show
     }
 
     implied for Read[Name] = {
@@ -113,7 +85,7 @@ object Names {
       case "Char"     => CharTag
       case "Void"     => VoidTag
       case "Void#"    => VoidCompTag
-      case str        => From(the[Read[Derived]].readAs(str))
+      case str        => From(str)
     }
   }
 }

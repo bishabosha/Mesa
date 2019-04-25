@@ -39,6 +39,8 @@ eec> :t (<<<)
 
 -}
 
+id x: A -> A = x
+
 idL[x] : A# ->. A# = x
 
 succ x : Integer -> Integer =

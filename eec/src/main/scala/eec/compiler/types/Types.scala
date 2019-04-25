@@ -2,6 +2,8 @@ package eec
 package compiler
 package types
 
+import scala.language.implicitConversions
+
 import scala.collection.generic.CanBuild
 import scala.annotation.tailrec
 
@@ -426,6 +428,61 @@ object Types {
 
           case _ => acc
         }
+      }
+    }
+
+    val variables: Stream[String] = {
+      val alpha = ('a' to 'z').toStream.map(_.toString)
+      val numeric = for
+        n <- Stream.from(1)
+        x <- alpha
+      yield s"$x$n"
+      alpha #::: numeric
+    }
+
+    val compVariables: Stream[String] = {
+      val alpha = ('a' to 'z').toStream.map(c => s"$c#")
+      val numeric = for
+        n <- Stream.from(1)
+        x <- alpha
+      yield s"$x$n#"
+      alpha #::: numeric
+    }
+
+    def (xs: Seq[String]) `filterVariables` (ys: Seq[String]) =
+      xs.filterNot(ys.contains)
+
+    def (tpe: Type) toNames: (Seq[Name], Seq[Name]) = {
+      tpe.foldLeft(List.empty[Name]) { (acc, t) =>
+        t match {
+          // case Variable(n)              => n::acc
+          case TypeRef(n)               => n::acc
+          case BaseType(n)              => n::acc
+          case AppliedType(n,_)         => n::acc
+          case InfixAppliedType(n,_,_)  => n::acc
+          case _                        => acc
+        }
+      }.distinct.partition {
+        case _: Comp => true
+        case _       => false
+      }
+    }
+
+    def (tpe: Type) fancyVariables: Type = {
+      import NameOps._
+      val (comp, from) = tpe.toNames
+      var comp1 = compVariables `filterVariables` comp.map(_.show)
+      var from1 = variables `filterVariables` from.map(_.show)
+      tpe.replaceVariables {
+        case _:Comp =>
+          val s = Comp(comp1.head)
+          comp1 = comp1.tail
+          Some(s)
+        case _:From =>
+          val s = From(from1.head)
+          from1 = from1.tail
+          Some(s)
+        case _ => None
       }
     }
 

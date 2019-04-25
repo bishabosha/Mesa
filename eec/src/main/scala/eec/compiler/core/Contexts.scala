@@ -8,7 +8,6 @@ import scala.annotation.tailrec
 import Names._
 import Name._
 import NameOps._
-import Derived._
 import error.CompilerErrors._
 import CompilerErrorOps._
 import types.Types
@@ -108,7 +107,6 @@ object Contexts {
     val dataTypeTable: TypeTable,
     val constructorTable: ConstructorTable,
     val constructorNames: mutable.Buffer[Name],
-    val localIdGen: IdGen,
   )
 
   final class RootContext() extends Context(
@@ -117,8 +115,7 @@ object Contexts {
     new mutable.AnyRefMap,
     new mutable.AnyRefMap,
     new mutable.HashMap[Name, mutable.Set[(Name, Type)]] with ConstructorTable,
-    new mutable.ArrayBuffer,
-    new IdGen,
+    new mutable.ArrayBuffer
   )
 
   final class Fresh private[Contexts](
@@ -129,16 +126,11 @@ object Contexts {
     new mutable.AnyRefMap,
     new mutable.AnyRefMap,
     new mutable.HashMap[Name, mutable.Set[(Name, Type)]] with ConstructorTable,
-    new mutable.ArrayBuffer,
-    new IdGen,
+    new mutable.ArrayBuffer
   )
 
   object Context {
     def ctx given (ctx: Context) = ctx
-
-    def resetLocalCtx given Context: Unit = {
-      ctx.localIdGen.reset
-    }
 
     def removeFromCtx(id: Id) given Context: Unit = {
       for (mapping <- symFor(id) if id != Id.empty) {
@@ -384,12 +376,6 @@ object Contexts {
 
     def dataType(name: Name) given Context: Lifted[Type] =
       ctx.dataTypeTable.getOrElse[Lifted[Type]](name, Err.noData(name))
-
-    def (tpe: Type) freshVariables given Context: Type = {
-      tpe.replaceVariables {
-        _.updateDerivedStr(Synthetic(ctx.localIdGen.fresh(), _))
-      }
-    }
 
     def enterBootstrapped given Context, IdGen: Lifted[Unit] = {
       val root = rootCtx
