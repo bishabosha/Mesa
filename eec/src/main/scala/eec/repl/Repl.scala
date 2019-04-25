@@ -170,7 +170,7 @@ object Repl {
         guarded(state, newPrompt) { state.copy(prompt = newPrompt) }
 
       case Reset =>
-        println("Loading a new context")
+        println("Loading a new context.")
         newContext.fold
           { err =>
             println(s"${err.show}. Quitting...".wrapErr)
@@ -189,9 +189,11 @@ object Repl {
         println(helpText)
         state
 
-      case Unknown =>
-        println(s"unrecognised command: `$input`. Try `:help`".wrapErr)
-        state
+      case Unknown(input) =>
+        guarded(state, input) {
+          println(s"unrecognised command: `$input`. Try `:help`.".wrapErr)
+          state
+        }
     }
   }
 
@@ -213,7 +215,7 @@ object Repl {
   private def guarded(state: LoopState, string: String)
                      (body: => LoopState): LoopState = {
     if string.isEmpty then {
-      println("empty input".wrapErr)
+      println("empty input.".wrapErr)
       state
     } else {
       body

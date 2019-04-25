@@ -13,7 +13,8 @@ object Commands {
     case AstFile(path: String)
     case TypeFile(path: String)
     case SetPrompt(prompt: String)
-    case Reset, Quit, ShowHelp, Ctx, Unknown
+    case Unknown(input: String)
+    case Reset, Quit, ShowHelp, Ctx
   }
 
   val helpText: String =
@@ -62,7 +63,7 @@ object Commands {
       case ctx()                => Ctx
       case showHelp()           => ShowHelp
       case resetCommand()       => Reset
-      case _                    => Unknown
+      case unknown              => Unknown(unknown)
     }
   }
 }
