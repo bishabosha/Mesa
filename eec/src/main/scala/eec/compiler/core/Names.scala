@@ -95,8 +95,10 @@ object Names {
     }
 
     implied for Define[Name] = {
-      case Comp(n)  => n.define
-      case From(n)  => n.define
+      case Comp(n)    => n.define
+      case From(n)    => n.define
+      case BangTag    => s"(${BangTag.show})"
+      case TensorTag  => s"(${TensorTag.show})"
       case other    => other.show
     }
 
