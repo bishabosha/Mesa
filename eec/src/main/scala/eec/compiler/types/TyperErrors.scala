@@ -11,6 +11,7 @@ import types.Types._
 import types.Typers._
 import core.Names._
 import Name._
+import NameOps._
 import core.Contexts._
 import Mode._
 
@@ -22,18 +23,35 @@ import implied NameOps._
 object TyperErrors {
 
   def functorNotMatch(functor: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
+    HKTpeNotMatch("Applied Type", functor, fTpe, functorTyp1, proto1)
+  }
+
+  def funcTpeNotMatch(function: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
+    HKTpeNotMatch("Function", function, fTpe, functorTyp1, proto1)
+  }
+
+  def lfuncTpeNotMatch(lfunction: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
+    HKTpeNotMatch("Linear function", lfunction, fTpe, functorTyp1, proto1)
+  }
+
+  def HKTpeNotMatch(kind: String, kindName: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
+    val nameMsg = kindName.foldEmptyName(kind)(name => s"$kind `${name.show}`")
     CompilerError.UnexpectedType(
-      s"Functor definition `${functor.show}` of type `${fTpe.show}` does not match args. Expected `${functorTyp1.show}` but was `${proto1.show}` in type tree.")
+      s"$nameMsg of type `${fTpe.show}` does not match args. Expected `${functorTyp1.show}` but was `${proto1.show}` in type tree.")
   }
 
   def functionNotMatch(fun: Tree, arg1: Type, argProto: Type) = {
+    val kind = "Function definition"
+    val nameMsg = uniqName(fun).foldEmptyName(kind)(name => s"$kind `${name.show}`")
     CompilerError.UnexpectedType(
-      s"Function definition `${uniqName(fun).show}` of type `${fun.tpe.show}` does not match args. Expected `${arg1.show}` but was `${argProto.show}` in application expr.")
+      s"$nameMsg of type `${fun.tpe.show}` does not match args. Expected `${arg1.show}` but was `${argProto.show}` in application expr.")
   }
 
   def linearFunctionNotMatch(fun: Tree, arg1: Type, argProto: Type) = {
+    val kind = "Linear function definition"
+    val nameMsg = uniqName(fun).foldEmptyName(kind)(name => s"$kind `${name.show}`")
     CompilerError.UnexpectedType(
-      s"Linear function definition `${uniqName(fun).show}` of type `${fun.tpe.show}` does not match args. Expected `${arg1.show}` but was `${argProto.show}` in evaluation expr.")
+      s"$nameMsg of type `${fun.tpe.show}` does not match args. Expected `${arg1.show}` but was `${argProto.show}` in evaluation expr.")
   }
 
   def emptyFunctorLinearCtx(fTpe: Type) =

@@ -143,15 +143,15 @@ object Typers {
 
   private val checkFunctorWithProto: (functor: Name, fTpe: Type, proto: Type)
                                       => Lifted[Type] =
-    checkFunctorWithProtoImpl((_,_) => true)(identity)
+    checkFunctorWithProtoImpl((_,_) => true)(Err.functorNotMatch)
 
   private val checkFunctionWithProto: (function: Name, fTpe: Type, proto: Type)
                                         => Lifted[Type] =
-    checkFunctorWithProtoImpl(unifyFunctionTypes)(identity)
+    checkFunctorWithProtoImpl(unifyFunctionTypes)(Err.funcTpeNotMatch)
 
   private val checkLinearFunctionWithProto: (function: Name, fTpe: Type, proto: Type)
                                               => Lifted[Type] =
-    checkFunctorWithProtoImpl(unifyLinearFunctionTypes)(identity)
+    checkFunctorWithProtoImpl(unifyLinearFunctionTypes)(Err.lfuncTpeNotMatch)
 
   private val checkFunWithProto: (fun: Tree, argProto: Type) =>
                                  (pt: Type) => Lifted[Type] = {
@@ -170,13 +170,13 @@ object Typers {
   }
 
   private def checkFunctorWithProtoImpl(canUnify: (Type, Type) => Boolean)
-                                       (f: Type => Type)
+                                       (onNoArgUnify: (Name, Type, Type, Type) => CompilerError)
                                        (fun: Name, fTpe: Type, proto: Type): Lifted[Type] = {
     if proto == WildcardType then {
       fTpe
     } else if canUnify(fTpe, proto) then {
-      unifiesThen[Lifted[Type]](fTpe, proto)(f)(
-        Err.functorNotMatch(fun, fTpe, _, _))
+      unifiesThen[Lifted[Type]](fTpe, proto)(identity)(
+        onNoArgUnify(fun, fTpe, _, _))
     } else {
       Err.noApplyNonFunctionType
     }
