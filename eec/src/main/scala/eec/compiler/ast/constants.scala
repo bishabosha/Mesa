@@ -25,5 +25,5 @@ object typed {
 }
 
 object any {
-  val wildcardIdent = Ident(Wildcard)(Id.noId, WildcardType)
+  val wildcardIdent = Ident(Wildcard)(Id.empty, WildcardType)
 }

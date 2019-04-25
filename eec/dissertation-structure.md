@@ -142,6 +142,7 @@
 * Isomorphisms from Proposition 4.1 in Egger, Ejlers and Simpson (2014).
 * Pick good examples from testing, e.g. why
 `\(f: A -> B#) =>. \(x: !A) => let !y = x in f y is bad`
+* show that you can only shadow linear var after it is consumed.
 * Create some encodings of effects and sample programs to use them.
 
 ### Missed Goals

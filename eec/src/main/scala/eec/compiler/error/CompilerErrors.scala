@@ -7,7 +7,7 @@ import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
-import util.Showable
+import util.Show
 
 object CompilerErrors {
   import CompilerError._
@@ -28,7 +28,7 @@ object CompilerErrors {
 
   object CompilerErrorOps {
 
-    implied for Showable[CompilerError] = {
+    implied for Show[CompilerError] = {
       case e @ NameCollision(msg)     => s"${e.productPrefix}: $msg"
       case e @ LinearScope(msg)       => s"${e.productPrefix}: $msg"
       case e @ UnknownIdentifier(msg) => s"${e.productPrefix}: $msg"
@@ -45,6 +45,12 @@ object CompilerErrors {
         (handler: CompilerError => Nothing): O = o match {
       case err: CompilerError => handler(err)
       case _                  => unlift(o)
+    }
+
+    def (o: Lifted[O]) doOnError [O]
+        (handler: CompilerError => Unit): Unit = o match {
+      case err: CompilerError => handler(err)
+      case _                  =>
     }
 
     inline def unlift[O](o: Lifted[O]): O = o.asInstanceOf[O]

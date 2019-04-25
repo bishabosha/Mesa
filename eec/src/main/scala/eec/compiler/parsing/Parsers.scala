@@ -14,10 +14,10 @@ import Tree._
 import TreeOps._
 import untyped._
 import any._
-import Names._
+import Names.{NameOps, Name}
 import Name._
 import NameOps._
-import Contexts._
+import Contexts.{Id, IdGen, IdReader}
 import IdGen._
 import Constants._
 import core.Constants.Constant._
@@ -487,7 +487,7 @@ object Parsers {
   }
 
   private def fromOpIdExpr(context: SimpleExprContext): Tree =
-    Ident(context.OpId.getText.readAs)(Id.noId, nt)
+    Ident(context.OpId.getText.readAs)(Id.empty, nt)
 
   private def fromEval(context: SimpleExprContext)
                       given IdGen: Lifted[Tree] = {

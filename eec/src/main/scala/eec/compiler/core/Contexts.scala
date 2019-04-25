@@ -15,7 +15,7 @@ import types.Types
 import Types._
 import Type._
 import TypeOps._
-import util.{Showable, Utils}
+import util.{Show, Utils}
 import core.{ContextErrors => Err}
 import Utils._
 
@@ -58,25 +58,27 @@ object Contexts {
   }
 
   object ModeOps {
-    implied for Showable[Mode] {
-      def (m: Mode) show: String = m match {
-        case LinearPat              => "linear pattern"
-        case Pat | PatAlt           => "pattern"
-        case Term                   => "term"
-        case PrimitiveType | Typing => "typing"
-      }
+    implied for Show[Mode] = {
+      case LinearPat              => "linear pattern"
+      case Pat | PatAlt           => "pattern"
+      case Term                   => "term"
+      case PrimitiveType | Typing => "typing"
     }
   }
 
   object Id {
     private[Contexts] val rootId: Id = 0l
-    val noId: Id = -1l
-    val initId: Id = 1l
+    val empty: Id = -1l
+    val init: Id = 1l
     def (x: Id) succ : Id = x + 1l
   }
 
   final class IdGen {
-    private[this] var _id: Id = Id.initId
+    private[this] var _id: Id = Id.init
+
+    private[Contexts] def reset: Unit = {
+      _id = Id.init
+    }
 
     def fresh(): Id = {
       val id = _id
@@ -84,7 +86,7 @@ object Contexts {
       id
     }
 
-    def id = _id
+    def current = _id
   }
 
   object IdGen {
@@ -134,13 +136,23 @@ object Contexts {
   object Context {
     def ctx given (ctx: Context) = ctx
 
+    def resetLocalCtx given Context: Unit = {
+      ctx.localIdGen.reset
+    }
+
+    def removeFromCtx(id: Id) given Context: Unit = {
+      for (mapping <- symFor(id) if id != Id.empty) {
+        ctx.termScope -= mapping
+      }
+    }
+
     def rootCtx given Context = {
       @tailrec
-      def inner(ctx: Context): Context = ctx match {
+      def (ctx: Context) root: Context = ctx match {
         case ctx: RootContext => ctx
-        case ctx: Fresh       => inner(ctx.outer)
+        case ctx: Fresh       => ctx.outer.root
       }
-      inner(ctx)
+      ctx.root
     }
 
     private def firstTermCtx(name: Name) given Context: Lifted[Context] = {
@@ -253,6 +265,10 @@ object Contexts {
       }.getOrElse(Err.noCtxForId(id))
     }
 
+    def symFor(id: Id) given Context: Option[(Sym, Context)] = {
+      ctx.termScope.find(_._1.id == id)
+    }
+
     def lookForInScope(name: Name) given Context: Lifted[Unit] =
       if name != Wildcard && !inScope(name) then Err.noVarInScope(name)
       else ()
@@ -301,7 +317,7 @@ object Contexts {
     def enterVariable(name: Name) given Context: Lifted[Unit] = {
       name.foldWildcard(()) {
         guardContains(_) {
-          ctx.termScope += Sym(noId, name) -> new Fresh(ctx)
+          ctx.termScope += Sym(empty, name) -> new Fresh(ctx)
           ()
         }
       }
@@ -379,7 +395,7 @@ object Contexts {
       val root = rootCtx
       if root.termScope.nonEmpty then {
         Err.noFreshScope
-      } else if idGen.id != Id.initId then {
+      } else if idGen.current != Id.init then {
         Err.noFreshIdGen
       } else {
         implied for Context = root

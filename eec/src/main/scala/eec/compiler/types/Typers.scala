@@ -27,7 +27,7 @@ import CompilerErrors._
 import CompilerErrorOps._
 import core.Contexts._
 import Context._
-import util.{Showable, Utils}
+import util.{Show, Utils}
 import Utils.{foldMap, eval}
 import Mode._
 
@@ -52,7 +52,10 @@ object Typers {
 
   def (tree: Tree) typed given Context: Lifted[Tree] = {
     implied for Stoup = Blank
-    tree.typedAsExpr(any)
+    val res = tree.typedAsExpr(any)
+    resetLocalCtx
+    res.doOnError(_ => removeFromCtx(tree.uniqId))
+    res
   }
 
   private def (tree: Tree) typedAsExpr(pt: Type)
@@ -1172,7 +1175,7 @@ object Typers {
             case EmptyName =>
               val prog :: progRest = progs
               val forBaseType: StatT = { stack =>
-                Ident(Wildcard)(Id.noId, selTpe) :: stack
+                Ident(Wildcard)(Id.empty, selTpe) :: stack
               }
               inner(
                 acc,

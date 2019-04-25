@@ -167,7 +167,7 @@ class ExprTest {
 
   @Test def typecheckCoTensor() = typecheck(
     """ InR [InL [()]] """ :|- "<L#:2> +: () +: <R#:4>",
-    """ InL [InR [()]] """ :|- "(<L#:8> +: ()) +: <R#:6>",
+    """ InL [InR [()]] """ :|- "(<L#:4> +: ()) +: <R#:2>",
   )
 
   @Test def typecheckLinearCase() = typecheck(

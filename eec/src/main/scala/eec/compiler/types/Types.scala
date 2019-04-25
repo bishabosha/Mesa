@@ -12,7 +12,7 @@ import Names._
 import Name._
 import error.CompilerErrors._
 import CompilerErrorOps._
-import util.{Showable,StackMachine, Utils}
+import util.{Show,StackMachine, Utils}
 import Utils.view
 import StackMachine._
 import Program._
@@ -457,7 +457,7 @@ object Types {
 
     def (tpe: Type) isValueType = !tpe.isComputationType
 
-    implied for Showable[Type] {
+    implied for Show[Type] {
 
       def (tpe: Type) show: String = tpe.compute {
         case FunctionType(arg, body)        => fromFunctionType(arg, body)

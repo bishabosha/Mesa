@@ -5,7 +5,7 @@ package core
 import types.Types._
 import Type._
 import Contexts.Id
-import util.{Showable, Readable}
+import util.{Show, Read}
 
 object Names {
   import Name._
@@ -31,16 +31,12 @@ object Names {
   val rootName: Name = "_root_".readAs
 
   object DerivedOps {
-    implied for Showable[Derived] {
-      def (n: Derived) show = n match {
-        case Str(str)           => str
-        case Synthetic(id, str) => s"<$str:$id>"
-      }
+    implied for Show[Derived] = {
+      case Str(str)           => str
+      case Synthetic(id, str) => s"<$str:$id>"
     }
 
-    implied for Readable[Derived] {
-      def (s: String) readAs = Str(s)
-    }
+    implied for Read[Derived] = Str(_)
   }
 
   object NameOps {
@@ -67,38 +63,34 @@ object Names {
         case _              => None
       }
 
-    implied for Showable[Name] {
-      def (n: Name) show = n match {
-        case Comp(n)        => n.show
-        case From(n)        => n.show
-        case BangTag        => "!"
-        case TensorTag      => "*:"
-        case VoidTag        => "Void"
-        case VoidCompTag    => "Void#"
-        case IntegerTag     => "Integer"
-        case DecimalTag     => "Decimal"
-        case BooleanTag     => "Boolean"
-        case StringTag      => "String"
-        case CharTag        => "Char"
-        case Wildcard       => "_"
-        case EmptyName      => "<empty>"
-      }
+    implied for Show[Name] = {
+      case Comp(n)        => n.show
+      case From(n)        => n.show
+      case BangTag        => "!"
+      case TensorTag      => "*:"
+      case VoidTag        => "Void"
+      case VoidCompTag    => "Void#"
+      case IntegerTag     => "Integer"
+      case DecimalTag     => "Decimal"
+      case BooleanTag     => "Boolean"
+      case StringTag      => "String"
+      case CharTag        => "Char"
+      case Wildcard       => "_"
+      case EmptyName      => "<empty>"
     }
 
-    implied for Readable[Name] {
-      def (str: String) readAs = str match {
-        case "!"        => BangTag
-        case "*:"       => TensorTag
-        case "_"        => Wildcard
-        case "Integer"  => IntegerTag
-        case "Decimal"  => DecimalTag
-        case "Boolean"  => BooleanTag
-        case "String"   => StringTag
-        case "Char"     => CharTag
-        case "Void"     => VoidTag
-        case "Void#"    => VoidCompTag
-        case _          => From(the[Readable[Derived]].readAs(str))
-      }
+    implied for Read[Name] = {
+      case "!"        => BangTag
+      case "*:"       => TensorTag
+      case "_"        => Wildcard
+      case "Integer"  => IntegerTag
+      case "Decimal"  => DecimalTag
+      case "Boolean"  => BooleanTag
+      case "String"   => StringTag
+      case "Char"     => CharTag
+      case "Void"     => VoidTag
+      case "Void#"    => VoidCompTag
+      case str        => From(the[Read[Derived]].readAs(str))
     }
   }
 }

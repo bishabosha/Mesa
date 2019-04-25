@@ -9,16 +9,16 @@ import Names._
 import Name._
 import Constants._
 import Constant._
-import Contexts._
+import Contexts.Id
 import Modifiers._
 import types.Types._
 import untyped.nt
 import annotation._
-import util.{Showable, Utils}
+import util.{Show, Utils}
 import Utils.eval
 
 import implied Stable.TreeOps._
-import implied NameOps._
+import implied Names.NameOps._
 import implied TypeOps._
 
 object Trees {
@@ -117,13 +117,19 @@ object Trees {
         .head
     }
 
-    implied for Showable[Tree] {
-      def (t: Tree) show =
-        pprint.apply(
-          x = (t: Stable.Tree),
-          height = Int.MaxValue
-        ).render
+    @tailrec
+    def (tree: Tree) uniqId: Id = tree match {
+      case Select(t, _)     => t.uniqId
+      case PackageDef(t, _) => t.uniqId
+      case DefDef(_,s,_,_)  => s.uniqId
+      case u: Unique        => u.id
+      case _                => Id.empty
     }
+
+    implied for Show[Tree] = t => pprint.apply(
+      x = (t: Stable.Tree),
+      height = Int.MaxValue
+    ).render
 
     implied for Conversion[Tree, List[Tree]] = {
       case EmptyTree          => Nil
