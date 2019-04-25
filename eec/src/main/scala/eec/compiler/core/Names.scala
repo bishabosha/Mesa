@@ -31,9 +31,13 @@ object Names {
   val rootName: Name = "_root_".readAs
 
   object DerivedOps {
+    private val OpId = """([!#/%&*+-:<=>?@\\^|~]+)""".r
+
     implied for Show[Derived] = {
-      case Str(str)           => str
-      case Synthetic(id, str) => s"<$str:$id>"
+      case Str(OpId(str))           => s"($str)"
+      case Str(str)                 => str
+      case Synthetic(id, OpId(str)) => s"<($str):$id>"
+      case Synthetic(id, str)       => s"<$str:$id>"
     }
 
     implied for Read[Derived] = Str(_)

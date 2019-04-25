@@ -54,6 +54,8 @@
   - AST printing.
   - define terms
   - type check terms/source files
+  - Good error messages
+  - Erase from scope if no Type
 
 ### Iteration of development
 * Initially basic effect calculus
