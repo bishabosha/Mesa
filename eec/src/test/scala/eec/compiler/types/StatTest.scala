@@ -15,15 +15,15 @@ class StatTest {
   )
 
   @Test def typecheckWildcard() = typecheck(
-    "forall A B . A -> B -> A" -|: "const x _: A -> B -> A = x"
+    "forall A B. A -> B -> A" -|: "const x _: A -> B -> A = x"
   )
 
   @Test def typecheckLinearSig() = typecheck(
-    "forall A L# R# . A -> (R# ->. L# +: R#)"
+    "forall A L# R#. A -> (R# ->. L# +: R#)"
     -|: """ InRproxy _ [r] : A -> (R# ->. L# +: R#) =
               InR[r] """,
 
-    "forall L# . L# +: ()"
+    "forall L#. L# +: ()"
     -|: """ foo : L# +: () =
               (InRproxy 0)[()] """,
 
@@ -57,7 +57,7 @@ class StatTest {
   )
 
   @Test def typecheckCompUnification() = typecheck(
-    """ eval c : a# -> () = () """        :|- "forall a# . a# -> ()",
+    """ eval c : a# -> () = () """        :|- "forall a#. a# -> ()",
     """ foo : () = eval () """            :|- "()",
     """ bar : () = eval ((), ()) """      :|- "()",
     """ baz : () = eval \(c: z#) => c """ :|- "()"
@@ -86,14 +86,14 @@ class StatTest {
   )
 
   @Test def projectTuplesLinear() = typecheck(
-    "forall A# B# . (A#, B#) ->. A#"       -|:  """ fst[pair] : (A#, B#) ->. A# =
-                                      case pair of (a, _) =>. a """,
+    "forall A# B#. (A#, B#) ->. A#"       -|:  """ fst[pair] : (A#, B#) ->. A# =
+                                                    case pair of (a, _) =>. a """,
 
-    "forall A# B# . (A#, B#) ->. B#"       -|:  """ snd[pair] : (A#, B#) ->. B# =
-                                      case pair of (_, b) =>. b """,
+    "forall A# B#. (A#, B#) ->. B#"       -|:  """ snd[pair] : (A#, B#) ->. B# =
+                                                    case pair of (_, b) =>. b """,
 
-    "forall A# B# . (A#, B#) ->. (A#, B#)" -|:  """ linearEval[pair] : (A#, B#) ->. (A#, B#) =
-                                      (fst[pair], snd[pair]) """
+    "forall A# B#. (A#, B#) ->. (A#, B#)" -|:  """ linearEval[pair] : (A#, B#) ->. (A#, B#) =
+                                                    (fst[pair], snd[pair]) """
   )
 
   /** cantDuplicate is bad because sequentialEval can not have an arg that
@@ -115,37 +115,37 @@ class StatTest {
   )
 
   @Test def typecheckSum() = typecheck(
-    "l: () |: q = Left ()"                    :|- "forall q . () |: q",
-    "r: m |: () = Right ()"                   :|- "forall m . m |: ()",
-    "u: y |: () |: z = Right (Left ())" :|- "forall y z . y |: () |: z",
-    "v: (y |: ()) |: z = Left (Right ())" :|- "forall y z . (y |: ()) |: z"
+    "l: () |: q = Left ()"                :|- "forall q. () |: q",
+    "r: m |: () = Right ()"               :|- "forall m. m |: ()",
+    "u: y |: () |: z = Right (Left ())"   :|- "forall y z. y |: () |: z",
+    "v: (y |: ()) |: z = Left (Right ())" :|- "forall y z. (y |: ()) |: z"
   )
 
   @Test def typecheckLiftBind() = typecheck(
-    "forall a b# . (a -> b#) -> !a -> b#" -|: """ lift f x: (a -> b#) -> !a -> b# =
-                                      let !y = x in f y """,
+    "forall a b#. (a -> b#) -> !a -> b#" -|: """ lift f x: (a -> b#) -> !a -> b# =
+                                                  let !y = x in f y """,
 
-    "forall t u . !t -> (t -> !u) -> !u" -|: """ ma >>= f: !t -> (t -> !u) -> !u =
-                                      lift f ma """,
+    "forall t u. !t -> (t -> !u) -> !u" -|: """ ma >>= f: !t -> (t -> !u) -> !u =
+                                                  lift f ma """,
   )
 
   @Test def linearNonDuplication() = typecheck(
-    "forall A# . A# ->. ()" -|:  """ safeDuplication [a] : A# ->. () =
-                          case (a, a) of
-                            (q, _) =>. ()
-                            (_, r) =>. () """
+    "forall A#. A# ->. ()" -|:  """ safeDuplication [a] : A# ->. () =
+                                      case (a, a) of
+                                        (q, _) =>. ()
+                                        (_, r) =>. () """
   )
 
   @Test def typecheckLinearLambdaEval() = typecheck(
-    "forall A# . Void# ->. A#" -|: """ absurdProxy: Void# ->. A# =
-                            \(v: Void#) =>. absurd[v] """,
+    "forall A#. Void# ->. A#" -|: """ absurdProxy: Void# ->. A# =
+                                        \(v: Void#) =>. absurd[v] """,
   )
 
   @Test def typecheckLambdaApply() = typecheck(
-    "forall A . () -> A" -|: """ primitive f a : () -> A """,
+    "forall A. () -> A" -|: """ primitive f a : () -> A """,
 
-    "forall A . () -> A" -|: """ applyTest: () -> A =
-                        \(u: ()) => f u """
+    "forall A. () -> A" -|: """ applyTest: () -> A =
+                                  \(u: ()) => f u """
   )
 
   @Test def failMatchVariable() =  noType(
@@ -156,8 +156,8 @@ class StatTest {
   )
 
   @Test def typecheckMaybe() = typecheck(
-    "forall a . Maybe a" -|: """ data Maybe a = Just a | Nothing """,
-    "forall A . Maybe A -> A |: ()" -|:
+    "forall a. Maybe a" -|: """ data Maybe a = Just a | Nothing """,
+    "forall A. Maybe A -> A |: ()" -|:
       """ maybe_to_or m : Maybe A -> A |: () =
             case m of
               Just a  => Left a;
@@ -165,8 +165,8 @@ class StatTest {
   )
 
   @Test def typecheckMaybeC() = typecheck(
-    "forall a# . MaybeC a#" -|: """ data MaybeC a# = JustC[a#] | NothingC """,
-    "forall A# . MaybeC A# -> A# +: ()" -|:
+    "forall a#. MaybeC a#" -|: """ data MaybeC a# = JustC[a#] | NothingC """,
+    "forall A#. MaybeC A# -> A# +: ()" -|:
       """ maybec_to_compsum m: MaybeC A# -> A# +: () =
             case m of
               JustC[a] =>. InL[a];
@@ -174,7 +174,7 @@ class StatTest {
   )
 
   @Test def typecheckMatchSumArbitraryDepth() = typecheck(
-    "forall u w x y z . (w |: x) |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
+    "forall u w x y z. (w |: x) |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
     -|: """ cat4_alt0 e wu xu yu zu: (w |: x) |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
               case e of
                 Left  (Left a)  => wu a;
@@ -182,7 +182,7 @@ class StatTest {
                 Right (Left c)  => yu c;
                 Right (Right d) => zu d """,
 
-    "forall u w x y z . ((w |: x) |: y) |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
+    "forall u w x y z. ((w |: x) |: y) |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
     -|: """ cat4_alt1 e wu xu yu zu: ((w |: x) |: y) |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
               case e of
                 Left  (Left  (Left a))  => wu a;
@@ -190,7 +190,7 @@ class StatTest {
                 Left  (Right c)         => yu c;
                 Right d                 => zu d """,
 
-    "forall u w x y z . w |: x |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
+    "forall u w x y z. w |: x |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u"
     -|: """ cat4_alt2 e wu xu yu zu: w |: x |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
               case e of
                 Left  a                 => wu a;
@@ -200,7 +200,7 @@ class StatTest {
   )
 
   @Test def typecheckLinearMatchSumArbitraryDepth() = typecheck(
-    "forall u w# x# y# z# . (w# ->. !u) -> (x# ->. !u) -> (y# ->. !u) -> (z# ->. !u) -> ((w# +: x#) +: y# +: z# ->. !u)"
+    "forall u w# x# y# z#. (w# ->. !u) -> (x# ->. !u) -> (y# ->. !u) -> (z# ->. !u) -> ((w# +: x#) +: y# +: z# ->. !u)"
     -|: """ cat4_alt0 wu xu yu zu [e] : (w# ->. !u) -> (x# ->. !u) -> (y# ->. !u) -> (z# ->. !u) -> ((w# +: x#) +: y# +: z# ->. !u) =
               case e of
                 InL[ InL[ a]] =>. wu[a]
@@ -208,7 +208,7 @@ class StatTest {
                 InR[ InL[ c]] =>. yu[c]
                 InR[ InR[ d]] =>. zu[d] """,
 
-    "forall u w# x# y# z# . (w# ->. !u) -> (x# ->. !u) -> (y# ->. !u) -> (z# ->. !u) -> (((w# +: x#) +: y#) +: z# ->. !u)"
+    "forall u w# x# y# z#. (w# ->. !u) -> (x# ->. !u) -> (y# ->. !u) -> (z# ->. !u) -> (((w# +: x#) +: y#) +: z# ->. !u)"
     -|: """ cat4_alt1 wu xu yu zu [e]: (w# ->. !u) -> (x# ->. !u) -> (y# ->. !u) -> (z# ->. !u) -> (((w# +: x#) +: y#) +: z# ->. !u) =
               case e of
                 InL[ InL[ InL[ a]]] =>. wu[a]
@@ -216,7 +216,7 @@ class StatTest {
                 InL[ InR[ c]]       =>. yu[c]
                 InR[ d]             =>. zu[d] """,
 
-    "forall u w# x# y# z# . (w# ->. !u) -> (x# ->. !u) -> (y# ->. !u) -> (z# ->. !u) -> (w# +: x# +: y# +: z# ->. !u)"
+    "forall u w# x# y# z#. (w# ->. !u) -> (x# ->. !u) -> (y# ->. !u) -> (z# ->. !u) -> (w# +: x# +: y# +: z# ->. !u)"
     -|: """ cat4_alt2 wu xu yu zu [e]: (w# ->. !u) -> (x# ->. !u) -> (y# ->. !u) -> (z# ->. !u) -> (w# +: x# +: y# +: z# ->. !u) =
               case e of
                 InL[ a]             =>. wu[a]

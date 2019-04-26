@@ -361,7 +361,7 @@ object Types {
       inner(Nil, tpe)
     }
 
-    def toCurriedList(t: Type): List[Type] = {
+    def (t: Type) toCurriedList: List[Type] = {
       @tailrec
       def inner(acc: List[Type], t: Type): List[Type] = t match {
         case FunctionType(arg, body)  => inner(arg :: acc, body)
@@ -373,10 +373,10 @@ object Types {
     def toBodyType(defSig: Tree, t: Type): Type =
       defSig match {
         case DefSig(_, args) =>
-          toFunctionType(toCurriedList(t).drop(args.length))
+          toFunctionType(t.toCurriedList.drop(args.length))
 
         case LinearSig(_, args, _) =>
-          val fArgs = toCurriedList(t).drop(args.length)
+          val fArgs = t.toCurriedList.drop(args.length)
           fArgs.reverse match {
             case LinearFunctionType(arg1, body) :: Nil =>
               body
@@ -484,7 +484,7 @@ object Types {
         val quantification = {
           Some(variableStrings)
             .filter(_.nonEmpty)
-            .fold("")(_.mkString("forall ", " ", " . "))
+            .fold("")(_.mkString("forall ", " ", ". "))
         }
         s"$quantification$body"
       }

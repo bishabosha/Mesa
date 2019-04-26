@@ -47,6 +47,7 @@ object Repl {
     prompt: String,
     break: Boolean,
     pwd: String,
+    loadPrelude: Boolean,
     idGen: IdGen,
     ctx: Context
   )
@@ -56,40 +57,56 @@ object Repl {
   private def (msg: String) wrapErr =
     Console.RED + "[ERROR] " + msg + Console.RESET
 
-  def loop(): Unit = {
+  def loop(enterPrelude: Boolean): Unit = {
 
     def (prompt: String) asPrompt: String = s"$prompt> "
 
     @tailrec
     def inner(state: LoopState): Unit = state match {
-      case s @ LoopState(prompt, false, _, _, _) =>
+      case s @ LoopState(prompt,false,_,_,_,_) =>
         println
         print(prompt.asPrompt)
         val nextState = command(s, readLine)
         inner(nextState)
 
-      case LoopState(_, true, _, _, _) =>
+      case LoopState(_,true,_,_,_,_) =>
         // exit
     }
 
-    newContext.fold
+    println("starting eec REPL...")
+    newContext(enterPrelude).fold
       { err => println(s"${err.show}. Quitting...".wrapErr) }
       { (idGen, ctx) =>
         val pwd = System.getProperty("user.dir")
-        val initial = LoopState(defaultPrompt, false, pwd, idGen, ctx)
-        println("starting eec REPL...")
+        val initial = LoopState(defaultPrompt, false, pwd, enterPrelude, idGen, ctx)
         print(defaultPrompt.asPrompt)
         val state = command(initial, readLine)
         inner(state)
       }
   }
 
-  private def newContext: Lifted[(IdGen, Context)] = {
+  private def newContext(enterPrelude: Boolean): Lifted[(IdGen, Context)] = {
     val rootCtx   = new RootContext()
     val rootIdGen = new IdGen
     implied for Context = rootCtx
     implied for IdGen = rootIdGen
-    for _ <- Context.enterBootstrapped yield (rootIdGen, rootCtx)
+    for
+      _ <- Context.enterBootstrapped
+      _ <- lift {
+        if enterPrelude then {
+          println("Loading Prelude.")
+          Prelude.preludeDefs.foldLeftE(()) { (_,s) =>
+            for
+              expr <- parseDef(s)
+              _    <- indexed(expr)
+              _    <- expr.typed
+            yield ()
+          }
+        } else {
+          ()
+        }
+      }
+    yield (rootIdGen, rootCtx)
   }
 
   private def command(state: LoopState, input: String): LoopState = {
@@ -124,8 +141,7 @@ object Repl {
         typed.fold
           { err => println(err.show.wrapErr) }
           { tpd =>
-            val DefDef(_, sig, _, _) = tpd
-            val name: Name = sig
+            val name: Name = tpd
             println(s"defined ${name.define} : ${tpd.tpe.show}")
           }
 
@@ -171,7 +187,7 @@ object Repl {
 
       case Reset =>
         println("Loading a new context.")
-        newContext.fold
+        newContext(state.loadPrelude).fold
           { err =>
             println(s"${err.show}. Quitting...".wrapErr)
             state.copy(break = true) }

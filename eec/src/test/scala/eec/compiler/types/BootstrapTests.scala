@@ -115,7 +115,7 @@ object BootstrapTests {
 
     val pair = for
       _ <- Context.enterBootstrapped
-      _ <- compiler.preludeDefs.mapE(typeStat(_)(any))
+      _ <- Prelude.preludeDefs.mapE(typeStat(_)(any))
     yield (idGen, ctx)
 
     pair.onError { err => fail(s"[INIT] ${err.show}"); ??? }

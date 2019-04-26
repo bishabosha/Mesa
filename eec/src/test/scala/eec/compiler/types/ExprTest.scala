@@ -125,6 +125,12 @@ class ExprTest {
                           Left  x => x;
                           Right _ => () """,
 
+    "()"       -|:  """ case Left () of
+                          (Left _) | (Right _) => () """,
+
+    "()"       -|:  """ case (0,0) of
+                          (1,2) | (_,_) => () """,
+
     "()"       -|:  """ case Right () of
                           Right x => x;
                           Left  _ => () """,
@@ -141,6 +147,13 @@ class ExprTest {
   @Test def failCase() = noType(
     """ case Left () of
          Left  x => x """, // error: missing [Right _]
+
+    """ case Right () of
+          l @ Left _ => ();
+          Left  _ => () """, // error: missing [Right _]
+
+    """ case (0,0) of
+          (1,2) | (3,_) => () """, // error: missing [(_: Integer, _: Integer)]
 
     """ case Right () of
          Right  x => x """, // error: missing [Left _]
@@ -209,6 +222,8 @@ class ExprTest {
   @Test def typecheckLambda() = typecheck(
     """ \(t: ()) => () """                :|- "() -> ()",
     """ \(_: ()) => () """                :|- "() -> ()",
+    """ \(t: A) => () """                 :|- "forall A. A -> ()",
+    """ \(_: A) => () """                 :|- "forall A. A -> ()",
     """ \(t: ()) => t """                 :|- "() -> ()",
     """ \(_: () -> ()) => () """          :|- "(() -> ()) -> ()",
     """ \(_: () ->. ()) => () """         :|- "(() ->. ()) -> ()",
@@ -231,10 +246,10 @@ class ExprTest {
   )
 
   @Test def typecheckLinearLambda() = typecheck(
-    """ \(a: A#) =>. a """                            :|- "A# ->. A#",
-    """ \(a: A#) =>. () """                           :|- "A# ->. ()",
-    """ \(_: A#) =>. () """                           :|- "A# ->. ()",
-    """ \(a: !A) =>. let !_ = a in \(a: ()) => a """  :|- "!A ->. (() -> ())",
+    """ \(a: A#) =>. a """                            :|- "forall A#. A# ->. A#",
+    """ \(a: A#) =>. () """                           :|- "forall A#. A# ->. ()",
+    """ \(_: A#) =>. () """                           :|- "forall A#. A# ->. ()",
+    """ \(a: !A) =>. let !_ = a in \(a: ()) => a """  :|- "forall A. !A ->. (() -> ())",
   )
 
   @Test def failLinearLambda() = noType(

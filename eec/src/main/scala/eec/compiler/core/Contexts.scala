@@ -365,7 +365,7 @@ object Contexts {
 
     def linkConstructor(name: Name, tpe: Type) given Context: Unit = {
       import NameOps._
-      val ret = toCurriedList(tpe).last.unwrapLinearBody
+      val ret = tpe.toCurriedList.last.unwrapLinearBody
       dataDefinitionName(ret).foldEmptyName(()) { functor =>
         ctx.constructorTable.addBinding(functor, name -> tpe)
         ctx.constructorNames += name

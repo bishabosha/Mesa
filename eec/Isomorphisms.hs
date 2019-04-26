@@ -12,7 +12,7 @@ sndL [p] : (A#, B#) ->. B# = case p of (_, b) =>. b
 fst p    : (A, B) -> A     = case p of (a, _) => a
 snd p    : (A, B) -> B     = case p of (_, b) => b
 
-------------------------------------
+-------------------------------------------
 
 isomorphism_2a f [t] : (A -> B#) -> (!A ->. B#) =
   let !x = t in f x

@@ -27,9 +27,10 @@ makeState a [s] : a -> (s# ->. (!a *: s#)) = !a *: s
 
 -- x >>= f : !a -> (a -> !b) -> !b = let !y = x in f y
 -- !0 >>= (\(i: Integer) => !(i + 1))
+-- \(f: a -> b -> c)(p: (a,b)) => case p of (a,b) => f a b
 
 g <<< f : (B -> C) -> (A -> B) -> A -> C = \(a: A) => g (f a)
-
+-- \(p: (a#,b#)) =>. case p of (a,_) =>. a
 {-
 eec> :def g <<< f : (B -> C) -> (A -> B) -> A -> C = \(a: A) => g (f a)
 defined <<< : (B -> C) -> (A -> B) -> A -> C
