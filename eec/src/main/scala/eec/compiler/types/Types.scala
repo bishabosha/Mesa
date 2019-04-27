@@ -2,6 +2,8 @@ package eec
 package compiler
 package types
 
+import scala.language.implicitConversions
+
 import scala.collection.generic.CanBuild
 import scala.annotation.tailrec
 
@@ -12,7 +14,7 @@ import Names._
 import Name._
 import error.CompilerErrors._
 import CompilerErrorOps._
-import util.{Show, StackMachine, Utils}
+import util.{Show, Define, StackMachine, Utils}
 import Utils.view
 import StackMachine._
 import Program._
@@ -457,126 +459,182 @@ object Types {
 
     def (tpe: Type) isValueType = !tpe.isComputationType
 
+    private def (tpe: Type) showImpl: String = tpe.compute {
+      case FunctionType(arg, body)        => fromFunctionType(arg, body)
+      case LinearFunctionType(arg, body)  => fromLinearFunctionType(arg, body)
+      case InfixAppliedType(op, a1, a2)   => fromInfixAppliedType(op,a1,a2)
+      case AppliedType(f, args)           => fromAppliedType(f, args)
+      case Product(tpes1)                 => fromProduct(tpes1)
+      case TypeRef(t)                     => t.show :: _
+      case BaseType(t)                    => t.show :: _
+      case Variable(t)                    => t.show :: _
+      case PackageInfo(parent, name)      => showPackage(parent, name) :: _
+      case WildcardType                   => "<any>" :: _
+      case EmptyType                      => "<nothing>" :: _
+    }
+
+    private def fromFunctionType(arg: Type, body: Type)
+                                  (stack: Stack[String]) = {
+      val a1 :: a2 :: rest = stack
+      val a1Final = arg match {
+        case _: (FunctionType | LinearFunctionType)  => s"($a1)"
+        case _                                       => a1
+      }
+      val a2Final = body match {
+        case _: LinearFunctionType  => s"($a2)"
+        case _                                       => a2
+      }
+      s"$a1Final -> $a2Final" :: rest
+    }
+
+    private def fromLinearFunctionType(arg: Type, body: Type)
+                                      (stack: Stack[String]) = {
+      val a1 :: a2 :: rest = stack
+      val a1Final = arg match {
+        case _: (FunctionType | LinearFunctionType)  => s"($a1)"
+        case _                                       => a1
+      }
+      val a2Final = body match {
+        case _: (FunctionType | LinearFunctionType)  => s"($a2)"
+        case _                                       => a2
+      }
+      s"$a1Final ->. $a2Final" :: rest
+    }
+
+    private def fromInfixAppliedType(op: Name, a1: Type, a2: Type)
+                                    (stack: Stack[String]) = {
+      val b1 :: b2 :: rest = stack
+      val b1Final = a1 match {
+        case AppliedType(BangTag, _ :: Nil) => b1
+
+        case _: (FunctionType | AppliedType | LinearFunctionType
+        | InfixAppliedType) =>
+          s"($b1)"
+
+        case _ => b1
+      }
+      val b2Final = a2 match {
+        case AppliedType(BangTag, _ :: Nil) => b2
+        case _: (FunctionType | AppliedType | LinearFunctionType) => s"($b2)"
+        case InfixAppliedType(op1,_,_) if op1 != op => s"($b2)"
+        case _                                      => b2
+      }
+      s"$b1Final ${op.show} $b2Final" :: rest
+    }
+
+    private def fromAppliedType(f: Name, args: List[Type])
+                                (stack: Stack[String]): List[String] = {
+      def checkAll(tpes: List[Type], strs: List[String]) =
+        tpes.zip(strs).map(check)
+
+      def check(tpe: Type, str: String) = tpe match {
+        case _: (FunctionType | AppliedType | LinearFunctionType | InfixAppliedType) =>
+          s"($str)"
+        case _ =>
+          str
+      }
+
+      val (removed, rest) = stack.splitAt(args.length)
+      val str = {
+        if removed.isEmpty then {
+          f.show
+        } else {
+          val fStr = f.show
+          val init =
+            if f == BangTag && args.length == 1 then fStr
+            else s"$fStr "
+          checkAll(args, removed).mkString(init, " ", "")
+        }
+      }
+      str :: rest
+    }
+
+    private def fromProduct(tpes: List[Type])
+                            (stack: Stack[String]) = {
+      val (removed, rest) = stack.splitAt(tpes.length)
+      removed.mkString("(", ", ", ")") :: rest
+    }
+
+    private inline def showPackage(parent: Type, name: Name): String = {
+      (packageNames(parent) ::: name :: Nil)
+        .map(_.show)
+        .mkString("package ", ".", "")
+    }
+
+    private def displayString(tpe: Type) = {
+      val body = tpe.showImpl
+      val variableStrings = tpe.foldLeft(List.empty[String]) { (acc, t) =>
+        t match {
+          case t: Variable => t.showImpl :: acc
+          case _           => acc
+        }
+      }.distinct.sorted
+      val quantification = {
+        Some(variableStrings)
+          .filter(_.nonEmpty)
+          .fold("")(_.mkString("forall ", " ", ". "))
+      }
+      s"$quantification$body"
+    }
+
     implied for Show[Type] {
 
-      private def (tpe: Type) showImpl: String = tpe.compute {
-        case FunctionType(arg, body)        => fromFunctionType(arg, body)
-        case LinearFunctionType(arg, body)  => fromLinearFunctionType(arg, body)
-        case InfixAppliedType(op, a1, a2)   => fromInfixAppliedType(op,a1,a2)
-        case AppliedType(f, args)           => fromAppliedType(f, args)
-        case Product(tpes1)                 => fromProduct(tpes1)
-        case TypeRef(t)                     => t.show :: _
-        case BaseType(t)                    => t.show :: _
-        case Variable(t)                    => t.show :: _
-        case PackageInfo(parent, name)      => showPackage(parent, name) :: _
-        case WildcardType                   => "<any>" :: _
-        case EmptyType                      => "<nothing>" :: _
+      val variables: Stream[String] = {
+        val alpha = ('a' to 'z').toStream.map(_.toString)
+        val numeric = for
+          n <- Stream.from(1)
+          x <- alpha
+        yield s"$x$n"
+        alpha #::: numeric
+      }
+
+      def (xs: Seq[String]) `filterVariables` (ys: Seq[String]) =
+        xs.filterNot(ys.contains)
+
+      def (tpe: Type) toNames: (Seq[Name], Seq[Name]) = {
+        tpe.foldLeft(List.empty[Name]) { (acc, t) =>
+          t match {
+            // case Variable(n)              => n::acc
+            case TypeRef(n)               => n::acc
+            case BaseType(n)              => n::acc
+            case AppliedType(n,_)         => n::acc
+            case InfixAppliedType(n,_,_)  => n::acc
+            case _                        => acc
+          }
+        }.distinct.partition {
+          case _: Comp => true
+          case _       => false
+        }
+      }
+
+      def (tpe: Type) fancyVariables: Type = {
+        import NameOps._
+        import Derived._
+        val (comp, from) = tpe.toNames
+        val subs0 = {
+          variables `filterVariables` comp.map(_.show `replaceAll` ("#", ""))
+        }
+        val subs1 = subs0 `filterVariables` from.map(_.show)
+        var stream = subs1
+        tpe.replaceVariables {
+          case _:Comp =>
+            val s = Comp(Str(stream.head + "#"))
+            stream = stream.tail
+            Some(s)
+          case _:From =>
+            val s = From(Str(stream.head))
+            stream = stream.tail
+            Some(s)
+          case _ => None
+        }
       }
 
       def (tpe: Type) show: String = {
-        val body = tpe.showImpl
-        val variableStrings = tpe.foldLeft(List.empty[String]) { (acc, t) =>
-          t match {
-            case t: Variable => t.showImpl :: acc
-            case _           => acc
-          }
-        }.distinct.sorted
-        val quantification = {
-          Some(variableStrings)
-            .filter(_.nonEmpty)
-            .fold("")(_.mkString("forall ", " ", ". "))
-        }
-        s"$quantification$body"
-      }
-
-      private def fromFunctionType(arg: Type, body: Type)
-                                  (stack: Stack[String]) = {
-        val a1 :: a2 :: rest = stack
-        val a1Final = arg match {
-          case _: (FunctionType | LinearFunctionType)  => s"($a1)"
-          case _                                       => a1
-        }
-        val a2Final = body match {
-          case _: LinearFunctionType  => s"($a2)"
-          case _                                       => a2
-        }
-        s"$a1Final -> $a2Final" :: rest
-      }
-
-      private def fromLinearFunctionType(arg: Type, body: Type)
-                                        (stack: Stack[String]) = {
-        val a1 :: a2 :: rest = stack
-        val a1Final = arg match {
-          case _: (FunctionType | LinearFunctionType)  => s"($a1)"
-          case _                                       => a1
-        }
-        val a2Final = body match {
-          case _: (FunctionType | LinearFunctionType)  => s"($a2)"
-          case _                                       => a2
-        }
-        s"$a1Final ->. $a2Final" :: rest
-      }
-
-      private def fromInfixAppliedType(op: Name, a1: Type, a2: Type)
-                                      (stack: Stack[String]) = {
-        val b1 :: b2 :: rest = stack
-        val b1Final = a1 match {
-          case AppliedType(BangTag, _ :: Nil) => b1
-
-          case _: (FunctionType | AppliedType | LinearFunctionType
-          | InfixAppliedType) =>
-            s"($b1)"
-
-          case _ => b1
-        }
-        val b2Final = a2 match {
-          case AppliedType(BangTag, _ :: Nil) => b2
-          case _: (FunctionType | AppliedType | LinearFunctionType) => s"($b2)"
-          case InfixAppliedType(op1,_,_) if op1 != op => s"($b2)"
-          case _                                      => b2
-        }
-        s"$b1Final ${op.show} $b2Final" :: rest
-      }
-
-      private def fromAppliedType(f: Name, args: List[Type])
-                                 (stack: Stack[String]): List[String] = {
-        def checkAll(tpes: List[Type], strs: List[String]) =
-          tpes.zip(strs).map(check)
-
-        def check(tpe: Type, str: String) = tpe match {
-          case _: (FunctionType | AppliedType | LinearFunctionType | InfixAppliedType) =>
-            s"($str)"
-          case _ =>
-            str
-        }
-
-        val (removed, rest) = stack.splitAt(args.length)
-        val str = {
-          if removed.isEmpty then {
-            f.show
-          } else {
-            val fStr = f.show
-            val init =
-              if f == BangTag && args.length == 1 then fStr
-              else s"$fStr "
-            checkAll(args, removed).mkString(init, " ", "")
-          }
-        }
-        str :: rest
-      }
-
-      private def fromProduct(tpes: List[Type])
-                             (stack: Stack[String]) = {
-        val (removed, rest) = stack.splitAt(tpes.length)
-        removed.mkString("(", ", ", ")") :: rest
-      }
-
-      private inline def showPackage(parent: Type, name: Name): String = {
-        (packageNames(parent) ::: name :: Nil)
-          .map(_.show)
-          .mkString("package ", ".", "")
+        displayString(tpe.fancyVariables)
       }
     }
+
+    implied for Define[Type] = displayString
 
     implied for Conversion[List[Type], Type] = {
       case tpe :: Nil => tpe

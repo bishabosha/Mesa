@@ -72,15 +72,15 @@ object Stable {
           for
             name <- ctx.linearScope
             tpe  = ctx.termTypeTable.get(name) match {
-              case Some(t) => t.show
+              case Some(t) => t.define
               case _       => "<notype>"
             }
-          yield LinearVariable(name.show, tpe)
+          yield LinearVariable(name.define, tpe)
         }
         val data = {
           for
             (name, tpe) <- ctx.dataTypeTable
-          yield Data(name.show, tpe.show)
+          yield Data(name.define, tpe.define)
         }
         val defs = {
           for
@@ -92,14 +92,14 @@ object Stable {
                     }
             (sym, child)  = pair
             tpeOpt        = ctx.termTypeTable.get(sym.name)
-            tpe           = tpeOpt.fold("<notype>")(t => t.show)
+            tpe           = tpeOpt.fold("<notype>")(t => t.define)
             name          = sym.name
           yield {
             if name.nonEmpty then {
               if child.termScope.isEmpty then
-                Term(name.show, tpe)
+                Term(name.define, tpe)
               else
-                TermScope(name.show, tpe, child)
+                TermScope(name.define, tpe, child)
             } else {
               AnonScope(child)
             }
@@ -119,8 +119,8 @@ object Stable {
           case ctx: RootContext =>
             List(
               TermScope(
-                rootSym.name.show,
-                rootPkg.show,
+                rootSym.name.define,
+                rootPkg.define,
                 branch(ctx)
               )
             )

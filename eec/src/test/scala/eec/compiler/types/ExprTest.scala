@@ -222,8 +222,8 @@ class ExprTest {
   @Test def typecheckLambda() = typecheck(
     """ \(t: ()) => () """                :|- "() -> ()",
     """ \(_: ()) => () """                :|- "() -> ()",
-    """ \(t: A) => () """                 :|- "forall A. A -> ()",
-    """ \(_: A) => () """                 :|- "forall A. A -> ()",
+    """ \(t: A) => () """                 :|- "forall a. a -> ()",
+    """ \(_: A) => () """                 :|- "forall a. a -> ()",
     """ \(t: ()) => t """                 :|- "() -> ()",
     """ \(_: () -> ()) => () """          :|- "(() -> ()) -> ()",
     """ \(_: () ->. ()) => () """         :|- "(() ->. ()) -> ()",
@@ -246,10 +246,10 @@ class ExprTest {
   )
 
   @Test def typecheckLinearLambda() = typecheck(
-    """ \(a: A#) =>. a """                            :|- "forall A#. A# ->. A#",
-    """ \(a: A#) =>. () """                           :|- "forall A#. A# ->. ()",
-    """ \(_: A#) =>. () """                           :|- "forall A#. A# ->. ()",
-    """ \(a: !A) =>. let !_ = a in \(a: ()) => a """  :|- "forall A. !A ->. (() -> ())",
+    """ \(a: A#) =>. a """                            :|- "forall a#. a# ->. a#",
+    """ \(a: A#) =>. () """                           :|- "forall a#. a# ->. ()",
+    """ \(_: A#) =>. () """                           :|- "forall a#. a# ->. ()",
+    """ \(a: !A) =>. let !_ = a in \(a: ()) => a """  :|- "forall a. !a ->. (() -> ())",
   )
 
   @Test def failLinearLambda() = noType(
