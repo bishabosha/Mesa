@@ -86,14 +86,14 @@ class StatTest {
   )
 
   @Test def projectTuplesLinear() = typecheck(
-    "forall A# B#. (A#, B#) ->. A#"       -|:  """ fst[pair] : (A#, B#) ->. A# =
+    "forall A# B#. (A#, B#) ->. A#"       -|:  """ fst1[pair] : (A#, B#) ->. A# =
                                                     case pair of (a, _) =>. a """,
 
-    "forall A# B#. (A#, B#) ->. B#"       -|:  """ snd[pair] : (A#, B#) ->. B# =
+    "forall A# B#. (A#, B#) ->. B#"       -|:  """ snd1[pair] : (A#, B#) ->. B# =
                                                     case pair of (_, b) =>. b """,
 
     "forall A# B#. (A#, B#) ->. (A#, B#)" -|:  """ linearEval[pair] : (A#, B#) ->. (A#, B#) =
-                                                    (fst[pair], snd[pair]) """
+                                                    (fst1[pair], snd1[pair]) """
   )
 
   /** cantDuplicate is bad because sequentialEval can not have an arg that

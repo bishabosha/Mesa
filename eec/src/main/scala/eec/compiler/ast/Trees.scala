@@ -128,6 +128,7 @@ object Trees {
 
     implied for Show[Tree] = t => pprint.apply(
       x = (t: Stable.Tree),
+      width = 80,
       height = Int.MaxValue
     ).render
 

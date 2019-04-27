@@ -178,8 +178,8 @@ object Types {
             case InfixAppliedType(_, a1, a2) =>
               inner(f(z, tpe), a1 :: a2 :: rest)
 
-            case Product(tpes)        => inner(f(z, tpe), tpes ::: rest)
-            case _                    => inner(f(z, tpe), rest)
+            case Product(tpes) => inner(f(z, tpe), tpes ::: rest)
+            case _             => inner(f(z, tpe), rest)
           }
       }
       inner(z, tpe :: Nil)
@@ -208,8 +208,8 @@ object Types {
                   case InfixAppliedType(_, a1, a2) =>
                     inner(f(z, tpe), a1 :: a2 :: rest)
 
-                  case Product(tpes)        => inner(f(z, tpe), tpes ::: rest)
-                  case _                    => inner(f(z, tpe), rest)
+                  case Product(tpes) => inner(f(z, tpe), tpes ::: rest)
+                  case _             => inner(f(z, tpe), rest)
                 }
             }
         }

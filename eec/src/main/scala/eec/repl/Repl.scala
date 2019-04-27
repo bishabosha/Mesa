@@ -38,6 +38,7 @@ object Repl {
 
   private val pprint2: pprint.PPrinter = pprint.copy(
     defaultHeight = Int.MaxValue,
+    defaultWidth  = 80,
     additionalHandlers = {
       case s: String => pprint.Tree.Literal(s)
     }

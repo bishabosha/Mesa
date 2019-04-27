@@ -1,11 +1,9 @@
 package eec.report.example
 
-primitive absurd : Void# ->. A#
+-- Please import the Prelude by using the `-p` flag
 
 data Either3 x y z      = In1 x | In2 y | In3 z
 data Either3C a# b# c#  = In1C[a#] | In2C[b#] | In3C[c#]
-data l |: r             = Left l | Right r
-data l# +: r#           = InL[l#] | InR[r#]
 data MaybeC a#          = JustC[a#] | NothingC
 data Maybe a            = Just a | Nothing
 data Maybe3 a b c       = Just3 a b c | Nothing3

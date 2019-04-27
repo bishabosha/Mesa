@@ -197,17 +197,19 @@ object Typers {
   }
 
   private def checkFunWithProtoImpl(arg: Type => Lifted[Type])
-                                   (unifyf: Type => (Type, Type))
+                                   (unwrap: Type => (Type, Type))
                                    (onNoArgUnify: (Tree, Type, Type) => CompilerError)
                                    (fun: Tree, argProto: Type)
                                    (pt: Type): Lifted[Type] = {
     for
       arg         <- arg(fun.tpe)
-      (arg1, ret) =  unifyf(fun.tpe.unifyFrom(arg)(argProto))
+      (arg1, ret) =  unwrap(fun.tpe.unifyFrom(arg)(argProto))
       argProto1   =  argProto.unify(arg1)
+      subs        =  arg1.unifications(argProto1)
+      arg2        =  arg1.unifyFromAll(subs)
       ret1        <- lift {
-        if arg1 =!= argProto1 then ret.unify(pt)
-        else onNoArgUnify(fun, arg1, argProto)
+        if arg2 =!= argProto1 then ret.unifyFromAll(subs).unify(pt)
+        else onNoArgUnify(fun, arg2, argProto1)
       }
     yield ret1
   }
