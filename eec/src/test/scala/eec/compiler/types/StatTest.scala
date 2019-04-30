@@ -173,6 +173,29 @@ class StatTest {
               NothingC =>. InR[()]; """
   )
 
+  @Test def typecheckMatchBoolean() = typecheck(
+    "Boolean -> ()"
+    -|: """ match_bool b: Boolean -> () =
+              case b of
+                True | _ => () """,
+    "Boolean -> ()"
+    -|: """ match_bool2 b: Boolean -> () =
+              case b of
+                True | False => () """,
+    "Boolean -> ()"
+    -|: """ match_bool3 b: Boolean -> () =
+              case b of
+                False | _ => () """,
+    "Boolean -> ()"
+    -|: """ match_bool4 b: Boolean -> () =
+              case b of
+                _ | False => () """,
+    "(Boolean, Boolean) -> ()"
+    -|: """ match_bool5 b: (Boolean, Boolean) -> () =
+              case b of
+                (True, False) | (False, True) | (True, True) | (False, False) => () """,
+  )
+
   @Test def typecheckMatchSumArbitraryDepth() = typecheck(
     "forall a b c d e. (a |: b) |: c |: d -> (a -> !e) -> (b -> !e) -> (c -> !e) -> (d -> !e) -> !e"
     -|: """ cat4_alt0 e wu xu yu zu: (w |: x) |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =

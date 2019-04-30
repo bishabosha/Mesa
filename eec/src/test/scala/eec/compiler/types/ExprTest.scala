@@ -131,6 +131,15 @@ class ExprTest {
     "()"       -|:  """ case (0,0) of
                           (1,2) | (_,_) => () """,
 
+    "()"       -|:  """ case True of
+                          True | _ => () """,
+
+    "()"       -|:  """ case Right 0 of
+                          (Right 0) | (Left _) | (Right _) => () """,
+
+     "()"       -|:  """ case Left True of
+                          (Left False) | (Right _) | (Left _) => () """,
+
     "()"       -|:  """ case Right () of
                           Right x => x;
                           Left  _ => () """,

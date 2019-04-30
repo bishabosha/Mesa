@@ -11,6 +11,7 @@ eec/gnotes
 *.interp
 src_managed
 eec_*
+*.sc
 
 *.DS_Store
 *.class

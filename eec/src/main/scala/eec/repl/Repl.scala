@@ -1,29 +1,28 @@
-package eec
-package repl
+package eec.repl
 
 import scala.language.implicitConversions
 
 import scala.util.control.NonFatal
 import scala.annotation.tailrec
   
-import Commands._
+import Commands.{Command, parseCommand, helpText}
 import Command._
-import compiler._
-import ast.Trees._
+import eec.compiler.{ast, core, parsing, error, types}
+import ast.Trees.{Tree, TreeOps}
 import Tree._
 import core.{Stable, Contexts, Names}
 import Stable.TreeOps._
 import Stable.ContextOps._
-import Contexts._
-import Names._
+import Contexts.{Context, IdGen, RootContext, IdReader}
+import Names.{Name, NameOps}
 import Context._
 import parsing.EntryPoint.{parseEEC, parseDef, parseExpr}
-import error.CompilerErrors._
+import error.CompilerErrors.{CompilerError, CompilerErrorOps, Lifted}
 import CompilerErrorOps._
-import types.{Namers, Typers, Types}
-import Namers._
-import Typers._
-import Types._
+import types.{Namers, Typers, Types, Prelude}
+import Namers.indexed
+import Typers.typed
+import Types.{Type, TypeOps}
 import Type._
 
 import implied CompilerErrorOps._
@@ -96,13 +95,7 @@ object Repl {
       _ <- lift {
         if enterPrelude then {
           println("Loading Prelude.")
-          Prelude.preludeDefs.foldLeftE(()) { (_,s) =>
-            for
-              expr <- parseDef(s)
-              _    <- indexed(expr)
-              _    <- expr.typed
-            yield ()
-          }
+          Prelude.importInScope
         } else {
           ()
         }

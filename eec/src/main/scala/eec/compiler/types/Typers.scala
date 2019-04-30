@@ -209,7 +209,7 @@ object Typers {
       arg2        =  arg1.unifyFromAll(subs)
       ret1        <- lift {
         if arg2 =!= argProto1 then ret.unifyFromAll(subs).unify(pt)
-        else onNoArgUnify(fun, arg2, argProto1)
+        else onNoArgUnify(fun, arg, argProto1)
       }
     yield ret1
   }
@@ -387,7 +387,7 @@ object Typers {
     }
   }
 
-  private def unifyPattern(
+  def unifyPattern(
       ctor: Name, ctorTpe: Type, sumTpe: Type): Lifted[(Name, List[Type])] =
     typeAsDestructor(ctor, ctorTpe, sumTpe).map(ctor -> _._1)
 
@@ -446,16 +446,16 @@ object Typers {
     yield Apply(functor1, args1)(tpe)
   }
 
-  private def typedInfixApply(functor: Tree, a1: Tree, a2: Tree)
+  private def typedInfixApply(functor: Tree, t: Tree, u: Tree)
                              given Context, Mode, Stoup, Closure: Lifted[Tree] = {
     for
       functor1 <- functor.typed(any)
-      a11      <- a1.typed(any)
-      a21      <- a2.typed(any)
+      t1       <- t.typed(any)
+      u1       <- u.typed(any)
       name     =  uniqName(functor1)
-      funProto <- InfixAppliedType(name, a11.tpe, a21.tpe)
+      funProto <- InfixAppliedType(name, t1.tpe, u1.tpe)
       tpe      <- checkFunctorWithProto(name, functor1.tpe, funProto)
-    yield InfixApply(functor1, a11, a21)(tpe)
+    yield InfixApply(functor1, t1, u1)(tpe)
   }
 
   private def typedApplyTerm(fun: Tree, args: List[Tree])
@@ -1080,7 +1080,7 @@ object Typers {
       yield ()
   }
 
-  private def unifiesWithTemplate(pattern: Tree)(template: Tree): Boolean = {
+  def unifiesWithTemplate(pattern: Tree)(template: Tree): Boolean = {
 
     @tailrec
     def inner(pss: List[List[Tree]], tss: List[List[Tree]]): Boolean = (pss, tss) match {
@@ -1089,14 +1089,11 @@ object Typers {
       case ((p::ps)::pss, (t::ts)::tss) => (p,t) match {
         case (Ident(_),_) => inner(ps::pss,ts::tss)
 
-        case (Literal(BooleanConstant(b1)),
-          Literal(BooleanConstant(b2))) =>
-            if b1 == b2 then
-              inner(ps::pss,ts::tss)
-            else
-              inner(pss,(t::ts)::tss)
+        case (Literal(BooleanConstant(b1)),Literal(BooleanConstant(b2)))
+        if b1 == b2 =>
+          inner(ps::pss,ts::tss)
 
-        case (Literal(_),t) => inner(pss,(t::ts)::tss)
+        case (Literal(_),_) => inner(pss,(t::ts)::tss)
 
         case (Parens(ps1),Parens(ts1)) =>
           if ps1.size == ts1.size then
@@ -1104,15 +1101,15 @@ object Typers {
           else
             inner(pss,(t::ts)::tss)
 
-        case (Unapply(op1, ps1), t @ Unapply(op2,ts1)) =>
+        case (Unapply(op1, ps1),Unapply(op2,ts1)) =>
           if op1 == op2 then
             inner((ps1:::ps)::pss,(ts1:::ts)::tss)
           else
             inner(pss,(t::ts)::tss)
 
-        case (Bind(_, p), t) => inner((p::ps)::pss, (t::ts)::tss)
+        case (Bind(_, p),_) => inner((p::ps)::pss, (t::ts)::tss)
 
-        case (Alternative(ps1), t) =>
+        case (Alternative(ps1),_) =>
           inner(
             ps1.map(_::ps) ::: pss,
             List.fill(ps1.length)(t::ts) ::: tss
@@ -1125,7 +1122,7 @@ object Typers {
     inner((pattern::Nil)::Nil, (template::Nil)::Nil)
   }
 
-  private def templates(
+  def templates(
        selTpe: Type)
       (unify: (ctor: Name, ctorTpe: Type, sumTpe: Type) => Lifted[(Name, List[Type])])
       given Context: Lifted[List[Tree]] = {
@@ -1156,84 +1153,83 @@ object Typers {
     @tailrec
     def inner(
         acc: List[Tree],
-        progs: List[ProgT],
+        programs: List[ProgT],
         selTpess: List[List[Type]]): Lifted[List[Tree]] = selTpess match {
       case Nil => acc
 
-      case selTpes :: selTpess => selTpes match {
+      case selTpes::selTpess => selTpes match {
 
         case Nil =>
-          val prog :: progRest = progs
-          val template = prog.foldLeft(List.empty[Tree])(eval).head
-          inner(template :: acc, progRest, selTpess)
+          val program::programs1 = programs
+          val templates = program.foldLeft(List.empty[Tree])(eval)
+          inner(templates:::acc, programs1, selTpess)
 
-        case selTpe :: selTpes => selTpe match {
+        case selTpe::selTpes => selTpe match {
 
           case Product(ts) =>
-            val prog :: progRest = progs
-            val program: StatT = { stack =>
-              ts.foldMap(unit :: stack) { ts =>
-                val (ts1, rest) = stack.splitAt(ts.length)
-                Parens(ts1)(EmptyType) :: rest
+            val program::programs1 = programs
+            val mkParens: StatT = { stack =>
+              ts.foldMap(unit::stack) { ts =>
+                val (ts1, stack1) = stack.splitAt(ts.length)
+                Parens(ts1)(EmptyType)::stack1
               }
             }
             inner(
               acc,
-              (program :: prog) :: progRest,
-              (ts ::: selTpes) :: selTpess
+              (mkParens::program)::programs1,
+              (ts:::selTpes)::selTpess
             )
 
           case BaseType(BooleanTag) =>
-            val prog :: progRest = progs
-            val forTrue: StatT = { stack =>
-              litTrue :: stack
+            val program::programs1 = programs
+            val putTrue: StatT = { stack =>
+              litTrue::stack
             }
-            val forFalse: StatT = { stack =>
-              litFalse :: stack
+            val putFalse: StatT = { stack =>
+              litFalse::stack
             }
-            val progs1 = (forTrue :: prog) :: (forFalse :: prog) :: progRest
-            val dummyBoolean = (EmptyType :: Nil)
+            val programs2 = (putFalse::program)::(putTrue::program)::programs1
             inner(
               acc,
-              progs1,
-              dummyBoolean :: selTpes :: selTpess
+              programs2,
+              selTpes :: selTpes :: selTpess
             )
 
           case _ => dataDefinitionName(selTpe) match {
 
             case EmptyName =>
-              val prog :: progRest = progs
-              val forBaseType: StatT = { stack =>
+              val program::programs1 = programs
+              val putIdent: StatT = { stack =>
                 Ident(Wildcard)(Id.empty, selTpe) :: stack
               }
               inner(
                 acc,
-                (forBaseType :: prog) :: progRest,
-                selTpes :: selTpess
+                (putIdent::program)::programs1,
+                selTpes::selTpess
               )
 
             case sumName =>
-              val prog :: progRest = progs
+              val program :: programs1 = programs
               constructorsForSum(sumName, selTpe) match {
                 case err: CompilerError => err
 
                 case constructors0 =>
                   val constructors = unlift(constructors0)
-                  val programs = {
+                  val mkCtors = {
                     for (name, args) <- constructors
                     yield {
-                      val forCtor: StatT = { stack =>
-                        val (args1, rest) = stack.splitAt(args.length)
-                        Unapply(name, args1)(any) :: rest
+                      val mkCtor: StatT = { stack =>
+                        val (args1, stack1) = stack.splitAt(args.length)
+                        Unapply(name, args1)(any)::stack1
                       }
-                      forCtor :: prog
+                      mkCtor::program
                     }
                   }
-                  val additions = constructors.map(_._2 ::: selTpes)
+                  val ctorArgLists = constructors.map(_._2:::selTpes)
                   inner(
                     acc,
-                    (programs ::: progRest) ::: progs,
-                    additions ::: selTpess
+                    mkCtors:::programs1,
+                    ctorArgLists:::selTpess
                   )
               }
           }

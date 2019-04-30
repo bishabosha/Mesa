@@ -6,19 +6,26 @@ import scala.language.implicitConversions
 
 import ast.Trees
 import core.{Names, Modifiers, Constants, Contexts}
-import Names._
-import NameOps._
 import Modifiers._
 import Constants._
 import Contexts._
 import types.Types._
 
 import implied TypeOps._
-import implied NameOps._
 
 object Stable {
   import Tree._
+  import Name._
   import Context._
+
+  import implied NameOps._
+
+  enum Name derives Eql {
+    case From(str: String)
+    case BangTag, TensorTag, IntegerTag, DecimalTag, VoidTag, VoidCompTag,
+      BooleanTag, StringTag, CharTag
+    case Wildcard
+  }
 
   enum Tree derives Eql {
     case Select(tree: Tree, name: Name)
@@ -56,11 +63,32 @@ object Stable {
   }
 
   enum Context derives Eql {
-    case LinearVariable(name: String, tpe: String)
-    case Term(name: String, tpe: String)
-    case TermScope(name: String, tpe: String, scope: Seq[Context])
-    case Data(name: String, tpe: String)
+    case LinearVariable(name: Name, tpe: String)
+    case Term(name: Name, tpe: String)
+    case TermScope(name: Name, tpe: String, scope: Seq[Context])
+    case Data(name: Name, tpe: String)
     case AnonScope(scope: Seq[Context])
+  }
+
+  object NameOps {
+    import implied Names.NameOps._
+    implied for Conversion[Names.Name, Name] = {
+      case f: (Names.Name.From | Names.Name.Comp) => From(f.show)
+      case Names.Name.BangTag                     => BangTag
+      case Names.Name.TensorTag                   => TensorTag
+      case Names.Name.IntegerTag                  => IntegerTag
+      case Names.Name.StringTag                   => StringTag
+      case Names.Name.CharTag                     => CharTag
+      case Names.Name.BooleanTag                  => BooleanTag
+      case Names.Name.DecimalTag                  => DecimalTag
+      case Names.Name.VoidCompTag                 => VoidCompTag
+      case Names.Name.VoidTag                     => VoidTag
+      case Names.Name.Wildcard                    => Wildcard
+
+      case Names.Name.EmptyName =>
+        throw new IllegalArgumentException(
+          s"Illegal ${Names.Name.EmptyName} in user facing API.")
+    }
   }
 
   object ContextOps {
@@ -75,12 +103,12 @@ object Stable {
               case Some(t) => t.define
               case _       => "<notype>"
             }
-          yield LinearVariable(name.define, tpe)
+          yield LinearVariable(name, tpe)
         }
         val data = {
           for
             (name, tpe) <- ctx.dataTypeTable
-          yield Data(name.define, tpe.define)
+          yield Data(name, tpe.define)
         }
         val defs = {
           for
@@ -88,18 +116,18 @@ object Stable {
                       val (Sym(_, name), child) = pair
                       child.termScope.nonEmpty ||
                       child.linearScope.nonEmpty ||
-                      name.nonEmpty
+                      name != Names.Name.EmptyName
                     }
             (sym, child)  = pair
             tpeOpt        = ctx.termTypeTable.get(sym.name)
             tpe           = tpeOpt.fold("<notype>")(t => t.define)
             name          = sym.name
           yield {
-            if name.nonEmpty then {
+            if name != Names.Name.EmptyName then {
               if child.termScope.isEmpty then
-                Term(name.define, tpe)
+                Term(name, tpe)
               else
-                TermScope(name.define, tpe, child)
+                TermScope(name, tpe, child)
             } else {
               AnonScope(child)
             }
@@ -119,7 +147,7 @@ object Stable {
           case ctx: RootContext =>
             List(
               TermScope(
-                rootSym.name.define,
+                rootSym.name,
                 rootPkg.define,
                 branch(ctx)
               )
@@ -141,7 +169,7 @@ object Stable {
         PackageDef(toTree(pid), stats.map(toTree))
 
       case Trees.Tree.DataDcl(name, args, ctors) =>
-        DataDcl(name, args, ctors.map(toTree))
+        DataDcl(name, args.map(n => n: Name), ctors.map(toTree))
 
       case Trees.Tree.InfixDataDcl(name, left, right, ctors) =>
         InfixDataDcl(name, left, right, ctors.map(toTree))
@@ -155,8 +183,8 @@ object Stable {
       case Trees.Tree.DefDef(modifiers, sig, tpeAs, body) =>
         DefDef(modifiers, toTree(sig), toTree(tpeAs), toTree(body))
 
-      case Trees.Tree.DefSig(name, args)        => DefSig(name, args)
-      case Trees.Tree.LinearSig(name, arg, lin) => LinearSig(name, arg, lin)
+      case Trees.Tree.DefSig(name, args)        => DefSig(name, args.map(n => n: Name))
+      case Trees.Tree.LinearSig(name, arg, lin) => LinearSig(name, arg.map(n => n: Name), lin)
 
       case Trees.Tree.Apply(id, args) =>
         Apply(toTree(id), args.map(toTree))

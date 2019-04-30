@@ -588,7 +588,7 @@ object Types {
         alpha #::: numeric
       }
 
-      def (xs: Seq[String]) `filterVariables` (ys: Seq[String]) =
+      def (xs: Seq[String]) filterVariables(ys: Seq[String]) =
         xs.filterNot(ys.contains)
 
       def (tpe: Type) toNames: (Seq[Name], Seq[Name]) = {
@@ -611,11 +611,11 @@ object Types {
         import NameOps._
         import Derived._
         val (comp, from) = tpe.toNames
-        val subs0 = {
-          variables `filterVariables` comp.map(_.show `replaceAll` ("#", ""))
+        var stream = {
+          variables
+            .filterVariables(comp.map(_.show `replaceAll` ("#", "")))
+            .filterVariables(from.map(_.show))
         }
-        val subs1 = subs0 `filterVariables` from.map(_.show)
-        var stream = subs1
         tpe.replaceVariables {
           case _:Comp =>
             val s = Comp(Str(stream.head + "#"))
