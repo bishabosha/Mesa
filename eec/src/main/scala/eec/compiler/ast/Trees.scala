@@ -15,7 +15,7 @@ import types.Types._
 import untyped.nt
 import annotation._
 import util.{Show, Utils}
-import Utils.eval
+import Utils.{eval, foldMap}
 
 import implied Stable.TreeOps._
 import implied Names.NameOps._
@@ -79,25 +79,19 @@ object Trees {
               val (args1, rest) = stack.splitAt(args.length)
               val args2 = args1.view.zip(args).map { (str, arg) =>
                 arg match {
-                  case _: (Ident | Parens) => str
+                  case (_:(Ident | Parens | Literal) | Unapply(_,Nil)) => str
                   case _ => s"($str)"
                 }
               }
-              val argsStr = args2.mkString(" ")
-              s"${name.show} $argsStr" :: rest
+              val argsStr = args2.foldMap("")(_.mkString(" ", " ", ""))
+              s"${name.show}$argsStr" :: rest
             }
             inner(prog :: acc, args ::: patts)
 
           case Parens(args) =>
             val prog = { stack: StackT =>
               val (args1, rest) = stack.splitAt(args.length)
-              val args2 = args1.view.zip(args).map { (str, arg) =>
-                arg match {
-                  case _: Ident => str
-                  case _ => s"($str)"
-                }
-              }
-              val argsStr = args2.mkString("(", ", ", ")")
+              val argsStr = args1.mkString("(", ", ", ")")
               argsStr :: rest
             }
             inner(prog :: acc, args ::: patts)
