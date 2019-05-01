@@ -119,17 +119,18 @@ object Typers {
                                   given Context: Lifted[Type] = {
     import TypeOps._
     val assertThere = tpe.foldLeftLifted(()) { (_, t) =>
-      dataDefinitionName(t) match {
-        case `data`    => Err.recursiveData(ctor, data)
+      // dataDefinitionName(t) match {
+      //   case `data`    => Err.recursiveData(ctor, data)
 
-        case _ => t match {
+      //   case _ => 
+      t match {
           case TypeRef(name) =>
             if names.contains(name) then ()
             else Err.unresolvedVariable(ctor, data, name)
 
           case _ => ()
         }
-      }
+      // }
     }
     assertThere.map { _ =>
       tpe.mapTypeRefs { name =>
@@ -614,7 +615,7 @@ object Typers {
 
   private def typeAsGenCaseClauses(
       f: (selTpe: Type, pt: Type, ts1: List[Tree],
-          remaining: List[Tree], c: Tree) => Lifted[(List[Tree], List[Tree])])
+          remaining: List[Template], c: Tree) => Lifted[(List[Tree], List[Template])])
       (ts: List[Tree], selTpe: Type)
       (pt: Type)
       (unify: (ctor: Name, ctorTpe: Type, sumTpe: Type)
@@ -1032,7 +1033,7 @@ object Typers {
       ()
   }
 
-  private def assertNoneRemain(templates: List[Tree]): Lifted[Unit] = {
+  private def assertNoneRemain(templates: List[Template]): Lifted[Unit] = {
     if templates.nonEmpty then
       Err.nonExhaustivePatterns(templates)
     else
@@ -1081,28 +1082,50 @@ object Typers {
       yield ()
   }
 
-  def unifiesWithTemplate(pattern: Tree)(template: Tree): Boolean = {
+  sealed trait Template
+
+  final case class LazyT(
+    tpe: Type,
+    unify: (Name, Type, Type) => Lifted[(Name, List[Type])]
+  ) extends Template {
+    def expand given Context = templates(tpe)(unify)
+  }
+
+  final case class BoolT(bool: Boolean) extends Template
+  final case class IdentT(name: Name) extends Template
+  final case class TupT(patts: List[Template]) extends Template
+  final case class UnappT(name: Name, patts: List[Template]) extends Template
+
+  def unifiesWithTemplate(pattern: Tree)(template: Template) given Context: Boolean = {
 
     @tailrec
-    def inner(pss: List[List[Tree]], tss: List[List[Tree]]): Boolean = (pss, tss) match {
+    def inner(pss: List[List[Tree]], tss: List[List[Template]]): Lifted[Boolean] = (pss, tss) match {
       case (Nil::pss,Nil::tss) => true
 
       case ((p::ps)::pss, (t::ts)::tss) => (p,t) match {
         case (Ident(_),_) => inner(ps::pss,ts::tss)
+        case (_,l:LazyT) =>
+          l.expand match {
+            case err: CompilerError => err
+            case ts0 =>
+              val ts1 = unlift(ts0)
+              val ts2: List[List[Template]] = ts1.map[List[Template], List[List[Template]]](_::ts)
+              inner((p::ps)::pss,ts2:::tss)
+          }
 
-        case (Literal(BooleanConstant(b1)),Literal(BooleanConstant(b2)))
+        case (Literal(BooleanConstant(b1)),BoolT(b2))
         if b1 == b2 =>
           inner(ps::pss,ts::tss)
 
         case (Literal(_),_) => inner(pss,(t::ts)::tss)
 
-        case (Parens(ps1),Parens(ts1)) =>
+        case (Parens(ps1),TupT(ts1)) =>
           if ps1.size == ts1.size then
             inner((ps1:::ps)::pss,(ts1:::ts)::tss)
           else
             inner(pss,(t::ts)::tss)
 
-        case (Unapply(op1, ps1),Unapply(op2,ts1)) =>
+        case (Unapply(op1, ps1),UnappT(op2,ts1)) =>
           if op1 == op2 then
             inner((ps1:::ps)::pss,(ts1:::ts)::tss)
           else
@@ -1120,15 +1143,15 @@ object Typers {
       }
       case _ => false
     }
-    inner((pattern::Nil)::Nil, (template::Nil)::Nil)
+    inner((pattern::Nil)::Nil, (template::Nil)::Nil).fold{_=>false}{identity}
   }
 
   def templates(
        selTpe: Type)
       (unify: (ctor: Name, ctorTpe: Type, sumTpe: Type) => Lifted[(Name, List[Type])])
-      given Context: Lifted[List[Tree]] = {
+      given Context: Lifted[List[Template]] = {
 
-    type StackT = List[Tree]
+    type StackT = List[Template]
     type StatT  = StackT => StackT
     type ProgT  = List[StatT]
 
@@ -1151,29 +1174,39 @@ object Typers {
       yield unified
     }
 
+    type Types = Type | LazyType
+
+    final case class LazyType(tpe: Type)
+
     @tailrec
     def inner(
-        acc: List[Tree],
+        acc: List[Template],
         programs: List[ProgT],
-        selTpess: List[List[Type]]): Lifted[List[Tree]] = selTpess match {
+        selTpess: List[List[Types]]): Lifted[List[Template]] = selTpess match {
       case Nil => acc
 
       case selTpes::selTpess => selTpes match {
 
         case Nil =>
           val program::programs1 = programs
-          val templates = program.foldLeft(List.empty[Tree])(eval)
+          val templates = program.foldLeft(List.empty[Template])(eval)
           inner(templates:::acc, programs1, selTpess)
 
-        case selTpe::selTpes => selTpe match {
+        case LazyType(t)::selTpes =>
+          val program::programs1 = programs
+          inner(
+            acc,
+            ((LazyT(t,unify)::_)::program)::programs1,
+            selTpes::selTpess
+          )
+
+        case (selTpe: Type)::selTpes => selTpe match {
 
           case Product(ts) =>
             val program::programs1 = programs
             val mkParens: StatT = { stack =>
-              ts.foldMap(unit::stack) { ts =>
-                val (ts1, stack1) = stack.splitAt(ts.size)
-                Parens(ts1)(EmptyType)::stack1
-              }
+              val (ts1, stack1) = stack.splitAt(ts.size)
+              TupT(ts1)::stack1
             }
             inner(
               acc,
@@ -1184,10 +1217,10 @@ object Typers {
           case BaseType(BooleanTag) =>
             val program::programs1 = programs
             val putTrue: StatT = { stack =>
-              litTrue::stack
+              BoolT(true)::stack
             }
             val putFalse: StatT = { stack =>
-              litFalse::stack
+              BoolT(false)::stack
             }
             val programs2 = (putFalse::program)::(putTrue::program)::programs1
             inner(
@@ -1201,7 +1234,7 @@ object Typers {
             case EmptyName =>
               val program::programs1 = programs
               val putIdent: StatT = { stack =>
-                Ident(Wildcard)(Id.empty, selTpe) :: stack
+                IdentT(Wildcard) :: stack
               }
               inner(
                 acc,
@@ -1221,12 +1254,21 @@ object Typers {
                     yield {
                       val mkCtor: StatT = { stack =>
                         val (args1, stack1) = stack.splitAt(args.length)
-                        Unapply(name, args1)(any)::stack1
+                        UnappT(name, args1)::stack1
                       }
                       mkCtor::program
                     }
                   }
-                  val ctorArgLists = constructors.map(_._2:::selTpes)
+                  val ctorArgLists = constructors.map[List[Types], List[List[Types]]] {
+                    (_, tpes) =>
+                      val tpes1 = tpes.map[Types, List[Types]] { t =>
+                        dataDefinitionName(t) match {
+                          case `sumName` => LazyType(t)
+                          case _ => t
+                        }
+                      }
+                      tpes1:::selTpes
+                  }
                   inner(
                     acc,
                     mkCtors:::programs1,

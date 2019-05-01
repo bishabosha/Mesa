@@ -12,6 +12,7 @@ import Constant._
 import Contexts.Id
 import Modifiers._
 import types.Types._
+import types.Typers._
 import untyped.nt
 import annotation._
 import util.{Show, Utils}
@@ -62,8 +63,55 @@ object Trees {
   }
 
   object TreeOps {
+    def showPatternTemplate(temp: Template): String = {
+      type StackT = List[String]
+      type StatT = StackT => StackT
+      type ProgT = List[StatT]
 
-    def showPatternTemplate(tree: Tree): String = {
+      @tailrec
+      def inner(program: ProgT, patts: List[Template]): ProgT = patts match {
+        case Nil => program
+
+        case patt::patts => patt match {
+
+          case UnappT(name, args) =>
+            val statement = { stack: StackT =>
+              val (args1, rest) = stack.splitAt(args.length)
+              val args2 = args1.view.zip(args).map { (str, arg) =>
+                arg match {
+                  case (_:(IdentT | TupT | BoolT | LazyT) | UnappT(_,Nil)) => str
+                  case _ => s"($str)"
+                }
+              }
+              val argsStr = args2.foldMap("")(_.mkString(" ", " ", ""))
+              s"${name.show}$argsStr"::rest
+            }
+            inner(statement::program, args:::patts)
+
+          case TupT(args) =>
+            val statement = { stack: StackT =>
+              val (args1, rest) = stack.splitAt(args.length)
+              val argsStr = args1.mkString("(", ", ", ")")
+              argsStr::rest
+            }
+            inner(statement::program, args:::patts)
+
+          case IdentT(name) => inner((name.show::_)::program, patts)
+
+          case BoolT(b) =>
+            val str = if b then "True" else "False"
+            inner((str::_)::program, patts)
+
+          case LazyT(t,_) => inner((s"<Lazy ${t.show}>"::_)::program, patts)
+        }
+      }
+
+      inner(Nil, temp :: Nil)
+        .foldLeft(List.empty[String])(eval)
+        .head
+    }
+
+    def showPatternTree(tree: Tree): String = {
       type StackT = List[String]
       type StatT = StackT => StackT
       type ProgT = List[StatT]

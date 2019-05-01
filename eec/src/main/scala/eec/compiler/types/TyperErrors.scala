@@ -74,7 +74,7 @@ object TyperErrors {
       tupleNotMatchLength
   }
 
-  def nonExhaustivePatterns(templates: List[Tree]) = {
+  def nonExhaustivePatterns(templates: List[Template]) = {
     val temps = {
       templates
         .map(showPatternTemplate(_))

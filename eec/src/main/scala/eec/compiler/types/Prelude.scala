@@ -13,6 +13,7 @@ object Prelude {
 
   data L |: R = Left L | Right R
   data L# +: R# = InL[L#] | InR[R#]
+  data List a = Cons a (List a) | Nil
 
   fstL [p] : (A#, B#) ->. A# = case p of (a, _) =>. a
   sndL [p] : (A#, B#) ->. B# = case p of (_, b) =>. b
