@@ -69,13 +69,13 @@ object Trees {
       type ProgT = List[StatT]
 
       @tailrec
-      def inner(acc: ProgT, patts: List[Tree]): ProgT = patts match {
-        case Nil => acc
+      def inner(program: ProgT, patts: List[Tree]): ProgT = patts match {
+        case Nil => program
 
-        case patt :: patts => patt match {
+        case patt::patts => patt match {
 
           case Unapply(name, args) =>
-            val prog = { stack: StackT =>
+            val statement = { stack: StackT =>
               val (args1, rest) = stack.splitAt(args.length)
               val args2 = args1.view.zip(args).map { (str, arg) =>
                 arg match {
@@ -84,25 +84,44 @@ object Trees {
                 }
               }
               val argsStr = args2.foldMap("")(_.mkString(" ", " ", ""))
-              s"${name.show}$argsStr" :: rest
+              s"${name.show}$argsStr"::rest
             }
-            inner(prog :: acc, args ::: patts)
+            inner(statement::program, args:::patts)
 
           case Parens(args) =>
-            val prog = { stack: StackT =>
+            val statement = { stack: StackT =>
               val (args1, rest) = stack.splitAt(args.length)
               val argsStr = args1.mkString("(", ", ", ")")
-              argsStr :: rest
+              argsStr::rest
             }
-            inner(prog :: acc, args ::: patts)
+            inner(statement::program, args:::patts)
 
-          case t @ Ident(name) => inner((s"${name.show} : ${t.tpe.show}" :: _) :: acc, patts)
+          case Ident(name) => inner((name.show::_)::program, patts)
 
           case Literal(BooleanConstant(b)) =>
             val str = if b then "True" else "False"
-            inner((str :: _) :: acc, patts)
+            inner((str::_)::program, patts)
 
-          case _ => inner(("<???>" :: _) :: acc, patts)
+          case Alternative(patts1) =>
+            val statement = { stack: StackT =>
+              val (args1, stack1) = stack.splitAt(patts1.length)
+              val argsStr = args1.mkString(" | ")
+              argsStr::stack1
+            }
+            inner(statement::program, patts1:::patts)
+
+          case Bind(x,patt) =>
+            val statement = { stack: StackT =>
+              val patt1::stack1 = stack
+              val pattStr = patt match {
+                case (_:(Ident | Parens | Literal) | Unapply(_,Nil)) => patt1
+                case _ => s"($patt1)"
+              }
+              s"${x.show} @ $pattStr"::stack1
+            }
+            inner(statement::program, patt::patts)
+
+          case _ => inner(("<???>"::_)::program, patts)
         }
       }
 

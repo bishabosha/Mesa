@@ -119,14 +119,16 @@ object Typers {
                                   given Context: Lifted[Type] = {
     import TypeOps._
     val assertThere = tpe.foldLeftLifted(()) { (_, t) =>
-      t match {
-        case TypeRef(`data`) => Err.recursiveData(ctor, data)
+      dataDefinitionName(t) match {
+        case `data`    => Err.recursiveData(ctor, data)
 
-        case TypeRef(name) =>
-          if names.contains(name) then ()
-          else Err.unresolvedVariable(ctor, data, name)
+        case _ => t match {
+          case TypeRef(name) =>
+            if names.contains(name) then ()
+            else Err.unresolvedVariable(ctor, data, name)
 
-        case _ => ()
+          case _ => ()
+        }
       }
     }
     assertThere.map { _ =>
@@ -1074,8 +1076,7 @@ object Typers {
     case _ =>
       for
         templates <- templates(selTpe)(unify)
-        remaining <- lift(
-                      templates.filterNot(unifiesWithTemplate(patt1)))
+        remaining <- lift(templates.filterNot(unifiesWithTemplate(patt1)))
         _         <- assertNoneRemain(remaining)
       yield ()
   }
@@ -1170,7 +1171,7 @@ object Typers {
             val program::programs1 = programs
             val mkParens: StatT = { stack =>
               ts.foldMap(unit::stack) { ts =>
-                val (ts1, stack1) = stack.splitAt(ts.length)
+                val (ts1, stack1) = stack.splitAt(ts.size)
                 Parens(ts1)(EmptyType)::stack1
               }
             }

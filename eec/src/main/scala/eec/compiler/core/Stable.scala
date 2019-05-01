@@ -28,18 +28,16 @@ object Stable {
   }
 
   enum Tree derives Eql {
+    case PackageDef(pid: Tree, stats: List[Tree])
     case Select(tree: Tree, name: Name)
     case Ident(name: Name)
-    case PackageDef(pid: Tree, stats: List[Tree])
     case DataDcl(name: Name, args: List[Name], ctors: List[Tree])
-    case InfixDataDcl(name: Name, left: Name, right: Name, ctors: List[Tree])
     case CtorSig(name: Name, tpeArgs: List[Tree])
     case LinearCtorSig(name: Name, tpeArg: Option[Tree])
-    case DefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)
+    case DefDcl(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)
     case DefSig(name: Name, args: List[Name])
-    case LinearSig(name: Name, args: List[Name], linear: Name)
+    case LinearDefSig(name: Name, args: List[Name], linear: Name)
     case Apply(id: Tree, args: List[Tree])
-    case InfixApply(f: Tree, left: Tree, right: Tree)
     case Eval(f: Tree, arg: Tree)
     case Bang(value: Tree)
     case WhyNot(value: Tree)
@@ -172,7 +170,7 @@ object Stable {
         DataDcl(name, args.map(n => n: Name), ctors.map(toTree))
 
       case Trees.Tree.InfixDataDcl(name, left, right, ctors) =>
-        InfixDataDcl(name, left, right, ctors.map(toTree))
+        DataDcl(name, List(left, right), ctors.map(toTree))
 
       case Trees.Tree.CtorSig(name, tpeArgs) =>
         CtorSig(name, tpeArgs.map(toTree))
@@ -181,16 +179,18 @@ object Stable {
         LinearCtorSig(name, tpeArg.map(toTree))
 
       case Trees.Tree.DefDef(modifiers, sig, tpeAs, body) =>
-        DefDef(modifiers, toTree(sig), toTree(tpeAs), toTree(body))
+        DefDcl(modifiers, toTree(sig), toTree(tpeAs), toTree(body))
 
-      case Trees.Tree.DefSig(name, args)        => DefSig(name, args.map(n => n: Name))
-      case Trees.Tree.LinearSig(name, arg, lin) => LinearSig(name, arg.map(n => n: Name), lin)
+      case Trees.Tree.DefSig(name, args) => DefSig(name, args.map(n => n: Name))
+
+      case Trees.Tree.LinearSig(name, arg, lin) =>
+        LinearDefSig(name, arg.map(n => n: Name), lin)
 
       case Trees.Tree.Apply(id, args) =>
         Apply(toTree(id), args.map(toTree))
 
       case Trees.Tree.InfixApply(f, left, right) =>
-        InfixApply(toTree(f), toTree(left), toTree(right))
+        Apply(toTree(f), List(toTree(left), toTree(right)))
 
       case Trees.Tree.Eval(f, arg)  => Eval(toTree(f), toTree(arg))
       case Trees.Tree.WhyNot(value) => WhyNot(toTree(value))
