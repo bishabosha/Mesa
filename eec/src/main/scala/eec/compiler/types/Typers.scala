@@ -216,12 +216,12 @@ object Typers {
     yield ret1
   }
 
-  private def constantTpe(c: Constant): Type = c match {
-    case _: BigDecConstant  => Bootstraps.DecimalType
-    case _: BigIntConstant  => Bootstraps.IntegerType
-    case _: CharConstant    => Bootstraps.CharType
-    case _: StringConstant  => Bootstraps.StringType
-    case _: BooleanConstant => Bootstraps.BooleanType
+  private def constantTpe(c: Constant): Type = c.asScala match {
+    case _: BigDecimal => Bootstraps.DecimalType
+    case _: BigInt     => Bootstraps.IntegerType
+    case _: Char       => Bootstraps.CharType
+    case _: String     => Bootstraps.StringType
+    case _: Boolean    => Bootstraps.BooleanType
   }
 
   private def functionTermTpe(args1: List[Tree], body1: Tree): Lifted[Type] = {
@@ -1090,8 +1090,7 @@ object Typers {
       case ((p::ps)::pss, (t::ts)::tss) => (p,t) match {
         case (Ident(_),_) => inner(ps::pss,ts::tss)
 
-        case (Literal(BooleanConstant(b1)),Literal(BooleanConstant(b2)))
-        if b1 == b2 =>
+        case (Literal(True),Literal(True)) | (Literal(False),Literal(False)) =>
           inner(ps::pss,ts::tss)
 
         case (Literal(_),_) => inner(pss,(t::ts)::tss)
@@ -1243,9 +1242,9 @@ object Typers {
   private def typedLiteral(constant: Constant) given Stoup: Lifted[Tree] = {
     for _ <- assertStoupEmpty(Err.illegalStoupValueLiteral)
     yield constant match {
-      case `constTrue`  => litTrue
-      case `constFalse` => litFalse
-      case _            => Literal(constant)(constantTpe(constant))
+      case True  => litTrue
+      case False => litFalse
+      case _     => Literal(constant)(constantTpe(constant))
     }
   }
 

@@ -10,11 +10,12 @@ import Bootstraps._
 import core.Names.Name._
 import core.Contexts._
 import core.Constants._
+import Constant._
 
 object untyped {
   val nt       = EmptyType
-  val litTrue  = Literal(constTrue)(nt)
-  val litFalse = Literal(constFalse)(nt)
+  val litTrue  = Literal(True)(nt)
+  val litFalse = Literal(False)(nt)
   val unit     = Parens(Nil)(nt)
 }
 

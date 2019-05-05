@@ -10,9 +10,9 @@ import Command._
 import eec.compiler.{ast, core, parsing, error, types}
 import ast.Trees.{Tree, TreeOps}
 import Tree._
-import core.{Stable, Contexts, Names}
-import Stable.TreeOps._
-import Stable.ContextOps._
+import core.{Meta, Contexts, Names}
+import Meta.TreeOps._
+import Meta.ContextOps._
 import Contexts.{Context, IdGen, RootContext, IdReader}
 import Names.{Name, NameOps}
 import Context._
@@ -29,8 +29,8 @@ import implied CompilerErrorOps._
 import implied TreeOps._
 import implied TypeOps._
 import implied NameOps._
-import implied Stable.TreeOps._
-import implied Stable.ContextOps._
+import implied Meta.TreeOps._
+import implied Meta.ContextOps._
 
 object Repl {
   import pprint2.pprintln
@@ -147,7 +147,7 @@ object Repl {
       guarded(state, s) {
         f(s).fold
           { err => println(err.show.wrapErr) }
-          { ast => pprintln((ast: Stable.Tree)) }
+          { ast => pprintln((ast: Meta.Tree)) }
 
         state
       }
@@ -188,7 +188,7 @@ object Repl {
           { (idGen, ctx) => state.copy(idGen = idGen, ctx = ctx) }
 
       case Ctx =>
-        pprintln(ctx: Seq[Stable.Context])
+        pprintln(ctx: Seq[Meta.Context])
         state
 
       case Quit =>

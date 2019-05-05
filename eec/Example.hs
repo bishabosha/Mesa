@@ -22,7 +22,7 @@ fmap f x : (A -> B) -> !A -> !B =
 makeState a [s] : a -> (s# ->. (!a *: s#)) = !a *: s
 
 -- equiv of lin haskell
-primitive read : MArray A ->. Integer -> !(MArray A, !A)
+primitive read : MArray A ->. (Integer -> !(MArray A, !A))
 
 {-
 linear haskell version:
@@ -33,7 +33,7 @@ foo2 [mx] : !Integer ->. !Integer = let !x = mx in !(x + x)
 {-
 newMArray :: Int -> (MArray a ->. Unrestricted b) ->. b
 -}
-primitive newMArray : Integer -> (MArray a ->. !b) ->. !b
+primitive newMArray : Integer -> ((MArray a ->. !b) ->. !b)
 
 succ x : Integer -> Integer =
   x + 1

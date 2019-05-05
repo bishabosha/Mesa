@@ -1,32 +1,26 @@
 /*
- [The "BSD licence"]
- Copyright (c) 2014 Leonardo Lucena
- Copyright (c) 2018 Andrey Stolyarov
- Copyright (c) 2019 James Thompson
- All rights reserved.
+ [The "BSD licence"] Copyright (c) 2014 Leonardo Lucena Copyright (c) 2018 Andrey Stolyarov
+ Copyright (c) 2019 James Thompson All rights reserved.
  
- Redistribution and use in source and binary forms, with or without modification,
- are permitted provided that the following conditions are met: 1. Redistributions of source code
- must retain the above copyright notice, this list of conditions and the following disclaimer. 2.
- Redistributions in binary form must reproduce the above copyright notice, this list of conditions
- and the following disclaimer in the documentation and/or other materials provided with the
- distribution. 3. The name of the author may not be used to endorse or promote products derived from
- this software without specific prior written permission.
+ Redistribution and use in source and binary forms, with or without modification, are permitted
+ provided that the following conditions are met: 1. Redistributions of source code must retain the
+ above copyright notice, this list of conditions and the following disclaimer. 2. Redistributions in
+ binary form must reproduce the above copyright notice, this list of conditions and the following
+ disclaimer in the documentation and/or other materials provided with the distribution. 3. The name
+ of the author may not be used to endorse or promote products derived from this software without
+ specific prior written permission.
  
- THIS SOFTWARE IS PROVIDED BY THE AUTHOR
- ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
- SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
- DAMAGE.
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
+ BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- Derived from https://github.com/antlr/grammars-v4/blob/master/scala/Scala.g4
+/*Derived from https://github.com/antlr/grammars-v4/blob/master/scala/Scala.g4
  */
-
 grammar EEC;
 
 literal:
@@ -46,9 +40,7 @@ qualId: id ('.' id)*;
 
 stableId: alphaId | alphaId '.' id;
 
-//
-// -- Types
-//
+////// Types //////
 
 type: infixType | func | lFunc;
 
@@ -68,9 +60,7 @@ prefixType: (Bang | qualId) simpleType+;
 
 simpleType: CompId | qualId | productType;
 
-//
-// -- Expressions
-//
+////// Expressions //////
 
 expr:
 	lambda
@@ -95,29 +85,23 @@ caseExpr: 'case' expr 'of' cases;
 
 lCaseExpr: 'case' expr 'of' lCases;
 
-expr1
-   : 'if' expr 'then' expr 'else' expr
-   | infixExpr
-   ;
+expr1: 'if' expr 'then' expr 'else' expr | infixExpr;
 
-infixExpr
-   : prefixExpr
-	 | tensorExpr
-   | infixExpr (OpId | '`' alphaId '`') infixExpr
-   ;
+infixExpr:
+	prefixExpr
+	| tensorExpr
+	| infixExpr (OpId | '`' alphaId '`') infixExpr;
 
 tensorExpr: Bang simpleExpr Tensor infixExpr;
 
 prefixExpr: (Bang | WhyNot)? simpleExpr;
 
-simpleExpr
-   : literal
-	 | '(' OpId ')'
-   | stableId
-//   | simpleExpr1 '.' Id  // nice for records
-   | exprsInParens
-	 | simpleExpr '[' expr ']'
-   ;
+simpleExpr:
+	literal
+	| '(' OpId ')'
+	| stableId
+	| exprsInParens
+	| simpleExpr '[' expr ']';
 
 cases: caseClause (Sep? caseClause)*;
 
@@ -129,9 +113,7 @@ lCaseClause: lPattern '=>.' expr;
 
 exprsInParens: '(' (expr (',' expr)*)? ')' | '()';
 
-//
-// -- Linear Patterns
-//
+////// Linear Patterns //////
 
 lPattern:
 	Varid
@@ -143,57 +125,43 @@ lPattern:
 
 lPatterns: lPattern (',' lPattern)*;
 
-//
-// -- Patterns
-//
+////// Patterns //////
 
 pattern: pattern1 ('|' pattern1)*;
 
-pattern1
-   : pattern2
-   ;
+pattern1: pattern2;
 
 pattern2: Varid ('@' pattern3)? | pattern3;
 
-pattern3
-   : simplePattern
-//   | simplePattern (id simplePattern)* // no infix patterns yet
-   ;
+pattern3:
+	simplePattern
+	; //   | simplePattern (id simplePattern)* // no infix patterns yet
 
-simplePattern
-   : Wildcard
-   | Varid
-   | literal
-   | Patid pattern*
-//   | stableId '(' (patterns? ',')? (Varid '@')? '_' '*' ')'
-   | '(' patterns? ')'
-   | '()'
-   ;
+simplePattern:
+	Wildcard
+	| Varid
+	| literal
+	| Patid pattern*
+	//   | stableId '(' (patterns? ',')? (Varid '@')? '_' '*' ')'
+	| '(' patterns? ')'
+	| '()';
 
 patterns: pattern (',' pattern)*;
 
 guard: 'if' infixExpr;
 
-//
-// -- Bindings and imports
-//
+////// Bindings and imports //////
 
 bindings
-//   : bindingsInferred
-   : bindingsTagged
-   ;
+: bindingsTagged; //   : bindingsInferred
 
-//bindingsInferred
-//   : id (',' id)*
-//   ;
+//bindingsInferred : id (',' id)* ;
 
 bindingsTagged: ('(' binding ')')+;
 
 binding: (id | Wildcard) ':' type;
 
-//
-// -- Declarations and Definitions
-//
+////// Declarations and Definitions //////
 
 dcl: primitiveDcl | dataDcl | lDataDcl;
 
@@ -207,9 +175,7 @@ lDataDcl: 'data' lTypeDcl '=' lConstructors;
 
 typeDcl: alphaId+ | alphaId rassocOpId alphaId;
 
-lTypeDcl:
-	alphaId lTpeId+
-	| lTpeId rassocOpId lTpeId;
+lTypeDcl: alphaId lTpeId+ | lTpeId rassocOpId lTpeId;
 
 lTpeId: CompId | alphaId;
 
@@ -223,7 +189,7 @@ ctor: Patid type*;
 
 def: defDef;
 
-defDef: (defSig | lSig) (':' type)/*?*/ '=' expr Sep?;
+defDef: (defSig | lSig) (':' type) /*?*/ '=' expr Sep?;
 
 lSig: alphaId paramName*? '[' paramName ']';
 
@@ -247,12 +213,9 @@ statAsTop: stat EOF;
 
 exprAsTop: expr EOF;
 
-translationUnit:
-	Sep* packageInfo Sep* (statSeq Sep*)? EOF;
+translationUnit: Sep* packageInfo Sep* (statSeq Sep*)? EOF;
 
-//
-// Lexer Defs
-//
+////// Lexer Defs //////
 
 Dashes: '--';
 Bang: '!';
@@ -278,10 +241,12 @@ StringLiteral:
 	| '"""' MultiLineChars '"""';
 
 FloatingPointLiteral:
-	'-'? (Digit+ '.' Digit+ ExponentPart? FloatType?
-	| '.' Digit+ ExponentPart? FloatType?
-	| Digit+ ExponentPart FloatType?
-	| Digit+ ExponentPart? FloatType);
+	'-'? (
+		Digit+ '.' Digit+ ExponentPart? FloatType?
+		| '.' Digit+ ExponentPart? FloatType?
+		| Digit+ ExponentPart FloatType?
+		| Digit+ ExponentPart? FloatType
+	);
 
 fragment CharNoBackQuoteOrNewline:
 	'\u0020' .. '\u0026'
@@ -338,7 +303,7 @@ fragment Letter:
 	Upper
 	| Lower
 	| UnicodeClass_LO
-	| UnicodeClass_LT ; // TODO Add category Nl
+	| UnicodeClass_LT; // TODO Add category Nl
 
 fragment ExponentPart: ('E' | 'e') ('+' | '-')? Digit+;
 
@@ -348,8 +313,6 @@ fragment CharEscapeSeq:
 	'\\' ('b' | 't' | 'n' | 'f' | 'r' | '"' | '\'' | '\\');
 
 fragment DecimalNumeral: '0' | NonZeroDigit Digit*;
-
-//fragment HexNumeral: '0' ('x' | 'X') HexDigit+;
 
 fragment Digit: '0' | NonZeroDigit;
 
@@ -868,9 +831,7 @@ fragment UnicodeClass_NL:
 	| '\u3038' ..'\u303a'
 	| '\ua6e6' ..'\ua6ef';
 
-//
-// Whitespace and comments
-//
+////// Whitespace and comments //////
 
 Sep: (Semi | NL)+;
 Semi: ';';

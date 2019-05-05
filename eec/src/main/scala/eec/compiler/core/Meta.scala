@@ -7,16 +7,16 @@ import scala.language.implicitConversions
 import ast.Trees
 import core.{Names, Modifiers, Constants, Contexts}
 import Modifiers._
-import Constants._
 import Contexts._
 import types.Types._
 
 import implied TypeOps._
 
-object Stable {
+object Meta {
   import Tree._
   import Name._
   import Context._
+  import Constant._
 
   import implied NameOps._
 
@@ -25,6 +25,16 @@ object Stable {
     case BangTag, TensorTag, IntegerTag, DecimalTag, VoidTag, VoidCompTag,
       BooleanTag, StringTag, CharTag
     case Wildcard
+    case EmptyName
+  }
+
+  enum Constant derives Eql {
+    case StringConstant(str: String)
+    case CharConstant(chr: Char)
+    case IntegerConstant(bi: BigInt)
+    case DecimalConstant(bd: BigDecimal)
+    case True
+    case False
   }
 
   enum Tree derives Eql {
@@ -32,11 +42,9 @@ object Stable {
     case Select(tree: Tree, name: Name)
     case Ident(name: Name)
     case DataDcl(name: Name, args: List[Name], ctors: List[Tree])
-    case CtorSig(name: Name, tpeArgs: List[Tree])
-    case LinearCtorSig(name: Name, tpeArg: Option[Tree])
-    case DefDcl(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)
-    case DefSig(name: Name, args: List[Name])
-    case LinearDefSig(name: Name, args: List[Name], linear: Name)
+    case CtorSig(name: Name, tpeArgs: List[Tree], lin: Tree)
+    case DefDcl(modifiers: List[Modifier], sig: Tree, tpeAs: Tree, body: Tree)
+    case DefSig(name: Name, args: List[Name], linear: Name)
     case Apply(id: Tree, args: List[Tree])
     case Eval(f: Tree, arg: Tree)
     case Bang(value: Tree)
@@ -50,13 +58,11 @@ object Stable {
     case CaseExpr(selector: Tree, cases: List[Tree])
     case CaseClause(pat: Tree, guard: Tree, body: Tree)
     case LinearCaseExpr(selector: Tree, cases: List[Tree])
-    case LinearCaseClause(pat: Tree, body: Tree)
     case Alternative(bodys: List[Tree])
     case Parens(exprs: List[Tree])
     case Bind(name: Name, body: Tree)
     case Unapply(name: Name, args: List[Tree])
     case Tagged(arg: Name, tpeAs: Tree)
-    case TreeSeq(args: List[Tree])
     case EmptyTree
   }
 
@@ -82,10 +88,7 @@ object Stable {
       case Names.Name.VoidCompTag                 => VoidCompTag
       case Names.Name.VoidTag                     => VoidTag
       case Names.Name.Wildcard                    => Wildcard
-
-      case Names.Name.EmptyName =>
-        throw new IllegalArgumentException(
-          s"Illegal ${Names.Name.EmptyName} in user facing API.")
+      case Names.Name.EmptyName                   => EmptyName
     }
   }
 
@@ -173,18 +176,19 @@ object Stable {
         DataDcl(name, List(left, right), ctors.map(toTree))
 
       case Trees.Tree.CtorSig(name, tpeArgs) =>
-        CtorSig(name, tpeArgs.map(toTree))
+        CtorSig(name, tpeArgs.map(toTree), EmptyTree)
 
       case Trees.Tree.LinearCtorSig(name, tpeArg) =>
-        LinearCtorSig(name, tpeArg.map(toTree))
+        CtorSig(name, Nil, tpeArg.map(toTree).getOrElse{EmptyTree})
 
       case Trees.Tree.DefDef(modifiers, sig, tpeAs, body) =>
-        DefDcl(modifiers, toTree(sig), toTree(tpeAs), toTree(body))
+        DefDcl(modifiers.toList, toTree(sig), toTree(tpeAs), toTree(body))
 
-      case Trees.Tree.DefSig(name, args) => DefSig(name, args.map(n => n: Name))
+      case Trees.Tree.DefSig(name, args) =>
+        DefSig(name, args.map(n => n: Name), EmptyName)
 
       case Trees.Tree.LinearSig(name, arg, lin) =>
-        LinearDefSig(name, arg.map(n => n: Name), lin)
+        DefSig(name, arg.map(n => n: Name), lin)
 
       case Trees.Tree.Apply(id, args) =>
         Apply(toTree(id), args.map(toTree))
@@ -211,7 +215,14 @@ object Stable {
       case Trees.Tree.LetTensor(x, z, s, t) =>
         LetTensor(toTree(x), toTree(z), toTree(s), toTree(t))
 
-      case Trees.Tree.Literal(constant) => Literal(constant)
+      case Trees.Tree.Literal(constant) =>
+        Constants.Constant.asScala(constant) match {
+          case c: Boolean     => Literal(if c then True else False)
+          case c: Char        => Literal(CharConstant(c))
+          case c: String      => Literal(StringConstant(c))
+          case c: BigDecimal  => Literal(DecimalConstant(c))
+          case c: BigInt      => Literal(IntegerConstant(c))
+        }
 
       case Trees.Tree.CaseExpr(selector, cases) =>
         CaseExpr(toTree(selector), cases.map(toTree))
@@ -223,15 +234,18 @@ object Stable {
         LinearCaseExpr(toTree(selector), cases.map(toTree))
 
       case Trees.Tree.LinearCaseClause(pat, body) =>
-        LinearCaseClause(toTree(pat), toTree(body))
+        CaseClause(toTree(pat), EmptyTree, toTree(body))
 
       case Trees.Tree.Alternative(bodys)  => Alternative(bodys.map(toTree))
       case Trees.Tree.Parens(exprs)       => Parens(exprs.map(toTree))
       case Trees.Tree.Bind(name, body)    => Bind(name, toTree(body))
       case Trees.Tree.Unapply(name, args) => Unapply(name, args.map(toTree))
       case Trees.Tree.Tagged(arg, tpeAs)  => Tagged(arg, toTree(tpeAs))
-      case Trees.Tree.TreeSeq(args)       => TreeSeq(args.map(toTree))
       case Trees.Tree.EmptyTree           => EmptyTree
+
+      case s: Trees.Tree.TreeSeq =>
+        throw new AssertionError(
+          s"Illegal ${s.productPrefix} in user facing API.")
     }
   }
 }

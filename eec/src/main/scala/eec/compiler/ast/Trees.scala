@@ -17,7 +17,7 @@ import annotation._
 import util.{Show, Utils}
 import Utils.{eval, foldMap}
 
-import implied Stable.TreeOps._
+import implied Meta.TreeOps._
 import implied Names.NameOps._
 import implied TypeOps._
 
@@ -98,8 +98,8 @@ object Trees {
 
           case Ident(name) => inner((name.show::_)::program, patts)
 
-          case Literal(BooleanConstant(b)) =>
-            val str = if b then "True" else "False"
+          case Literal(b @ (True | False)) =>
+            val str = if b == True then "True" else "False"
             inner((str::_)::program, patts)
 
           case Alternative(patts1) =>
@@ -140,7 +140,7 @@ object Trees {
     }
 
     implied for Show[Tree] = t => pprint.apply(
-      x = (t: Stable.Tree),
+      x = (t: Meta.Tree),
       width = 80,
       height = Int.MaxValue
     ).render
