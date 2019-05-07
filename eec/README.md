@@ -1,4 +1,4 @@
-# Mesa 0.3.1-RC1
+# Mesa 0.3.1-RC3
 
 ## Requirements
 * sbt 1.2.8
