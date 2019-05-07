@@ -1,4 +1,4 @@
-# EEC
+# Mesa
 
 ### Current Release
 0.3.0-RC1
@@ -11,9 +11,9 @@ This repository is for implementing a programming language based on the enriched
 
 ## Features
 * Read Eval Print Loop
-  - Define `EEC+` terms and typecheck them.
-  - Print the parsed AST for `EEC+` terms and source files.
-  - Print the derived types of `EEC+` terms and source files.
+  - Define Mesa terms and type-check them.
+  - Print the meta AST for Mesa terms and source files.
+  - Print the derived types of Mesa terms and source files.
   - Print the current environment of terms and types.
 
 * Linear types that enforce the *linear usage of effects*.
