@@ -233,27 +233,25 @@ object Parsers {
                        given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
     for
-      infixes <- lift {
-        context
-          .infixType
-          .asScala
-          .mapE(fromInfixType)
-      }
-    yield LinearFunction(infixes(0), infixes(1))(freshId(), nt)
+      infix <- fromInfixType(context.infixType)
+      tpe   <- fromType(context.`type`)
+    yield LinearFunction(infix, tpe)(freshId(), nt)
   }
 
   private def fromFunc(context: FuncContext) given IdGen: Lifted[Tree] = {
     import CompilerErrorOps._
     for
-      infixes <- lift {
+      infix <- fromInfixType(context.infixType)
+      tpes <- lift {
         context
-          .infixType
+          .`type`
           .asScala
-          .mapE(fromInfixType)
+          .mapE(fromType)
       }
     yield {
-      val head :: rest = infixes.toList.reverse
-      rest.foldLeft(head)((acc, t) => Function(t :: Nil, acc)(freshId(), nt))
+      val head :: rest = tpes.toList.reverse
+      val tail = rest.foldLeft(head)((acc, t) => Function(t :: Nil, acc)(freshId(), nt))
+      Function(infix :: Nil, tail)(freshId(), nt)
     }
   }
 
@@ -773,13 +771,19 @@ object Parsers {
   private def fromConstructors(context: ConstructorsContext)
                               given IdGen: Lifted[List[Tree]] = {
     import CompilerErrorOps._
-    context.ctor.asScala.mapE(fromCtor).map(_.toList)
+    if defined(context.ctor1) then
+      fromCtor1(context.ctor1).map(_::Nil)
+    else
+      context.ctor.asScala.mapE(fromCtor).map(_.toList)
   }
 
   private def fromLConstructors(context: LConstructorsContext)
                                given IdGen: Lifted[List[Tree]] = {
     import CompilerErrorOps._
-    context.lCtor.asScala.mapE(fromLCtor).map(_.toList)
+    if defined(context.lCtor1) then
+      fromLCtor1(context.lCtor1).map(_::Nil)
+    else
+      context.lCtor.asScala.mapE(fromLCtor).map(_.toList)
   }
 
   private def fromCtor(context: CtorContext)
@@ -788,6 +792,22 @@ object Parsers {
     val name = context.Patid.getText.readAs
     for args <- context.`type`.asScala.mapE(fromType)
     yield CtorSig(name, args.toList)(nt)
+  }
+
+  private def fromCtor1(context: Ctor1Context)
+                       given IdGen: Lifted[Tree] = {
+   import CompilerErrorOps._
+    val name = context.Patid.getText.readAs
+    for args <- context.`type`.asScala.mapE(fromType)
+    yield CtorSig(name, args.toList)(nt)
+  }
+
+  private def fromLCtor1(context: LCtor1Context)
+                        given IdGen: Lifted[Tree] = {
+   import CompilerErrorOps._
+    val name = context.Patid.getText.readAs
+    for arg <- fromType(context.`type`)
+    yield LinearCtorSig(name, Some(arg))(nt)
   }
 
   private def fromLCtor(context: LCtorContext)
@@ -815,13 +835,45 @@ object Parsers {
     yield DefDef(Set(), sig, typ, EmptyTree)(nt)
   }
 
-  private def fromLSig(context: LSigContext) given IdGen: Tree = {
+  private def fromLSig(context: LSigContext) given IdGen: Tree =
+    if defined(context.infixLSig) then fromInfixLSig(context.infixLSig)
+    else fromLSigImpl(context)
+
+  private def fromLSigImpl(context: LSigContext) given IdGen: Tree = {
     var name     = (fromAlphaId(context.alphaId): Name)
     val paramids = context.paramName.asScala.map(fromParamName)
     if paramids.size == 1 then
       LinearSig(name, Nil, paramids(0))(freshId(), nt)
     else
       LinearSig(name, paramids.init.toList, paramids.last)(freshId(), nt)
+  }
+
+  private def fromInfixLSig(context: InfixLSigContext) given IdGen: Tree = {
+    if defined(context.prefixOpLSig) then
+      fromPrefixOpLSig(context.prefixOpLSig)
+    else if defined(context.OpId) then
+      fromInfixOpLSig(context)
+    else
+      fromInfixAlphaLSig(context)
+  }
+
+  private def fromPrefixOpLSig(context: PrefixOpLSigContext) given IdGen: Tree = {
+    var args = context.paramName.asScala.map(fromParamName).toList
+    val name = context.OpId.getText.readAs
+    LinearSig(name, args.init, args.last)(freshId(), nt)
+  }
+
+  private def fromInfixOpLSig(context: InfixLSigContext) given IdGen: Tree = {
+    var args = context.paramName.asScala.map(fromParamName).toList
+    var name = context.OpId.getText.readAs
+    LinearSig(name, args.init, args.last)(freshId(), nt)
+  }
+
+  private def fromInfixAlphaLSig(context: InfixLSigContext)
+                               given IdGen: Tree = {
+    var args  = context.paramName.asScala.map(fromParamName).toList
+    val name  = (fromAlphaId(context.alphaId): Name)
+    LinearSig(name, args.init, args.last)(freshId(), nt)
   }
 
   private def fromParamName(context: ParamNameContext): Name =

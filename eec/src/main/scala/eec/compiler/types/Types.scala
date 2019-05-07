@@ -15,7 +15,7 @@ import Name._
 import error.CompilerErrors._
 import CompilerErrorOps._
 import util.{Show, Define, StackMachine, Utils}
-import Utils.view
+import Utils.{view, const}
 import StackMachine._
 import Program._
 
@@ -106,14 +106,15 @@ object Types {
       }
     }
 
-    def unifyImpl(tpe: Type, sub: Name, by: Type): Type = tpe.mapVariables {
-      case `sub` =>
-        if by == WildcardType then
-          Variable(sub)
-        else
-          by
-
-      case other => Variable(other)
+    def unifyImpl(tpe: Type, sub: Name, by: Type): Type = {
+      val replacement = {
+        if by == WildcardType then Variable(_)
+        else const(by)
+      }
+      tpe.mapVariables {
+        case `sub` => replacement(sub)
+        case other => Variable(other)
+      }
     }
   }
 
@@ -281,7 +282,6 @@ object Types {
     }
 
     def canUnify(arg: Type, app: Type) : Boolean = {
-      @tailrec
       def inner(z: Boolean, args: List[Type], apps: List[Type]): Boolean = args match {
         case Nil => z
 
@@ -297,15 +297,13 @@ object Types {
 
             case ( _:FunctionType,       _:FunctionType       )
             |    ( _:LinearFunctionType, _:LinearFunctionType )
-            |    ( _:BaseType,            _:BaseType          )
-            |    ( _:TypeRef,             _:TypeRef           )
+            |    ( _:InfixAppliedType,   _:InfixAppliedType   )
+            |    ( _:BaseType,           _:BaseType           )
+            |    ( _:TypeRef,            _:TypeRef            )
             |    ( _:Variable
                 |    WildcardType,       _                    )
             |    ( _:PackageInfo,        _:PackageInfo        )
             |    (   EmptyType,            EmptyType          ) => true
-
-            case (_: InfixAppliedType,  _: InfixAppliedType) =>
-              inner(z, argRest, appsRest)
 
             case _ => false
           }
@@ -433,28 +431,28 @@ object Types {
 
     def (tpe: Type) isComputationType: Boolean = {
       @tailrec
-      def inner(acc: Boolean, tpes: List[Type]): Boolean = tpes match {
-        case Nil => acc
+      def inner(tpes: List[Type]): Boolean = tpes match {
+        case Nil => true
 
         case tpe :: tpes => tpe match {
           case AppliedType(BangTag, _ :: Nil)
           |    InfixAppliedType(TensorTag,_,_)
           |    BaseType(VoidCompTag)
           |    TypeRef(_: Comp)
-          |    Variable(_: Comp)     => true
+          |    Variable(_: Comp) => inner(tpes)
 
           case AppliedType(_, args) =>
-            inner(acc, args ::: tpes)
+            inner(args:::tpes)
 
           case InfixAppliedType(_, left, right) =>
-            inner(acc, left :: right :: tpes)
+            inner(left::right::tpes)
 
-          case FunctionType(_, body) => inner(acc, body :: tpes)
-          case Product(ts)           => inner(acc, ts ::: tpes)
+          case FunctionType(_, body) => inner(body::tpes)
+          case Product(ts)           => inner(ts:::tpes)
           case _                     => false
         }
       }
-      inner(true, tpe :: Nil)
+      inner(tpe :: Nil)
     }
 
     def (tpe: Type) isValueType = !tpe.isComputationType
@@ -465,26 +463,22 @@ object Types {
       case InfixAppliedType(op, a1, a2)   => fromInfixAppliedType(op,a1,a2)
       case AppliedType(f, args)           => fromAppliedType(f, args)
       case Product(tpes1)                 => fromProduct(tpes1)
-      case TypeRef(t)                     => t.show :: _
-      case BaseType(t)                    => t.show :: _
-      case Variable(t)                    => t.show :: _
-      case PackageInfo(parent, name)      => showPackage(parent, name) :: _
-      case WildcardType                   => "<any>" :: _
-      case EmptyType                      => "<nothing>" :: _
+      case TypeRef(t)                     => t.show::_
+      case BaseType(t)                    => t.show::_
+      case Variable(t)                    => t.show::_
+      case PackageInfo(parent, name)      => showPackage(parent, name)::_
+      case WildcardType                   => "<any>"::_
+      case EmptyType                      => "<nothing>"::_
     }
 
     private def fromFunctionType(arg: Type, body: Type)
-                                  (stack: Stack[String]) = {
+                                (stack: Stack[String]) = {
       val a1 :: a2 :: rest = stack
       val a1Final = arg match {
         case _: (FunctionType | LinearFunctionType)  => s"($a1)"
         case _                                       => a1
       }
-      val a2Final = body match {
-        case _: LinearFunctionType  => s"($a2)"
-        case _                                       => a2
-      }
-      s"$a1Final -> $a2Final" :: rest
+      s"$a1Final -> $a2" :: rest
     }
 
     private def fromLinearFunctionType(arg: Type, body: Type)
@@ -494,11 +488,7 @@ object Types {
         case _: (FunctionType | LinearFunctionType)  => s"($a1)"
         case _                                       => a1
       }
-      val a2Final = body match {
-        case _: (FunctionType | LinearFunctionType)  => s"($a2)"
-        case _                                       => a2
-      }
-      s"$a1Final ->. $a2Final" :: rest
+      s"$a1Final ->. $a2" :: rest
     }
 
     private def fromInfixAppliedType(op: Name, a1: Type, a2: Type)

@@ -24,8 +24,11 @@ import implied TreeOps._
 import implied TypeOps._
 import implied NameOps._
 
+
 object BootstrapTests {
   val any = WildcardType
+  
+  export org.junit.Test
 
   def (str: String) -|: (other: String) = other -> str
   def (str: String) :|- (other: String) = str -> other
@@ -54,7 +57,7 @@ object BootstrapTests {
                             (exp: Tree)
                             given IdGen, Context: Lifted[Tree] =
     for
-      _   <- indexed(exp)
+      _   <- exp.indexed
       tpd <- exp.typed
     yield tpd
 

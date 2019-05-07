@@ -7,6 +7,13 @@ data Either3C a# b# c#  = In1C[a#] | In2C[b#] | In3C[c#]
 data MaybeC a#          = JustC[a#] | NothingC
 data Maybe a            = Just a | Nothing
 data Maybe3 a b c       = Just3 a b c | Nothing3
+data Product3 a b c     = Product3 a b c
+
+product3_to_tuple p: Product3 A B C -> (A,B,C) =
+  case p of Product3 a b c => (a,b,c)
+
+tuple_to_product3 t: (A,B,C) -> Product3 A B C =
+  case t of (a,b,c) => Product3 a b c
 
 maybe_to_or m : Maybe A -> A |: () =
   case m of

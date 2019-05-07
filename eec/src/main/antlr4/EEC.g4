@@ -44,9 +44,9 @@ stableId: alphaId | alphaId '.' id;
 
 type: infixType | func | lFunc;
 
-func: infixType ('->' infixType)+;
+func: infixType ('->' type)+;
 
-lFunc: infixType '->.' infixType;
+lFunc: infixType '->.' type;
 
 infixAppliedType: functorType rassocOpId infixType;
 
@@ -175,15 +175,19 @@ lDataDcl: 'data' lTypeDcl '=' lConstructors;
 
 typeDcl: alphaId+ | alphaId rassocOpId alphaId;
 
-lTypeDcl: alphaId lTpeId+ | lTpeId rassocOpId lTpeId;
+lTypeDcl: alphaId lTpeId* | lTpeId rassocOpId lTpeId;
 
 lTpeId: CompId | alphaId;
 
-lConstructors: lCtor (Sep? '|' lCtor)+;
+lConstructors: lCtor1 | (lCtor (Sep? '|' lCtor)+);
 
-constructors: ctor (Sep? '|' ctor)+;
+constructors: ctor1 | (ctor (Sep? '|' ctor)+);
 
 lCtor: Patid ('[' type ']')?;
+
+lCtor1: Patid '[' type ']';
+
+ctor1: Patid type+;
 
 ctor: Patid type*;
 
@@ -191,7 +195,13 @@ def: defDef;
 
 defDef: (defSig | lSig) (':' type) /*?*/ '=' expr Sep?;
 
-lSig: alphaId paramName*? '[' paramName ']';
+lSig: infixLSig | alphaId paramName*? '[' paramName ']';
+
+infixLSig:
+	paramName (OpId | '`' alphaId '`') '[' paramName ']'
+	| prefixOpLSig;
+
+prefixOpLSig: '(' OpId ')' paramName* '[' paramName ']';
 
 defSig: infixDefSig | alphaId paramName*;
 
@@ -234,7 +244,7 @@ OpId: Op;
 CharacterLiteral: '\'' (PrintableChar | CharEscapeSeq) '\'';
 
 IntegerLiteral:
-	'-'? (DecimalNumeral /*| HexNumeral*/) ('L' | 'l')?;
+	'-'? DecimalNumeral ('L' | 'l')?;
 
 StringLiteral:
 	'"' StringElement* '"'

@@ -84,12 +84,6 @@ object Typers {
     tree.typed(pt)
   }
 
-  private def (tree: Tree) typedAsPrimitive(pt: Type)
-                                           given Context, Stoup, Closure: Lifted[Tree] = {
-    implied for Mode = PrimitiveType
-    tree.typed(pt)
-  }
-
   private def (tree: Tree) typedAsPattern(pt: Type)
                                          given Context, Stoup, Closure: Lifted[Tree] = {
     implied for Mode = Pat
@@ -209,8 +203,9 @@ object Typers {
       argProto1   =  argProto.unify(arg1)
       subs        =  arg1.unifications(argProto1)
       arg2        =  arg1.unifyFromAll(subs)
+      argProto2   =  argProto1.unifyFromAll(subs)
       ret1        <- lift {
-        if arg2 =!= argProto1 then ret.unifyFromAll(subs).unify(pt)
+        if arg2 =!= argProto2 then ret.unifyFromAll(subs).unify(pt)
         else onNoArgUnify(fun, arg, argProto1)
       }
     yield ret1
@@ -871,14 +866,8 @@ object Typers {
   private def typedDefDef(
        modifiers: Set[Modifier], sig: Tree & Unique, tpeD: Tree, body: Tree)
       given Context, Mode, Stoup, Closure: Lifted[Tree] = {
-    val typntAs = {
-      if modifiers.contains(Modifier.Primitive) then
-        typedAsPrimitive
-      else
-        typedAsTyping
-    }
     for
-      tpeD1    <- typntAs(tpeD)(any)
+      tpeD1    <- tpeD.typedAsTyping(any)
       tpe      =  tpeD1.tpe
       sig1     <- sig.typed(tpe)
       ret      =  toBodyType(sig1, tpe)
@@ -946,6 +935,8 @@ object Typers {
     val pts = pt.toCurriedList
     if pts.length <= args.length then {
       Err.declArgsNotMatchType(name)
+    } else if name.isOperator && pts.length < 2 then {
+      Err.declArgsInfixLNotBinary(name)
     } else {
       lookIn(id).flatMap { bodyCtx =>
         implied for Context = bodyCtx

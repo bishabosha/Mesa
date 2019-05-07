@@ -20,6 +20,7 @@ object CompilerErrors {
     case LinearScope(msg: String)
     case UnknownIdentifier(msg: String)
     case UnexpectedType(msg: String)
+    case MissingCase(msg: String)
     case IllegalState(msg: String)
     case Internal(msg: String)
     case IllegalInput(msg: String)
@@ -33,6 +34,7 @@ object CompilerErrors {
       case e @ LinearScope(msg)       => s"${e.productPrefix}: $msg"
       case e @ UnknownIdentifier(msg) => s"${e.productPrefix}: $msg"
       case e @ UnexpectedType(msg)    => s"${e.productPrefix}: $msg"
+      case e @ MissingCase(msg)       => s"${e.productPrefix}: $msg"
       case e @ IllegalState(msg)      => s"${e.productPrefix}: $msg"
       case e @ Internal(msg)          => s"${e.productPrefix}: $msg"
       case e @ IllegalInput(msg)      => s"${e.productPrefix}: $msg"

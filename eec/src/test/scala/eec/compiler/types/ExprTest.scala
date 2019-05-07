@@ -1,18 +1,13 @@
-package eec
-package compiler
-package types
+package eec.compiler.types
 
-import ExprBootstraps._
 import BootstrapTests._
-
-import org.junit.Test
-import org.junit.Assert._
+import ExprBootstraps._
 
 class ExprTest {
 
   @Test def typecheckInteger() = typecheck(
-    "0"  :|- "Integer",
-    "-0" :|- "Integer"
+    "Integer" -|: "0",
+    "Integer" -|: "-0"
   )
 
   @Test def failInteger() = noParse(
@@ -21,9 +16,11 @@ class ExprTest {
   )
 
   @Test def typecheckDecimal() = typecheck(
-    "3.14159265358979323846264338328" :|- "Decimal", // PI
-    "6.62607004e-34"                  :|- "Decimal", // Planck's constant
-    "-273.15"                         :|- "Decimal"  // 0 degrees Kelvin
+    "Decimal"
+    -|: "3.14159265358979323846264338328", // PI
+
+    "Decimal" -|: "6.62607004e-34", // Planck's constant
+    "Decimal" -|: "-273.15"         // 0 degrees Kelvin
   )
 
   @Test def failDecimal() = noParse(
@@ -34,13 +31,13 @@ class ExprTest {
   )
 
   @Test def typecheckBoolean() = typecheck(
-    "True"  :|- "Boolean",
-    "False" :|- "Boolean"
+    "Boolean" -|: "True",
+    "Boolean" -|: "False"
   )
 
   @Test def typecheckChar() = typecheck(
-    """ 'a' """  :|- "Char",
-    """ '\n' """ :|- "Char"
+    "Char" -|: """ 'a' """,
+    "Char" -|: """ '\n' """
   )
 
   @Test def failChar() = noParse(
@@ -49,19 +46,19 @@ class ExprTest {
   )
 
   @Test def typecheckString() = typecheck(
-    """ "test" """       :|- "String",
-    "\"\"\"test\"\"\""   :|- "String"
+    "String" -|: """ "test" """,
+    "String" -|: "\"\"\"test\"\"\""
   )
 
   @Test def typecheckProducts() = typecheck(
-    "()"          :|- "()",
-    "(())"        :|- "()",
-    "((),())"     :|- "((), ())",
-    "((),(),())"  :|- "((), (), ())",
+    "()"           -|: "()",
+    "()"           -|: "(())",
+    "((), ())"     -|: "((),())",
+    "((), (), ())" -|: "((),(),())",
   )
 
   @Test def typecheckTensor() = typecheck(
-    "!() *: ()" :|- "!() *: ()",
+    "!() *: ()" -|: "!() *: ()",
   )
 
   @Test def failTensor() = noType(
@@ -73,9 +70,9 @@ class ExprTest {
   )
 
   @Test def typecheckCompute() = typecheck(
-    "!()"       :|- "!()",
-    "!((),())"  :|- "!((), ())",
-    "(!(),!())" :|- "(!(), !())",
+    "!()"        -|: "!()",
+    "!((), ())"  -|: "!((),())",
+    "(!(), !())" -|: "(!(),!())",
   )
 
   @Test def failCompute() = noType(
@@ -85,7 +82,7 @@ class ExprTest {
   )
 
   @Test def typecheckIf() = typecheck(
-    "if True then () else ()" :|- "()"
+    "()" -|: "if True then () else ()"
   )
 
   @Test def failIf() = noType(
@@ -94,63 +91,79 @@ class ExprTest {
   )
 
   @Test def typecheckCase() = typecheck(
-    "()"       -|:  """ case () of
-                          _ => () """,
+    "()" -|:
+    """ case () of _ => () """,
 
-    "()"       -|:  """ case () of
-                          x => x """,
+    "()" -|:
+    """ case () of x => x """,
 
-    "((), ())" -|:  """ case () of
-                          c @ x => (c, x) """,
+    "((), ())" -|:
+    """ case () of
+          c @ x => (c, x) """,
 
-    "()"       -|:  """ case () of
-                          _ if True => () """,
+    "()" -|:
+    """ case () of
+              _ if True => () """,
 
-    "()"       -|:  """ case () of
-                          ( ) | () => () """,
+    "()" -|:
+    """ case () of
+              ( ) | () => () """,
 
-    "()"       -|:  """ case ((), ()) of
-                          (_, a) => a """,
+    "()" -|:
+    """ case ((), ()) of
+              (_, a) => a """,
 
-    "()"       -|:  """ case ((), ((), ())) of
-                          (_, (_, a)) => a """,
+    "()" -|:
+    """ case ((), ((), ())) of
+              (_, (_, a)) => a """,
 
-    "((), ())" -|:  """ case ((), ((), ())) of
-                          (a, (_, b)) => (a, b) """,
+    "((), ())" -|:
+    """ case ((), ((), ())) of
+          (a, (_, b)) => (a, b) """,
 
-    "()"       -|:  """ case ((), (), ()) of
-                          (_, _, _) => () """,
+    "()" -|:
+    """ case ((), (), ()) of
+          (_, _, _) => () """,
 
-    "()"       -|:  """ case Left () of
-                          Left  x => x;
-                          Right _ => () """,
+    "()" -|:
+    """ case Left () of
+          Left  x => x;
+          Right _ => () """,
 
-    "()"       -|:  """ case Left () of
-                          (Left _) | (Right _) => () """,
+    "()" -|:
+    """ case Left () of
+          (Left _) | (Right _) => () """,
 
-    "()"       -|:  """ case (0,0) of
-                          (1,2) | (_,_) => () """,
+    "()" -|:
+    """ case (0,0) of
+          (1,2) | (_,_) => () """,
 
-    "()"       -|:  """ case True of
-                          True | _ => () """,
+    "()" -|:
+    """ case True of
+          True | _ => () """,
 
-    "()"       -|:  """ case Right 0 of
-                          (Right 0) | (Left _) | (Right _) => () """,
+    "()" -|:
+    """ case Right 0 of
+          (Right 0) | (Left _) | (Right _) => () """,
 
-     "()"       -|:  """ case Left True of
-                          (Left False) | (Right _) | (Left _) => () """,
+    "()" -|:
+    """ case Left True of
+          (Left False) | (Right _) | (Left _) => () """,
 
-    "()"       -|:  """ case Right () of
-                          Right x => x;
-                          Left  _ => () """,
+    "()" -|:
+    """ case Right () of
+          Right x => x;
+          Left  _ => () """,
 
-    "()"       -|:  """ case False of
-                          True => ();
-                          _    => () """,
+    "()" -|:
+    """ case False of
+          True => ();
+          _    => () """,
 
-    "()"       -|:  """ case True of
-                          False => ();
-                          _     => () """,
+    "()" -|:
+    """ case True of
+          False => ();
+          _     => () """,
   )
 
   @Test def failCase() = noType(
@@ -188,27 +201,33 @@ class ExprTest {
   )
 
   @Test def typecheckLinearCase() = typecheck(
+    "()" -|:
     """ case ((), ()) of
-          (x, _) =>. x """            :|- "()",
+          (x, _) =>. x """,
 
+    "()" -|:
     """ case ((),()) of
-          (x, ( )) =>. x """          :|- "()",
+          (x, ( )) =>. x """,
 
+    "()" -|:
     """ case InR [((), ())] of
           InR[(x, _)] =>. x
-          InL[u]      =>. () """      :|- "()",
+          InL[u]      =>. () """,
 
+    "()" -|:
     """ case (InR [()], ()) of
           (InR[x], _) =>. x
-          (InL[u], _) =>. () """      :|- "()",
+          (InL[u], _) =>. () """,
 
+    "()" -|:
     """ case InL [()] of
           InL[n] =>. n
-          InR[u] =>. () """          :|- "()",
+          InR[u] =>. () """,
 
+    "()" -|:
     """ case 0 of
           0 =>. ()
-          _ =>. () """          :|- "()",
+          _ =>. () """,
   )
 
   @Test def failLinearCase() = noType(

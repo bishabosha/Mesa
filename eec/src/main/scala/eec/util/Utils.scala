@@ -9,6 +9,8 @@ object Utils {
 
   def eval[A,B](a: A, f: A => B) = f(a)
 
+  def const[A,B](a: B)(b: A) = a
+
   def (ts: CC[A]) foldMap[CC[_] <: Seq[_], A, O](empty: => O)(f: CC[A] => O) =
     if ts.isEmpty then empty
     else f(ts)

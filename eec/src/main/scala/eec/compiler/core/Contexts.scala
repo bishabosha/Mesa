@@ -38,7 +38,7 @@ object Contexts {
   opaque type Id        = Long
 
   enum Mode derives Eql {
-    case PrimitiveType, Typing, Term, Pat, PatAlt, LinearPat
+    case Typing, Term, Pat, PatAlt, LinearPat
   }
 
   object Mode {
@@ -51,7 +51,7 @@ object Contexts {
       Pat == mode || PatAlt == mode || LinearPat == mode
 
     def isType given Mode =
-      Typing == mode || PrimitiveType == mode
+      Typing == mode
 
     def isTerm given Mode =
       Term == mode
@@ -59,10 +59,10 @@ object Contexts {
 
   object ModeOps {
     implied for Show[Mode] = {
-      case LinearPat              => "linear pattern"
-      case Pat | PatAlt           => "pattern"
-      case Term                   => "term"
-      case PrimitiveType | Typing => "typing"
+      case LinearPat    => "linear pattern"
+      case Pat | PatAlt => "pattern"
+      case Term         => "term"
+      case Typing       => "typing"
     }
   }
 

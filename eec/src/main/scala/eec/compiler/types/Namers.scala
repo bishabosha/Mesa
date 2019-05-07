@@ -12,7 +12,6 @@ import CompilerErrorOps._
 import core.Contexts._
 import core.Names._
 import core.Modifiers._
-import Modifier.Primitive
 import Name._
 import NameOps._
 import Context._
@@ -26,7 +25,7 @@ object Namers {
 
   private val anon = EmptyName
 
-  def indexed(tree: Tree) given Context: Lifted[Unit] = {
+  def (tree: Tree) indexed given Context: Lifted[Unit] = {
     implied for Mode = Mode.Term
     index(tree)
   }
@@ -66,21 +65,10 @@ object Namers {
       implied for Context = ctx1
       for
         _ <- args.foldLeftE(())((_, n) => enterVariable(n))
-        _ <- sig.linearArg.foldEmptyName(())(enterLinearArg(modifiers))
+        _ <- sig.linearArg.foldEmptyName(())(enterLinear)
         _ <- index(body)
       yield ()
     }
-  }
-
-  private def enterLinearArg(mods: Set[Modifier])(linearArg: Name)
-                            given Context: Lifted[Unit] = {
-    val enterArg = {
-      val isPrimitive = mods.contains(Primitive)
-      val isWildcard  = linearArg == Wildcard
-      (isPrimitive && !isWildcard) || !isPrimitive
-    }
-    if enterArg then enterLinear(linearArg)
-    else ()
   }
 
   private def namedFunctionTerm(args: List[Tree], body: Tree)

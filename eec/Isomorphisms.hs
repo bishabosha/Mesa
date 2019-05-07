@@ -2,54 +2,54 @@ package eec.report.example
 
 -- Please import the Prelude by using the `-p` flag
 
-isomorphism_2a f [t] : (A -> B#) -> (!A ->. B#) =
+isomorphism_2a f [t] : (A -> B#) -> !A ->. B# =
   let !x = t in f x
 
 isomorphism_2b f a : (!A ->. B#) -> A -> B# =
   f[!a]
 
-isomorphism_3_1a f a [b] : (!A *: B# ->. C#) -> A -> (B# ->. C#) =
+isomorphism_3_1a f a [b] : (!A *: B# ->. C#) -> A -> B# ->. C# =
   f[!a *: b]
 
-isomorphism_3_1b f [t] : (A -> (B# ->. C#)) -> (!A *: B# ->. C#) =
+isomorphism_3_1b f [t] : (A -> B# ->. C#) -> !A *: B# ->. C# =
   let !a *: b = t in
   (f a)[b]
 
-isomorphism_3_2a f [b] : (A -> (B# ->. C#)) -> (B# ->. (A -> C#)) =
+isomorphism_3_2a f [b] : (A -> B# ->. C#) -> B# ->. (A -> C#) =
   \(a: A) => (f a)[b]
 
-isomorphism_3_2b f a [b] : (B# ->. (A -> C#)) -> A -> (B# ->. C#) =
+isomorphism_3_2b f a [b] : (B# ->. A -> C#) -> A -> B# ->. C# =
   f[b] a
 
-isomorphism_3_3a f [b] : (!A *: B# ->. C#) -> (B# ->. (A -> C#)) =
+isomorphism_3_3a f [b] : (!A *: B# ->. C#) -> B# ->. (A -> C#) =
   \(a: A) => f[!a *: b]
 
-isomorphism_3_3b f [t] : (B# ->. (A -> C#)) -> (!A *: B# ->. C#) =
+isomorphism_3_3b f [t] : (B# ->. A -> C#) -> !A *: B# ->. C# =
   let !a *: b = t in
   f[b] a
 
 isomorphism_4a _ : (A# ->. ()) -> () =
   ()
 
-isomorphism_4b _ [_] : () -> (A# ->. ()) =
+isomorphism_4b _ [_] : () -> A# ->. () =
   ()
 
 isomorphism_5a f : (A# ->. (B#, C#)) -> (A# ->. B#, A# ->. C#) =
   (\(a: A#) =>. fstL[f[a]], \(a: A#) =>. sndL[f[a]])
 
-isomorphism_5b p [a] : (A# ->. B#, A# ->. C#) -> (A# ->. (B#, C#)) =
+isomorphism_5b p [a] : (A# ->. B#, A# ->. C#) -> A# ->. (B#, C#) =
   ((fst p)[a], (snd p)[a])
 
 isomorphism_6a _ : (Void# ->. A#) -> () =
   ()
 
-isomorphism_6b _ : () -> (Void# ->. A#) =
+isomorphism_6b _ : () -> Void# ->. A# =
   absurd
 
 isomorphism_7a f : (A# +: B# ->. C#) -> (A# ->. C#, B# ->. C#) =
   (\(a: A#) =>. f[InL[a]], \(b: B#) =>. f[InR[b]])
 
-isomorphism_7b p [e] : (A# ->. C#, B# ->. C#) -> (A# +: B# ->. C#) =
+isomorphism_7b p [e] : (A# ->. C#, B# ->. C#) -> A# +: B# ->. C# =
   case e of
     InL[a] =>. (fst p)[a]
     InR[b] =>. (snd p)[b]

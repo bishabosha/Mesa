@@ -112,7 +112,7 @@ object Repl {
       guarded(state, s) {
         val yieldTyped = for
           expr  <- f(s)
-          _     <- indexed(expr)
+          _     <- expr.indexed
           typed <- expr.typed
         yield typed
 
@@ -128,7 +128,7 @@ object Repl {
       guarded(state, s) {
         val typed = for
           exp <- parseDef(s)
-          _   <- indexed(exp)
+          _   <- exp.indexed
           tpd <- exp.typed
         yield tpd
 

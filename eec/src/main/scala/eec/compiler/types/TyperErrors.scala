@@ -80,7 +80,7 @@ object TyperErrors {
         .map(showPatternTemplate(_))
         .mkString("[", ", ", "]")
     }
-    CompilerError.UnexpectedType(
+    CompilerError.MissingCase(
       s"Pattern match will fail on values matching these patterns: $temps")
   }
 
@@ -191,6 +191,11 @@ object TyperErrors {
   def declArgsInfixNotBinary(name: Name) = {
     CompilerError.UnexpectedType(
       s"Infix function declaration ${name.define} does not have at least two arguments.")
+  }
+
+  def declArgsInfixLNotBinary(name: Name) = {
+    CompilerError.UnexpectedType(
+      s"Infix Linear function declaration ${name.define} does not have at least two arguments.")
   }
 
   def linearArgNotMatchType(name: Name) = {
