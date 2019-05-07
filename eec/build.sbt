@@ -10,8 +10,8 @@ antlr4GenVisitor in Antlr4  := false // default: false
 lazy val root = project
   .in(file("."))
   .settings(
-    name := "eec",
-    version := "0.3.0-RC1",
+    name := "mesa-core",
+    version := "0.3.1-RC1",
 
     compileOrder := CompileOrder.JavaThenScala,
 

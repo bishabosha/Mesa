@@ -16,7 +16,7 @@ import Meta.ContextOps._
 import Contexts.{Context, IdGen, RootContext, IdReader}
 import Names.{Name, NameOps}
 import Context._
-import parsing.EntryPoint.{parseEEC, parseDef, parseExpr}
+import parsing.EntryPoint.{parseMesa, parseDef, parseExpr}
 import error.CompilerErrors.{CompilerError, CompilerErrorOps, Lifted}
 import CompilerErrorOps._
 import types.{Namers, Typers, Types, Prelude}
@@ -161,7 +161,7 @@ object Repl {
         Ast(name) { n =>
           for
             code  <- loadFile(state.pwd, n)
-            ast   <- parseEEC(code)
+            ast   <- parseMesa(code)
           yield ast
         }
 
@@ -172,7 +172,7 @@ object Repl {
         Typed(name) { n =>
           for
             code  <- loadFile(state.pwd, n)
-            ast   <- parseEEC(code)
+            ast   <- parseMesa(code)
           yield ast
         }
 

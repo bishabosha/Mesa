@@ -8,7 +8,7 @@ import error.CompilerErrors.Lifted
 import core.Contexts.IdReader
 
 object EntryPoint {
-  val parseEEC: String => IdReader[Lifted[Tree]] =
+  val parseMesa: String => IdReader[Lifted[Tree]] =
     eecParser `toTreeParser` fromTranslationUnit
 
   val parseDef: String => IdReader[Lifted[Tree]] =

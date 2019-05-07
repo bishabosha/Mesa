@@ -1,4 +1,4 @@
-# EEC 0.3.0-RC1
+# Mesa 0.3.1-RC1
 
 ## Requirements
 * sbt 1.2.8

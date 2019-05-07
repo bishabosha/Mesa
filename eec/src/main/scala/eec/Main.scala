@@ -8,7 +8,7 @@ object Main {
     if args `sameElements` Array("-help") then {
       println("Usage: eec <option>")
       println
-      println("  -e    => run EEC REPL")
+      println("  -e    => run Mesa REPL")
       println("  -p    => modifier for -e to load the REPL with Prelude definitions.")
       println("  -help => view these options")
     } else if args `sameElements` Array("-e") then {
