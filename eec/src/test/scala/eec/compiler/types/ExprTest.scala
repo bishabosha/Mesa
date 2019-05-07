@@ -277,7 +277,7 @@ class ExprTest {
     """ \(a: A#) =>. a """                            :|- "forall a#. a# ->. a#",
     """ \(a: A#) =>. () """                           :|- "forall a#. a# ->. ()",
     """ \(_: A#) =>. () """                           :|- "forall a#. a# ->. ()",
-    """ \(a: !A) =>. let !_ = a in \(a: ()) => a """  :|- "forall a. !a ->. (() -> ())",
+    """ \(a: !A) =>. let !_ = a in \(a: ()) => a """  :|- "forall a. !a ->. () -> ()",
   )
 
   @Test def failLinearLambda() = noType(

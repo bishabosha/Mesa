@@ -771,19 +771,13 @@ object Parsers {
   private def fromConstructors(context: ConstructorsContext)
                               given IdGen: Lifted[List[Tree]] = {
     import CompilerErrorOps._
-    if defined(context.ctor1) then
-      fromCtor1(context.ctor1).map(_::Nil)
-    else
-      context.ctor.asScala.mapE(fromCtor).map(_.toList)
+    context.ctor.asScala.mapE(fromCtor).map(_.toList)
   }
 
   private def fromLConstructors(context: LConstructorsContext)
                                given IdGen: Lifted[List[Tree]] = {
     import CompilerErrorOps._
-    if defined(context.lCtor1) then
-      fromLCtor1(context.lCtor1).map(_::Nil)
-    else
-      context.lCtor.asScala.mapE(fromLCtor).map(_.toList)
+    context.lCtor.asScala.mapE(fromLCtor).map(_.toList)
   }
 
   private def fromCtor(context: CtorContext)
@@ -792,22 +786,6 @@ object Parsers {
     val name = context.Patid.getText.readAs
     for args <- context.`type`.asScala.mapE(fromType)
     yield CtorSig(name, args.toList)(nt)
-  }
-
-  private def fromCtor1(context: Ctor1Context)
-                       given IdGen: Lifted[Tree] = {
-   import CompilerErrorOps._
-    val name = context.Patid.getText.readAs
-    for args <- context.`type`.asScala.mapE(fromType)
-    yield CtorSig(name, args.toList)(nt)
-  }
-
-  private def fromLCtor1(context: LCtor1Context)
-                        given IdGen: Lifted[Tree] = {
-   import CompilerErrorOps._
-    val name = context.Patid.getText.readAs
-    for arg <- fromType(context.`type`)
-    yield LinearCtorSig(name, Some(arg))(nt)
   }
 
   private def fromLCtor(context: LCtorContext)

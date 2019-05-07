@@ -1,6 +1,7 @@
-# EEC 0.2.2-RC1
+# EEC 0.3.0-RC1
 
 ## Requirements
+* sbt 1.2.8
 * Dotty 0.14.0-RC1 <http://dotty.epfl.ch>
 
 ## Usage

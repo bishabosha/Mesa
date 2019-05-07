@@ -179,15 +179,11 @@ lTypeDcl: alphaId lTpeId* | lTpeId rassocOpId lTpeId;
 
 lTpeId: CompId | alphaId;
 
-lConstructors: lCtor1 | (lCtor (Sep? '|' lCtor)+);
+lConstructors: lCtor (Sep? '|' lCtor)*;
 
-constructors: ctor1 | (ctor (Sep? '|' ctor)+);
+constructors: ctor (Sep? '|' ctor)*;
 
 lCtor: Patid ('[' type ']')?;
-
-lCtor1: Patid '[' type ']';
-
-ctor1: Patid type+;
 
 ctor: Patid type*;
 
