@@ -2,6 +2,8 @@ package eec
 package compiler
 package types
 
+import scala.language.implicitConversions
+
 import core.Contexts._
 import core.Names._
 import error.CompilerErrors._
@@ -11,9 +13,8 @@ import Namers._
 import CompilerErrorOps._
 import Namers._
 import Types._
+import Type._
 import ast.Trees._
-import util.Convert
-import Convert._
 
 import org.junit.Test
 import org.junit.Assert._
@@ -23,44 +24,46 @@ import implied TreeOps._
 import implied TypeOps._
 import implied NameOps._
 
-object BootstrapTests {
 
-  private val any = Type.WildcardType
+object BootstrapTests {
+  val any = WildcardType
+  
+  export org.junit.Test
 
   def (str: String) -|: (other: String) = other -> str
   def (str: String) :|- (other: String) = str -> other
 
-  def typeExpr: String => Type => Contextual[IdReader[Checked[Tree]]] =
+  def typeExpr: String => Type => Contextual[IdReader[Lifted[Tree]]] =
     typeCore(parseExpr)
 
-  def typeStat: String => Type => Contextual[IdReader[Checked[Tree]]] =
-    typeCore(parseStat)
+  def typeStat: String => Type => Contextual[IdReader[Lifted[Tree]]] =
+    typeCore(parseDef)
 
   def failIfUnparsedOrTypedExpr: String => Type => Contextual[IdReader[Unit]] =
     failIfUnparsedOrTyped(parseExpr)
 
   def failIfUnparsedOrTypedStat: String => Type => Contextual[IdReader[Unit]] =
-    failIfUnparsedOrTyped(parseStat)
+    failIfUnparsedOrTyped(parseDef)
 
-  private def typeCore(f: String => IdReader[Checked[Tree]])
+  def typeCore(f: String => IdReader[Lifted[Tree]])
                       (str: String)
-                      (pt: Type) given IdGen, Context: Checked[Tree] =
+                      (pt: Type) given IdGen, Context: Lifted[Tree] =
     for
       exp <- f(str)
       tpd <- typeAfterParse(pt)(exp)
     yield tpd
 
-  private def typeAfterParse(pt: Type)
+  def typeAfterParse(pt: Type)
                             (exp: Tree)
-                            given IdGen, Context: Checked[Tree] =
+                            given IdGen, Context: Lifted[Tree] =
     for
-      _   <- indexAsExpr(exp)
-      tpd <- exp.typedWith(pt)
+      _   <- exp.indexed
+      tpd <- exp.typed
     yield tpd
 
-  def failIfUnparsedOrTyped(f: String => IdReader[Checked[Tree]])
-                           (str: String)
-                           (pt: Type) given IdGen, Context: Unit = {
+  def failIfUnparsedOrTyped(f: String => IdReader[Lifted[Tree]])
+                            (str: String)
+                            (pt: Type) given IdGen, Context: Unit = {
     f(str).fold
       { err => fail(err.show) }
       { tpd =>
@@ -68,7 +71,7 @@ object BootstrapTests {
       }
   }
 
-  def failIfParsed(f: String => IdReader[Checked[Tree]])
+  def failIfParsed(f: String => IdReader[Lifted[Tree]])
                   (str: String)
                   given IdGen: Unit = {
     f(str).fold
@@ -76,7 +79,7 @@ object BootstrapTests {
       { exp => fail(s"Parsed expr sucessfully:\n${exp.show}") }
   }
 
-  def failIfTyped(tpd: Checked[Tree]): Unit = {
+  def failIfTyped(tpd: Lifted[Tree]): Unit = {
     tpd.fold
       { err => () }
       { tpd =>
@@ -86,12 +89,12 @@ object BootstrapTests {
       }
   }
 
-  def failIfAllTyped(tpd: Checked[Iterable[Tree]]): Unit = {
+  def failIfAllTyped(tpd: Lifted[Iterable[Tree]]): Unit = {
     tpd.fold
       { err => () }
       { tpds =>
         val tpes = tpds.map { t =>
-          val nameStr = (t.convert: Name).show
+          val nameStr = (t: Name).show
           val tpeStr  = t.tpe.show
           s"$nameStr: $tpeStr"
         }
@@ -100,7 +103,7 @@ object BootstrapTests {
       }
   }
 
-  def checkTpe(parsed: Checked[Tree], checkTpe: String): Unit = {
+  def checkTpe(parsed: Lifted[Tree], checkTpe: String): Unit = {
     parsed.fold
       { err => fail(err.show) }
       { tpd => assertEquals(checkTpe, tpd.tpe.show) }
@@ -115,7 +118,7 @@ object BootstrapTests {
 
     val pair = for
       _ <- Context.enterBootstrapped
-      _ <- compiler.preludeDefs.mapE(typeStat(_)(any))
+      _ <- Prelude.source.mapE(typeStat(_)(any))
     yield (idGen, ctx)
 
     pair.onError { err => fail(s"[INIT] ${err.show}"); ??? }

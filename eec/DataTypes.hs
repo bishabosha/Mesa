@@ -1,37 +1,94 @@
 package eec.report.example
 
-data Triple x y z =
-    InX x
-  | InY y
-  | InZ z
+-- Please import the Prelude by using the `-p` flag
 
-data L |: R =
-    Left L
-  | Right R
+data Either3 x y z      = In1 x | In2 y | In3 z
+data Either3C a# b# c#  = In1C[a#] | In2C[b#] | In3C[c#]
+data MaybeC a#          = JustC[a#] | NothingC
+data Maybe a            = Just a | Nothing
+data Maybe3 a b c       = Just3 a b c | Nothing3
+data Product3 a b c     = Product3 a b c
 
-data L# +: R# =
-    InL[L#]
-  | InR[R#]
+product3_to_tuple p: Product3 A B C -> (A,B,C) =
+  case p of Product3 a b c => (a,b,c)
 
-data Maybe e =
-    Just e
-  | Nothing
+tuple_to_product3 t: (A,B,C) -> Product3 A B C =
+  case t of (a,b,c) => Product3 a b c
 
-{-| recursive data types are not supported -}
+maybe_to_or m : Maybe A -> A |: () =
+  case m of
+    Just a  => Left  a;
+    _       => Right ();
+
+or_to_maybe m : A |: () -> Maybe A =
+  case m of
+    Left a  => Just a;
+    _       => Nothing;
     
-maybeZero x : Integer -> Maybe Integer =
-  case x of
-    0 => Just 0;
-    _ => Nothing;
+maybe_to_maybe3 m : Maybe (A, B, C) -> Maybe3 A B C =
+  case m of
+    Just (a, b, c) => Just3 a b c;
+    _              => Nothing3;
 
-tripleToEither t: Triple X Y Z -> X |: Y |: Z =
+maybe3_to_maybe m : Maybe3 A B C -> Maybe (A, B, C) =
+  case m of
+    Just3 a b c => Just (a, b, c);
+    _           => Nothing;
+
+boolean_to_or b: Boolean -> () |: () =
+  if b then Left () else Right ()
+
+or_to_boolean b: () |: () -> Boolean =
+  case b of
+    Left _ => True;
+    _      => False;
+
+either3_to_or t : Either3 X Y Z -> X |: Y |: Z =
   case t of
-    InX x => Left x;
-    InY y => Right (Left y);
-    InZ z => Right (Right z);
+    In1 x => Left x;
+    In2 y => Right (Left y);
+    In3 z => Right (Right z);
 
-eitherToTriple e: X |: Y |: Z -> Triple X Y Z =
+or_to_either3 e : X |: Y |: Z -> Either3 X Y Z =
   case e of
-    Left x          => InX x;
-    Right (Left y)  => InY y;
-    Right (Right z) => InZ z;
+    Left x          => In1 x;
+    Right (Left y)  => In2 y;
+    Right (Right z) => In3 z;
+
+either3c_to_orC [t] : Either3C X# Y# Z# ->. X# +: Y# +: Z# =
+  case t of
+    In1C[x] =>. InL[x];
+    In2C[y] =>. InR[InL[y]];
+    In3C[z] =>. InR[InR[z]];
+
+orC_to_either3c [e] : X# +: Y# +: Z# ->. Either3C X# Y# Z# =
+  case e of
+    InL[x]      =>. In1C[x];
+    InR[InL[y]] =>. In2C[y];
+    InR[InR[z]] =>. In3C[z];
+
+maybec_to_orC [m]: MaybeC A# ->. A# +: () =
+  case m of
+    JustC[a] =>. InL[a];
+    _        =>. InR[()];
+
+orC_to_maybec [s]: A# +: () ->. MaybeC A# =
+  case s of
+    InL[a] =>. JustC[a];
+    _      =>. NothingC;
+
+orV_to_a e: Void |: A -> A =
+  case e of
+    Left v  => ?v;
+    Right a => a;
+
+a_to_orV a: A -> Void |: A =
+  Right a
+
+orCV_to_a [e]: Void# +: A# ->. A# =
+  case e of
+    InL[v] =>. absurd[v];
+    InR[a] =>. a;
+
+a_to_orCV [a]: A# ->. Void# +: A# =
+  InR[a]

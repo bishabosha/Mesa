@@ -1,6 +1,7 @@
 package eec
 package repl
 
+
 object Commands {
   import Command._
 
@@ -12,10 +13,11 @@ object Commands {
     case AstFile(path: String)
     case TypeFile(path: String)
     case SetPrompt(prompt: String)
-    case Reset, Quit, ShowHelp, Ctx, Unknown
+    case Unknown(input: String)
+    case Reset, Quit, ShowHelp, Ctx
   }
 
-  val helpText =
+  val helpText: String =
     """The REPL has several commands available:
       |
       | :help           => Show this help
@@ -30,32 +32,38 @@ object Commands {
       | :ctx            => Show the current Context
       | :q              => Quit the REPL""".stripMargin
 
-  private val resetCommand = """:reset(?:\s*)""".r
-  private val quitCommand = """:q(?:\s*)""".r
-  private val astExpr = """:ast(?:\s+?(.*))?""".r
-  private val astTop = """:astt(?:\s+?(.*))?""".r
-  private val typeExpr = """:t(?:\s+?(.*))?""".r
-  private val define = """:def(?:\s+?(.*))?""".r
-  private val astFile = """:astf(?:\s+((?:\S(?:\s*)?)*))?""".r
-  private val typeFile = """:tf(?:\s+((?:\S(?:\s*)?)*))?""".r
-  private val setPrompt = """:prompt(?:\s*?(\S*))?""".r
-  private val ctx = """:ctx(?:\s*)""".r
-  private val showHelp = """:help(?:\s*)""".r
+  def parseCommand(line: String): Command = {
+    import Parsers._
 
-  def (s: String) trimOrEmpty: String = Option(s).fold("")(_.trim)
+    def (s: String) trimOrEmpty: String = Option(s).fold("")(_.trim)
 
-  def parseCommand(line: String): Command = line.trim match {
-    case quitCommand()        => Quit
-    case astExpr(code)        => AstExpr(code.trimOrEmpty)
-    case astTop(code)         => AstTop(code.trimOrEmpty)
-    case typeExpr(code)       => TypeExpr(code.trimOrEmpty)
-    case define(code)         => Define(code.trimOrEmpty)
-    case astFile(file)        => AstFile(file.trimOrEmpty)
-    case typeFile(file)       => TypeFile(file.trimOrEmpty)
-    case setPrompt(newPrompt) => SetPrompt(newPrompt.trimOrEmpty)
-    case ctx()                => Ctx
-    case showHelp()           => ShowHelp
-    case resetCommand()       => Reset
-    case _                    => Unknown
+    object Parsers {
+      val resetCommand  = """:reset(?:\s*)""".r
+      val quitCommand   = """:q(?:\s*)""".r
+      val astExpr       = """:ast(?:\s+?(.*))?""".r
+      val astTop        = """:astt(?:\s+?(.*))?""".r
+      val typeExpr      = """:t(?:\s+?(.*))?""".r
+      val define        = """:def(?:\s+?(.*))?""".r
+      val astFile       = """:astf(?:\s+((?:\S(?:\s*)?)*))?""".r
+      val typeFile      = """:tf(?:\s+((?:\S(?:\s*)?)*))?""".r
+      val setPrompt     = """:prompt(?:\s*?(\S*))?""".r
+      val ctx           = """:ctx(?:\s*)""".r
+      val showHelp      = """:help(?:\s*)""".r
+    }
+
+    line.trim match {
+      case quitCommand()        => Quit
+      case astExpr(code)        => AstExpr(code.trimOrEmpty)
+      case astTop(code)         => AstTop(code.trimOrEmpty)
+      case typeExpr(code)       => TypeExpr(code.trimOrEmpty)
+      case define(code)         => Define(code.trimOrEmpty)
+      case astFile(file)        => AstFile(file.trimOrEmpty)
+      case typeFile(file)       => TypeFile(file.trimOrEmpty)
+      case setPrompt(newPrompt) => SetPrompt(newPrompt.trimOrEmpty)
+      case ctx()                => Ctx
+      case showHelp()           => ShowHelp
+      case resetCommand()       => Reset
+      case unknown              => Unknown(unknown)
+    }
   }
 }

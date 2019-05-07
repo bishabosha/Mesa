@@ -7,59 +7,92 @@ import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
-import util.Showable
+import util.Show
 
 object CompilerErrors {
   import CompilerError._
   import CompilerErrorOps._
 
-  enum CompilerError derives Eql {
-    case UnexpectedType(msg: String)
-    case IllegalState(msg: String)
-    case SyntaxError(msg: String)
-    case Internal(e: Exception)
-  }
+  type Lifted[O] = O | CompilerError
 
-  type Checked[O] = O | CompilerError
+  enum CompilerError derives Eql {
+    case NameCollision(msg: String)
+    case LinearScope(msg: String)
+    case UnknownIdentifier(msg: String)
+    case UnexpectedType(msg: String)
+    case MissingCase(msg: String)
+    case IllegalState(msg: String)
+    case Internal(msg: String)
+    case IllegalInput(msg: String)
+    case Syntax(msg: String)
+  }
 
   object CompilerErrorOps {
 
-    def checked[O](o: Checked[O]): Checked[O] = o
-
-    def (o: Checked[O]) onError [O]
-        (handler: CompilerError => Nothing): O = o match {
-      case err: CompilerError => handler(err)
-      case _                  => unchecked(o)
+    implied for Show[CompilerError] = {
+      case e @ NameCollision(msg)     => s"${e.productPrefix}: $msg"
+      case e @ LinearScope(msg)       => s"${e.productPrefix}: $msg"
+      case e @ UnknownIdentifier(msg) => s"${e.productPrefix}: $msg"
+      case e @ UnexpectedType(msg)    => s"${e.productPrefix}: $msg"
+      case e @ MissingCase(msg)       => s"${e.productPrefix}: $msg"
+      case e @ IllegalState(msg)      => s"${e.productPrefix}: $msg"
+      case e @ Internal(msg)          => s"${e.productPrefix}: $msg"
+      case e @ IllegalInput(msg)      => s"${e.productPrefix}: $msg"
+      case e @ Syntax(msg)            => s"${e.productPrefix}: $msg"
     }
 
-    inline def unchecked[O](o: Checked[O]): O = o.asInstanceOf[O]
+    def lift[O](o: Lifted[O]): Lifted[O] = o
 
-    def (o: Checked[O]) fold [O, U]
+    def (o: Lifted[O]) onError [O]
+        (handler: CompilerError => Nothing): O = o match {
+      case err: CompilerError => handler(err)
+      case _                  => unlift(o)
+    }
+
+    def (o: Lifted[O]) doOnError [O]
+        (handler: CompilerError => Unit): Unit = o match {
+      case err: CompilerError => handler(err)
+      case _                  =>
+    }
+
+    inline def unlift[O](o: Lifted[O]): O = o.asInstanceOf[O]
+
+    def (o: Lifted[O]) fold [O, U]
         (e: CompilerError => U)
         (f: O => U): U = o match {
       case err: CompilerError => e(err)
-      case _                  => f(unchecked(o))
+      case _                  => f(unlift(o))
     }
 
-    def (o: Checked[O]) map [O, U] (f: O => U): Checked[U] = o match {
+    def (o: Lifted[O]) map [O, U] (f: O => U): Lifted[U] = o match {
       case err: CompilerError => err
-      case _                  => f(unchecked(o))
+      case _                  => f(unlift(o))
     }
 
-    def (o: Checked[O]) flatMap [O, U]
-        (f: O => Checked[U]): Checked[U] = o match {
+    def (o: Lifted[O]) flatMap [O, U]
+        (f: O => Lifted[U]): Lifted[U] = o match {
       case err: CompilerError => err
-      case _                  => f(unchecked(o))
+      case _                  => f(unlift(o))
+    }
+
+    def (c: Option[A]) mapE [A, O]
+        (f: A => Lifted[O]): Lifted[Option[O]] = {
+      c.fold[Lifted[Option[O]]](None){
+        f(_) match {
+          case err: CompilerError => err
+          case o                  => Some(unlift(o))
+        }
+      }
     }
 
     def (c: CC[A]) mapE [CC[A] <: Iterable[A], A, O, That]
-        (f: A => Checked[O])
-        given (bf: CanBuildFrom[CC[A], O, That]): Checked[That] = {
+        (f: A => Lifted[O])
+        given (bf: CanBuildFrom[CC[A], O, That]): Lifted[That] = {
       @tailrec
-      def inner(acc: mutable.Builder[O, That], it: Iterator[A]): Checked[That] = {
+      def inner(acc: mutable.Builder[O, That], it: Iterator[A]): Lifted[That] = {
         if it.hasNext then f(it.next) match {
           case err: CompilerError => err
-          case o                  => inner(acc += unchecked(o), it)
+          case o                  => inner(acc += unlift(o), it)
         } else {
           acc.result
         }
@@ -70,14 +103,14 @@ object CompilerErrors {
 
     def (l: Iterable[A]) foldLeftE[A, O]
         (z: O)
-        (f: (O, A) => Checked[O]): Checked[O] = {
+        (f: (O, A) => Lifted[O]): Lifted[O] = {
 
       @tailrec
-      def inner(acc: O, it: Iterator[A]): Checked[O] =
+      def inner(acc: O, it: Iterator[A]): Lifted[O] =
         if it.hasNext then
           f(acc, it.next) match {
             case err: CompilerError => err
-            case acc1               => inner(unchecked(acc1), it)
+            case acc1               => inner(unlift(acc1), it)
           }
         else
           acc
@@ -86,31 +119,11 @@ object CompilerErrors {
     }
 
     def (f: => O) recover[O]
-        (opt: PartialFunction[Exception, CompilerError]): Checked[O] = {
+        (opt: PartialFunction[Throwable, CompilerError]): Lifted[O] = {
       try {
         f
       } catch {
-        case e: Exception if opt.isDefinedAt(e) => opt(e)
-        case e: Exception if NonFatal(e)        => Internal(e)
-      }
-    }
-
-    implied for Showable[CompilerError] {
-      def (e: CompilerError) show = e match {
-        case Internal(error) =>
-          val trace = {
-            error
-              .getStackTraceString
-              .split("\n")
-              .toSeq
-              .map("    " + _)
-              .mkString("\n")
-          }
-          s"Internal: ${e.getClass.getSimpleName}: ${error.getMessage}\nDebug trace:\n$trace"
-
-        case UnexpectedType(msg)  => s"UnexpectedType: $msg"
-        case IllegalState(msg)    => s"IllegalState: $msg"
-        case SyntaxError(msg)     => s"SyntaxError: $msg"
+        case NonFatal(e) if opt.isDefinedAt(e) => opt(e)
       }
     }
   }

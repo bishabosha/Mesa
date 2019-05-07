@@ -12,7 +12,7 @@ import implied ModeOps._
 
 object NamerErrors {
   def namingMissing(tree: Tree) given Mode = {
-    CompilerError.IllegalState(
-      s"Naming not implemented for <${mode.show}, ${tree.show}>")
+    CompilerError.Internal(
+      s"No implementation for naming in mode ${mode.show} for tree given by ${tree.show}")
   }
 }

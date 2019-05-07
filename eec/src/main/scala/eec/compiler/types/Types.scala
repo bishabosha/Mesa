@@ -2,6 +2,8 @@ package eec
 package compiler
 package types
 
+import scala.language.implicitConversions
+
 import scala.collection.generic.CanBuild
 import scala.annotation.tailrec
 
@@ -12,7 +14,8 @@ import Names._
 import Name._
 import error.CompilerErrors._
 import CompilerErrorOps._
-import util.{Showable,|>,StackMachine}
+import util.{Show, Define, StackMachine, Utils}
+import Utils.{view, const}
 import StackMachine._
 import Program._
 
@@ -34,7 +37,6 @@ object Types {
     case AppliedType(op: Name, args: List[Type])
     case InfixAppliedType(op: Name, a1: Type, a2: Type)
     case WildcardType
-    case Untyped
     case EmptyType
   }
 
@@ -46,11 +48,12 @@ object Types {
     val StringType    = BaseType(StringTag)
     val VoidType      = BaseType(VoidTag)
     val VoidCompType  = BaseType(VoidCompTag)
+    val UnitType      = Product(Nil)
 
     val TensorType = {
       InfixAppliedType(
         TensorTag,
-        Variable("A".readAs),
+        Variable("A#".readAs),
         Variable("B#".readAs)
       )
     }
@@ -64,7 +67,7 @@ object Types {
   }
 
   val bootstrapped = {
-    Vector(
+    IArray(
       TensorTag   -> Bootstraps.TensorType,
       BangTag     -> Bootstraps.BangType,
       VoidCompTag -> Bootstraps.VoidCompType,
@@ -103,14 +106,15 @@ object Types {
       }
     }
 
-    def unifyImpl(tpe: Type, sub: Name, by: Type): Type = tpe.mapVariables {
-      case `sub` =>
-        if by == WildcardType then
-          Variable(sub)
-        else
-          by
-
-      case other => Variable(other)
+    def unifyImpl(tpe: Type, sub: Name, by: Type): Type = {
+      val replacement = {
+        if by == WildcardType then Variable(_)
+        else const(by)
+      }
+      tpe.mapVariables {
+        case `sub` => replacement(sub)
+        case other => Variable(other)
+      }
     }
   }
 
@@ -177,22 +181,22 @@ object Types {
             case InfixAppliedType(_, a1, a2) =>
               inner(f(z, tpe), a1 :: a2 :: rest)
 
-            case Product(tpes)        => inner(f(z, tpe), tpes ::: rest)
-            case _                    => inner(f(z, tpe), rest)
+            case Product(tpes) => inner(f(z, tpe), tpes ::: rest)
+            case _             => inner(f(z, tpe), rest)
           }
       }
       inner(z, tpe :: Nil)
     }
 
-    def (tpe: Type) foldLeftChecked[O]
-        (z: Checked[O])
-        (f: (O, Type) => Checked[O]): Checked[O] = {
+    def (tpe: Type) foldLeftLifted[O]
+        (z: Lifted[O])
+        (f: (O, Type) => Lifted[O]): Lifted[O] = {
       @tailrec
-      def inner(z: Checked[O], tpes: List[Type]): Checked[O] = {
+      def inner(z: Lifted[O], tpes: List[Type]): Lifted[O] = {
         z match {
           case err: CompilerError => err
           case z0 =>
-            val z = unchecked(z0)
+            val z = unlift(z0)
             tpes match {
               case Nil => z
 
@@ -207,8 +211,8 @@ object Types {
                   case InfixAppliedType(_, a1, a2) =>
                     inner(f(z, tpe), a1 :: a2 :: rest)
 
-                  case Product(tpes)        => inner(f(z, tpe), tpes ::: rest)
-                  case _                    => inner(f(z, tpe), rest)
+                  case Product(tpes) => inner(f(z, tpe), tpes ::: rest)
+                  case _             => inner(f(z, tpe), rest)
                 }
             }
         }
@@ -278,7 +282,6 @@ object Types {
     }
 
     def canUnify(arg: Type, app: Type) : Boolean = {
-      @tailrec
       def inner(z: Boolean, args: List[Type], apps: List[Type]): Boolean = args match {
         case Nil => z
 
@@ -294,16 +297,13 @@ object Types {
 
             case ( _:FunctionType,       _:FunctionType       )
             |    ( _:LinearFunctionType, _:LinearFunctionType )
-            |    ( _:BaseType,            _:BaseType          )
-            |    ( _:TypeRef,             _:TypeRef           )
+            |    ( _:InfixAppliedType,   _:InfixAppliedType   )
+            |    ( _:BaseType,           _:BaseType           )
+            |    ( _:TypeRef,            _:TypeRef            )
             |    ( _:Variable
                 |    WildcardType,       _                    )
             |    ( _:PackageInfo,        _:PackageInfo        )
-            |    (   EmptyType,            EmptyType          )
-            |    (   Untyped,              Untyped            ) => true
-
-            case (_: InfixAppliedType,  _: InfixAppliedType) =>
-              inner(z, argRest, appsRest)
+            |    (   EmptyType,            EmptyType          ) => true
 
             case _ => false
           }
@@ -361,7 +361,7 @@ object Types {
       inner(Nil, tpe)
     }
 
-    def toCurriedList(t: Type): List[Type] = {
+    def (t: Type) toCurriedList: List[Type] = {
       @tailrec
       def inner(acc: List[Type], t: Type): List[Type] = t match {
         case FunctionType(arg, body)  => inner(arg :: acc, body)
@@ -373,10 +373,10 @@ object Types {
     def toBodyType(defSig: Tree, t: Type): Type =
       defSig match {
         case DefSig(_, args) =>
-          toFunctionType(toCurriedList(t).drop(args.length))
+          toFunctionType(t.toCurriedList.drop(args.length))
 
         case LinearSig(_, args, _) =>
-          val fArgs = toCurriedList(t).drop(args.length)
+          val fArgs = t.toCurriedList.drop(args.length)
           fArgs.reverse match {
             case LinearFunctionType(arg1, body) :: Nil =>
               body
@@ -431,150 +431,209 @@ object Types {
 
     def (tpe: Type) isComputationType: Boolean = {
       @tailrec
-      def inner(acc: Boolean, tpes: List[Type]): Boolean = tpes match {
-        case Nil => acc
+      def inner(tpes: List[Type]): Boolean = tpes match {
+        case Nil => true
 
         case tpe :: tpes => tpe match {
           case AppliedType(BangTag, _ :: Nil)
           |    InfixAppliedType(TensorTag,_,_)
           |    BaseType(VoidCompTag)
           |    TypeRef(_: Comp)
-          |    Variable(_: Comp)     => true
+          |    Variable(_: Comp) => inner(tpes)
 
           case AppliedType(_, args) =>
-            inner(acc, args ::: tpes)
+            inner(args:::tpes)
 
           case InfixAppliedType(_, left, right) =>
-            inner(acc, left :: right :: tpes)
+            inner(left::right::tpes)
 
-          case FunctionType(_, body) => inner(acc, body :: tpes)
-          case Product(ts)           => inner(acc, ts ::: tpes)
+          case FunctionType(_, body) => inner(body::tpes)
+          case Product(ts)           => inner(ts:::tpes)
           case _                     => false
         }
       }
-      inner(true, tpe :: Nil)
+      inner(tpe :: Nil)
     }
 
     def (tpe: Type) isValueType = !tpe.isComputationType
 
-    implied for Showable[Type] {
+    private def (tpe: Type) showImpl: String = tpe.compute {
+      case FunctionType(arg, body)        => fromFunctionType(arg, body)
+      case LinearFunctionType(arg, body)  => fromLinearFunctionType(arg, body)
+      case InfixAppliedType(op, a1, a2)   => fromInfixAppliedType(op,a1,a2)
+      case AppliedType(f, args)           => fromAppliedType(f, args)
+      case Product(tpes1)                 => fromProduct(tpes1)
+      case TypeRef(t)                     => t.show::_
+      case BaseType(t)                    => t.show::_
+      case Variable(t)                    => t.show::_
+      case PackageInfo(parent, name)      => showPackage(parent, name)::_
+      case WildcardType                   => "<any>"::_
+      case EmptyType                      => "<nothing>"::_
+    }
 
-      def (tpe: Type) show: String = tpe.compute {
-        case FunctionType(arg, body)        => fromFunctionType(arg, body)
-        case LinearFunctionType(arg, body)  => fromLinearFunctionType(arg, body)
-        case InfixAppliedType(op, a1, a2)   => fromInfixAppliedType(op,a1,a2)
-        case AppliedType(f, args)           => fromAppliedType(f, args)
-        case Product(tpes1)                 => fromProduct(tpes1)
-        case TypeRef(t)                     => t.show :: _
-        case BaseType(t)                    => t.show :: _
-        case Variable(t)                    => t.show :: _
-        case PackageInfo(parent, name)      => showPackage(parent, name) :: _
-        case WildcardType                   => "<anytype>" :: _
-        case Untyped                        => "<untyped>" :: _
-        case EmptyType                      => "<emptytype>" :: _
+    private def fromFunctionType(arg: Type, body: Type)
+                                (stack: Stack[String]) = {
+      val a1 :: a2 :: rest = stack
+      val a1Final = arg match {
+        case _: (FunctionType | LinearFunctionType)  => s"($a1)"
+        case _                                       => a1
       }
+      s"$a1Final -> $a2" :: rest
+    }
 
-      private def fromFunctionType(arg: Type, body: Type)
-                                  (stack: Stack[String]) = {
-        val a1 :: a2 :: rest = stack
-        val a1Final = arg match {
-          case _: (FunctionType | LinearFunctionType)  => s"($a1)"
-          case _                                       => a1
-        }
-        val a2Final = body match {
-          case _: LinearFunctionType  => s"($a2)"
-          case _                                       => a2
-        }
-        s"$a1Final -> $a2Final" :: rest
-      }
-
-      private def fromLinearFunctionType(arg: Type, body: Type)
-                                        (stack: Stack[String]) = {
-        val a1 :: a2 :: rest = stack
-        val a1Final = arg match {
-          case _: (FunctionType | LinearFunctionType)  => s"($a1)"
-          case _                                       => a1
-        }
-        val a2Final = body match {
-          case _: (FunctionType | LinearFunctionType)  => s"($a2)"
-          case _                                       => a2
-        }
-        s"$a1Final |- $a2Final" :: rest
-      }
-
-      private def fromInfixAppliedType(op: Name, a1: Type, a2: Type)
+    private def fromLinearFunctionType(arg: Type, body: Type)
                                       (stack: Stack[String]) = {
-        val b1 :: b2 :: rest = stack
-        val b1Final = a1 match {
-          case AppliedType(BangTag, _ :: Nil) => b1
+      val a1 :: a2 :: rest = stack
+      val a1Final = arg match {
+        case _: (FunctionType | LinearFunctionType)  => s"($a1)"
+        case _                                       => a1
+      }
+      s"$a1Final ->. $a2" :: rest
+    }
 
-          case _: (FunctionType | AppliedType | LinearFunctionType
-          | InfixAppliedType) =>
-            s"($b1)"
+    private def fromInfixAppliedType(op: Name, a1: Type, a2: Type)
+                                    (stack: Stack[String]) = {
+      val b1 :: b2 :: rest = stack
+      val b1Final = a1 match {
+        case AppliedType(BangTag, _ :: Nil) => b1
 
-          case _ => b1
-        }
-        val b2Final = a2 match {
-          case AppliedType(BangTag, _ :: Nil) => b2
-          case _: (FunctionType | AppliedType | LinearFunctionType) => s"($b2)"
-          case InfixAppliedType(op1,_,_) if op1 != op => s"($b2)"
-          case _                                      => b2
-        }
-        s"$b1Final ${op.show} $b2Final" :: rest
+        case _: (FunctionType | AppliedType | LinearFunctionType
+        | InfixAppliedType) =>
+          s"($b1)"
+
+        case _ => b1
+      }
+      val b2Final = a2 match {
+        case AppliedType(BangTag, _ :: Nil) => b2
+        case _: (FunctionType | AppliedType | LinearFunctionType) => s"($b2)"
+        case InfixAppliedType(op1,_,_) if op1 != op => s"($b2)"
+        case _                                      => b2
+      }
+      s"$b1Final ${op.show} $b2Final" :: rest
+    }
+
+    private def fromAppliedType(f: Name, args: List[Type])
+                                (stack: Stack[String]): List[String] = {
+      def checkAll(tpes: List[Type], strs: List[String]) =
+        tpes.zip(strs).map(check)
+
+      def check(tpe: Type, str: String) = tpe match {
+        case _: (FunctionType | AppliedType | LinearFunctionType | InfixAppliedType) =>
+          s"($str)"
+        case _ =>
+          str
       }
 
-      private def fromAppliedType(f: Name, args: List[Type])
-                                 (stack: Stack[String]): List[String] = {
-        def checkAll(tpes: List[Type], strs: List[String]) =
-          tpes.zip(strs).map(check)
-
-        def check(tpe: Type, str: String) = tpe match {
-          case _: (FunctionType | AppliedType | LinearFunctionType | InfixAppliedType) =>
-            s"($str)"
-          case _ =>
-            str
+      val (removed, rest) = stack.splitAt(args.length)
+      val str = {
+        if removed.isEmpty then {
+          f.show
+        } else {
+          val fStr = f.show
+          val init =
+            if f == BangTag && args.length == 1 then fStr
+            else s"$fStr "
+          checkAll(args, removed).mkString(init, " ", "")
         }
+      }
+      str :: rest
+    }
 
-        val (removed, rest) = stack.splitAt(args.length)
-        val str = {
-          if removed.isEmpty then {
-            f.show
-          } else {
-            val fStr = f.show
-            val init =
-              if f == BangTag && args.length == 1 then fStr
-              else s"$fStr "
-            checkAll(args, removed).mkString(init, " ", "")
+    private def fromProduct(tpes: List[Type])
+                            (stack: Stack[String]) = {
+      val (removed, rest) = stack.splitAt(tpes.length)
+      removed.mkString("(", ", ", ")") :: rest
+    }
+
+    private inline def showPackage(parent: Type, name: Name): String = {
+      (packageNames(parent) ::: name :: Nil)
+        .map(_.show)
+        .mkString("package ", ".", "")
+    }
+
+    private def displayString(tpe: Type) = {
+      val body = tpe.showImpl
+      val variableStrings = tpe.foldLeft(List.empty[String]) { (acc, t) =>
+        t match {
+          case t: Variable => t.showImpl :: acc
+          case _           => acc
+        }
+      }.distinct.sorted
+      val quantification = {
+        Some(variableStrings)
+          .filter(_.nonEmpty)
+          .fold("")(_.mkString("forall ", " ", ". "))
+      }
+      s"$quantification$body"
+    }
+
+    implied for Show[Type] {
+
+      val variables: Stream[String] = {
+        val alpha = ('a' to 'z').toStream.map(_.toString)
+        val numeric = for
+          n <- Stream.from(1)
+          x <- alpha
+        yield s"$x$n"
+        alpha #::: numeric
+      }
+
+      def (xs: Seq[String]) filterVariables(ys: Seq[String]) =
+        xs.filterNot(ys.contains)
+
+      def (tpe: Type) toNames: (Seq[Name], Seq[Name]) = {
+        tpe.foldLeft(List.empty[Name]) { (acc, t) =>
+          t match {
+            // case Variable(n)              => n::acc
+            case TypeRef(n)               => n::acc
+            case BaseType(n)              => n::acc
+            case AppliedType(n,_)         => n::acc
+            case InfixAppliedType(n,_,_)  => n::acc
+            case _                        => acc
           }
+        }.distinct.partition {
+          case _: Comp => true
+          case _       => false
         }
-        str :: rest
       }
 
-      private def fromProduct(tpes: List[Type])
-                             (stack: Stack[String]) = {
-        val (removed, rest) = stack.splitAt(tpes.length)
-        removed.mkString("(", ", ", ")") :: rest
+      def (tpe: Type) fancyVariables: Type = {
+        import NameOps._
+        import Derived._
+        val (comp, from) = tpe.toNames
+        var stream = {
+          variables
+            .filterVariables(comp.map(_.show `replaceAll` ("#", "")))
+            .filterVariables(from.map(_.show))
+        }
+        tpe.replaceVariables {
+          case _:Comp =>
+            val s = Comp(Str(stream.head + "#"))
+            stream = stream.tail
+            Some(s)
+          case _:From =>
+            val s = From(Str(stream.head))
+            stream = stream.tail
+            Some(s)
+          case _ => None
+        }
       }
 
-      private inline def showPackage(parent: Type, name: Name): String = {
-        (packageNames(parent) ::: name :: Nil)
-          .map(_.show)
-          .mkString("package ", ".", "")
+      def (tpe: Type) show: String = {
+        displayString(tpe.fancyVariables)
       }
     }
 
-    implied for (List[Type] |> Type) {
-      def apply(ts: List[Type]) = ts match {
-        case tpe :: Nil => tpe
-        case types      => Product(types)
-      }
+    implied for Define[Type] = displayString
+
+    implied for Conversion[List[Type], Type] = {
+      case tpe :: Nil => tpe
+      case types      => Product(types)
     }
 
-    implied for (Type |> List[Type]) {
-      def apply(t: Type) = t match {
-        case Product(ls)  => ls
-        case tpe          => tpe :: Nil
-      }
+    implied for Conversion[Type, List[Type]] = {
+      case Product(ls)  => ls
+      case tpe          => tpe :: Nil
     }
   }
 }

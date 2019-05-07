@@ -2,25 +2,29 @@ package eec
 package compiler
 package ast
 
+import scala.language.implicitConversions
+
 import core._
 import Names._
 import Name._
 import Constants._
 import Constant._
-import Contexts._
+import Contexts.Id
 import Modifiers._
 import types.Types._
+import untyped.nt
 import annotation._
-import util.{Showable, |>, Convert}
-import Convert._
+import util.{Show, Utils}
+import Utils.{eval, foldMap}
 
-import implied Printing.untyped.AstOps._
-import implied NameOps._
+import implied Meta.TreeOps._
+import implied Names.NameOps._
+import implied TypeOps._
 
 object Trees {
   import Tree._
 
-  trait Unique(val id: Id)
+  trait Unique(val id: Id) { self: Tree => }
 
   enum Tree(val tpe: Type) derives Eql {
     case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
@@ -29,7 +33,7 @@ object Trees {
     case DataDcl(name: Name, args: List[Name], ctors: List[Tree])(tpe: Type) extends Tree(tpe)
     case InfixDataDcl(name: Name, left: Name, right: Name, ctors: List[Tree])(tpe: Type) extends Tree(tpe)
     case CtorSig(name: Name, tpeArgs: List[Tree])(tpe: Type) extends Tree(tpe)
-    case LinearCtorSig(name: Name, tpeArg: Tree)(tpe: Type) extends Tree(tpe)
+    case LinearCtorSig(name: Name, tpeArg: Option[Tree])(tpe: Type) extends Tree(tpe)
     case DefDef(modifiers: Set[Modifier], sig: Tree, tpeAs: Tree, body: Tree)(tpe: Type) extends Tree(tpe)
     case DefSig(name: Name, args: List[Name])(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case LinearSig(name: Name, args: List[Name], linear: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
@@ -53,8 +57,8 @@ object Trees {
     case Bind(name: Name, body: Tree)(tpe: Type) extends Tree(tpe)
     case Unapply(name: Name, args: List[Tree])(tpe: Type) extends Tree(tpe)
     case Tagged(arg: Name, tpeAs: Tree)(tpe: Type) extends Tree(tpe)
-    case TreeSeq(args: List[Tree]) extends Tree(Type.EmptyType)
-    case EmptyTree extends Tree(Type.EmptyType)
+    case TreeSeq(args: List[Tree]) extends Tree(nt)
+    case EmptyTree extends Tree(nt)
   }
 
   object TreeOps {
@@ -65,93 +69,113 @@ object Trees {
       type ProgT = List[StatT]
 
       @tailrec
-      def inner(acc: ProgT, patts: List[Tree]): ProgT = patts match {
-        case Nil => acc
+      def inner(program: ProgT, patts: List[Tree]): ProgT = patts match {
+        case Nil => program
 
-        case patt :: patts => patt match {
+        case patt::patts => patt match {
 
           case Unapply(name, args) =>
-            val prog = { stack: StackT =>
+            val statement = { stack: StackT =>
               val (args1, rest) = stack.splitAt(args.length)
               val args2 = args1.view.zip(args).map { (str, arg) =>
                 arg match {
-                  case _: (Ident | Parens) => str
+                  case (_:(Ident | Parens | Literal) | Unapply(_,Nil)) => str
                   case _ => s"($str)"
                 }
               }
-              val argsStr = args2.mkString(" ")
-              s"${name.show} $argsStr" :: rest
+              val argsStr = args2.foldMap("")(_.mkString(" ", " ", ""))
+              s"${name.show}$argsStr"::rest
             }
-            inner(prog :: acc, args ::: patts)
+            inner(statement::program, args:::patts)
 
           case Parens(args) =>
-            val prog = { stack: StackT =>
+            val statement = { stack: StackT =>
               val (args1, rest) = stack.splitAt(args.length)
-              val args2 = args1.view.zip(args).map { (str, arg) =>
-                arg match {
-                  case _: Ident => str
-                  case _ => s"($str)"
-                }
-              }
-              val argsStr = args2.mkString("(", ", ", ")")
-              argsStr :: rest
+              val argsStr = args1.mkString("(", ", ", ")")
+              argsStr::rest
             }
-            inner(prog :: acc, args ::: patts)
+            inner(statement::program, args:::patts)
 
-          case Ident(name) => inner((name.show :: _) :: acc, patts)
+          case Ident(name) => inner((name.show::_)::program, patts)
 
-          case Literal(BooleanConstant(b)) =>
-            val str = if b then "True" else "False"
-            inner((str :: _) :: acc, patts)
+          case Literal(b @ (True | False)) =>
+            val str = if b == True then "True" else "False"
+            inner((str::_)::program, patts)
 
-          case _ => inner(("<???>" :: _) :: acc, patts)
+          case Alternative(patts1) =>
+            val statement = { stack: StackT =>
+              val (args1, stack1) = stack.splitAt(patts1.length)
+              val argsStr = args1.mkString(" | ")
+              argsStr::stack1
+            }
+            inner(statement::program, patts1:::patts)
+
+          case Bind(x,patt) =>
+            val statement = { stack: StackT =>
+              val patt1::stack1 = stack
+              val pattStr = patt match {
+                case (_:(Ident | Parens | Literal) | Unapply(_,Nil)) => patt1
+                case _ => s"($patt1)"
+              }
+              s"${x.show} @ $pattStr"::stack1
+            }
+            inner(statement::program, patt::patts)
+
+          case _ => inner(("<???>"::_)::program, patts)
         }
       }
 
-      inner(Nil, tree :: Nil).foldLeft(Nil: List[String])((acc, f) => f(acc)).head
+      inner(Nil, tree :: Nil)
+        .foldLeft(List.empty[String])(eval)
+        .head
     }
 
-    implied for Showable[Tree] {
-      def (t: Tree) show = toAst(t).toString
+    @tailrec
+    def (tree: Tree) uniqId: Id = tree match {
+      case Select(t, _)     => t.uniqId
+      case PackageDef(t, _) => t.uniqId
+      case DefDef(_,s,_,_)  => s.uniqId
+      case u: Unique        => u.id
+      case _                => Id.empty
     }
 
-    implied for (Tree |> List[Tree]) {
-      def apply(t: Tree) = t match {
-        case EmptyTree          => Nil
-        case TreeSeq(args)      => args
-        case Parens(args)       => args
-        case Alternative(args)  => args
-        case t                  => t :: Nil
-      }
+    implied for Show[Tree] = t => pprint.apply(
+      x = (t: Meta.Tree),
+      width = 80,
+      height = Int.MaxValue
+    ).render
+
+    implied for Conversion[Tree, List[Tree]] = {
+      case EmptyTree          => Nil
+      case TreeSeq(args)      => args
+      case Parens(args)       => args
+      case Alternative(args)  => args
+      case t                  => t :: Nil
     }
 
-    implied for (List[Tree] |> Tree) {
-      def apply(ts: List[Tree]) = ts match {
-        case Nil      => EmptyTree
-        case t :: Nil => t
-        case ts       => TreeSeq(ts)
-      }
+    implied for Conversion[List[Tree], Tree] = {
+      case Nil      => EmptyTree
+      case t :: Nil => t
+      case ts       => TreeSeq(ts)
     }
 
-    implied uniqName for (Tree |> Name) {
-      def apply(tree: Tree) = tree match {
-        case DefSig(name, _)              => name
-        case LinearSig(name, _, _)        => name
-        case DefDef(_, sig, _, _)         => apply(sig)
-        case Tagged(name, _)              => name
-        case Bind(name, _)                => name
-        case Ident(name)                  => name
-        case DataDcl(name, _, _)          => name
-        case InfixDataDcl(name, _, _, _)  => name
-        case CtorSig(name, _)             => name
-        case LinearCtorSig(name, _)       => name
-        case _                            => EmptyName
-      }
+    implied uniqName for Conversion[Tree, Name] = {
+      case DefSig(name, _)              => name
+      case LinearSig(name, _, _)        => name
+      case DefDef(_, sig, _, _)         => sig
+      case Tagged(name, _)              => name
+      case Bind(name, _)                => name
+      case Ident(name)                  => name
+      case DataDcl(name, _, _)          => name
+      case InfixDataDcl(name, _, _, _)  => name
+      case CtorSig(name, _)             => name
+      case LinearCtorSig(name, _)       => name
+      case _                            => EmptyName
     }
 
     def (tree: Tree) linearArg: Name = tree match {
       case LinearSig(_, _, linearArg) => linearArg
-      case LinearFunction(arg,_)      => arg.convert
+      case LinearFunction(arg,_)      => arg
       case _                          => EmptyName
     }
 

@@ -1,20 +1,20 @@
 package eec.compiler.core
 
 object Constants {
-  import Constant._
 
-  enum Constant derives Eql {
-    case StringConstant(str: String)
-    case CharConstant(chr: Char)
-    // case IntConstant(i: Int)
-    // case LongConstant(l: Long)
-    // case FloatConstant(f: Float)
-    // case DoubleConstant(d: Double)
-    case BigIntConstant(bi: BigInt)
-    case BigDecConstant(bd: BigDecimal)
-    case BooleanConstant(z: Boolean)
+  opaque type Constant = ConstantScala
+
+  type ConstantScala = Boolean | BigDecimal | BigInt | String | Char
+
+  object Constant {
+    def BooleanConstant(z: Boolean): Constant = z
+    def BigDecConstant(bd: BigDecimal): Constant = bd
+    def BigIntConstant(bi: BigInt): Constant = bi
+    def StringConstant(str: String): Constant = str
+    def CharConstant(c: Char): Constant = c
+    val True: Constant  = true
+    val False: Constant = false
+    
+    def (c: Constant) asScala: ConstantScala = c
   }
-
-  val constTrue  = BooleanConstant(true)
-  val constFalse = BooleanConstant(false)
 }

@@ -3,6 +3,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0-RC1] - 2019-05-7
+### Added
+- A Prelude library, containing data definitions for encodings of sums and
+  linear coproducts in EEC+, and operators for recursion and handling of `Void#`.
+- Pretty printing for types with a canonical representation of universally
+  quantified types, e.g. `forall a b c. (a -> b -> c) -> (a, b) -> c`, from
+  an infinite ordered stream matching `/[a-z] | [a-z][1-9]/`.
+- Lambda terms at the top level in the REPL now type as polymorphic.
+- Allow data types to be isomorphic to `()`.
+### Changed
+- Update the representation of data types for printing in the REPL, in
+  preparation for a standard API.
+- Update the syntax for the linear arrow to `->.`, matching LinearTypes for
+  GHC, and allowing all arrows to have the same right associative precedence.
+- General bug fixes in the type checker for unification of polymorphic types.
+
+## [0.2.3-RC1] - 2019-04-9
+### Added
+- Allow the use of patterns inside both `let` term forms, with the same
+  semantics as a singular case clause.
+
 ## [0.2.3-RC1] - 2019-04-9
 ### Added
 - Allow the use of patterns inside both `let` term forms, with the same
@@ -73,7 +94,8 @@ All notable changes to this project will be documented in this file.
   - Source files use `.hs` suffix at present to benefit from syntax highlighting.
   - Refer to [eec/src/main/antlr4/EEC.g4](eec/src/main/antlr4/EEC.g4) for a context free grammar.
 
-[Unreleased]: https://github.com/bishabosha/EEC/compare/0.2.3-RC1...develop
+[Unreleased]: https://github.com/bishabosha/EEC/compare/0.3.0-RC1...develop
+[0.3.0-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.3.0-RC1
 [0.2.3-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.3-RC1
 [0.2.2-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.2-RC1
 [0.2.1-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.1-RC1

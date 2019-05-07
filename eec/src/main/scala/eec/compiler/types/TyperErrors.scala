@@ -2,16 +2,18 @@ package eec
 package compiler
 package types
 
+import scala.language.implicitConversions
+
 import error.CompilerErrors._
 import ast.Trees._
 import TreeOps._
 import types.Types._
 import types.Typers._
 import core.Names._
+import Name._
+import NameOps._
 import core.Contexts._
 import Mode._
-import util.Convert
-import Convert._
 
 import implied ModeOps._
 import implied TreeOps._
@@ -21,34 +23,49 @@ import implied NameOps._
 object TyperErrors {
 
   def functorNotMatch(functor: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
-    val functorTyp1Str  = functorTyp1.show
-    val proto1Str       = proto1.show
-    val functorNameStr  = functor.show
+    HKTpeNotMatch("Applied Type", functor, fTpe, functorTyp1, proto1)
+  }
+
+  def funcTpeNotMatch(function: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
+    HKTpeNotMatch("Function", function, fTpe, functorTyp1, proto1)
+  }
+
+  def lfuncTpeNotMatch(lfunction: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
+    HKTpeNotMatch("Linear function", lfunction, fTpe, functorTyp1, proto1)
+  }
+
+  def HKTpeNotMatch(kind: String, kindName: Name, fTpe: Type, functorTyp1: Type, proto1: Type) = {
+    val nameMsg = kindName.foldEmptyName(kind)(name => s"$kind `${name.define}`")
     CompilerError.UnexpectedType(
-      s"Functor definition `$functorNameStr: ${fTpe.show}` does not match args. Expected `$functorTyp1Str` but was `$proto1Str` in type tree.")
+      s"$nameMsg of type `${fTpe.show}` does not match args. Expected `${functorTyp1.show}` but was `${proto1.show}` in type tree.")
   }
 
   def functionNotMatch(fun: Tree, arg1: Type, argProto: Type) = {
-    val argProtoStr = argProto.show
-    val arg1Str     = arg1.show
-    val funNameStr  = uniqName(fun).show
+    val kind = "Function definition"
+    val nameMsg = uniqName(fun).foldEmptyName(kind)(name => s"$kind `${name.define}`")
     CompilerError.UnexpectedType(
-      s"Function definition `$funNameStr: ${fun.tpe.show}` does not match args. Expected `$arg1Str` but was `$argProtoStr` in application expr.")
+      s"$nameMsg of type `${fun.tpe.show}` does not match args. Expected `${arg1.show}` but was `${argProto.show}` in application expr.")
   }
 
   def linearFunctionNotMatch(fun: Tree, arg1: Type, argProto: Type) = {
-    val argProtoStr = argProto.show
-    val arg1Str     = arg1.show
-    val funNameStr  = uniqName(fun).show
+    val kind = "Linear function definition"
+    val nameMsg = uniqName(fun).foldEmptyName(kind)(name => s"$kind `${name.define}`")
     CompilerError.UnexpectedType(
-      s"Linear function definition `$funNameStr: ${fun.tpe.show}` does not match args. Expected `$arg1Str` but was `$argProtoStr` in evaluation expr.")
+      s"$nameMsg of type `${fun.tpe.show}` does not match args. Expected `${arg1.show}` but was `${argProto.show}` in evaluation expr.")
   }
 
   def emptyFunctorLinearCtx(fTpe: Type) =
     CompilerError.UnexpectedType(s"Empty Linear Context for Functor Type ${fTpe.show}")
 
-  def emptyFunctor(fTpe: Type) =
-    CompilerError.UnexpectedType(s"Empty Functor Type ${fTpe.show}")
+  def emptyFunctor(name: Name, fTpe: Type) =
+    CompilerError.UnexpectedType(s"Tried to unapply empty sum constructor ${name.define} of type ${fTpe.show}.")
+
+  def emptyLinearFunctor(name: Name, fTpe: Type) =
+    CompilerError.UnexpectedType(s"Tried to unapply empty linear coproduct constructor ${name.define} of type ${fTpe.show}.")
+
+  def functionInLinearUnapply(name: Name, fTpe: Type) =
+    CompilerError.UnexpectedType(
+      s"Tried to use sum constructor `${name.define}` of type `${fTpe.show}` as a linear coproduct constructor.")
 
   def tupleNoMatch(pt: Type, ptAsTuple: List[_]) = {
     if ptAsTuple.length == 1 then
@@ -63,7 +80,7 @@ object TyperErrors {
         .map(showPatternTemplate(_))
         .mkString("[", ", ", "]")
     }
-    CompilerError.UnexpectedType(
+    CompilerError.MissingCase(
       s"Pattern match will fail on values matching these patterns: $temps")
   }
 
@@ -73,49 +90,35 @@ object TyperErrors {
   def tupleNotMatchLength =
     CompilerError.UnexpectedType("Tuple lengths do not match.")
 
-  def argsNotMatchLength =
-    CompilerError.UnexpectedType("Arg lengths do not match.")
+  def sumCtorArgsNotMatchLengthPattern(name: Name, in: Int, out: Int) =
+    CompilerError.UnexpectedType(
+      s"Constructor `${name.define}` has $in function arguments, but an attempt was made to extract $out in a pattern.")
 
   def linearUnapplyArgLengthGT1 =
     CompilerError.UnexpectedType("Linear case clause must have a single path.")
 
   def typecheckFail(typed: Tree)(tpe1: Type, pt: Type) given Mode = {
     CompilerError.UnexpectedType(
-      s"Check failed. Type ${typed.tpe.show} != ${pt.show} in ${mode.show}:\n${typed.show}")
-  }
-
-  def hkArgsDoNotUnify(functor: Tree, args0: List[Type], args: List[Type]) = {
-    val argsOrdered = args0.reverse
-    val argsExpect  = argsOrdered.map(_.show).mkString("[", ", ", "]")
-    val argsPassed  = args.map(_.show).mkString("[", ", ", "]")
-    val hint =
-      if args0.length == 0 then {
-        val name = (functor.convert: Name).show
-        s" Perhaps functor type `$name` is unknown."
-      } else {
-        ""
-      }
-    CompilerError.UnexpectedType(
-      s"Higher kinded type args do not match. Expected $argsExpect but got $argsPassed.$hint")
+      s"Check failed. Type ${typed.tpe.show} != ${pt.show} in ${mode.show} for tree given by ${typed.show}")
   }
 
   def recursiveData(ctor: Name, data: Name) =
     CompilerError.UnexpectedType(
-      s"Recursive type reference in constructor ${ctor.show} of ${data.show}.")
+      s"Recursive type reference in constructor ${ctor.define} of ${data.define}.")
 
   def unresolvedVariable(ctor: Name, data: Name, name: Name) =
-    CompilerError.UnexpectedType(
-      s"Unresolved type variable ${name.show} in constructor ${ctor.show} of ${data.show}.")
+    CompilerError.UnknownIdentifier(
+      s"Unresolved type variable ${name.define} in constructor ${ctor.define} of ${data.define}.")
 
   def typingMissing(tree: Tree) given Mode =
-    CompilerError.IllegalState(
-      s"Typing not implemented for <${mode.show}, ${tree.show}>")
+    CompilerError.Internal(
+      s"No implementation for typing in mode ${mode.show} for tree given by ${tree.show}")
 
   def noApplyNonFunctionType =
-    CompilerError.IllegalState(s"Can not apply to non function type.")
+    CompilerError.UnexpectedType(s"Can not apply to non function type.")
 
   def noEvalNonLinearFunctionType =
-    CompilerError.IllegalState(s"Can not eval a non linear function type.")
+    CompilerError.UnexpectedType(s"Can not eval a non-linear function type.")
 
   def tpesNotUnifyTo(tpe: Type) =
     CompilerError.UnexpectedType(s"Types do not unify to ${tpe.show}")
@@ -124,84 +127,111 @@ object TyperErrors {
     CompilerError.UnexpectedType(
       "Linear function does not have computational domain.")
 
-  def noCompArgCtor(ctor: Name, data: Name, tpe: Type) =
-    CompilerError.UnexpectedType(
-      s"Argument of value type ${tpe.show} in linear constructor ${ctor.show} of ${data.show}.")
-
   def noLinearCompCodomain =
     CompilerError.UnexpectedType(
       "Linear function does not have computational co-domain.")
 
+  def noCompArgCtor(ctor: Name, data: Name, tpe: Type) =
+    CompilerError.UnexpectedType(
+      s"Argument of value type ${tpe.show} in linear constructor ${ctor.define} of ${data.define}.")
+
   def noTensorCompCodomain(comp1: Tree) = {
-    val name = (comp1.convert: Name).show
+    val name = (comp1: Name).define
     val tpe = comp1.tpe.show
     CompilerError.UnexpectedType(
-      s"Linear tensor does not have computational second argument. Given `$name: $tpe`")
+      s"Linear tensor does not have computational second argument. Given `$name` of type `$tpe`")
   }
+
+  def noTensorCompCodomainTpe(tpe: Type) = {
+    CompilerError.UnexpectedType(
+      s"Linear tensor does not have computational second argument. Given `${tpe.show}`")
+  }
+
+  def noCompEvalArg =
+    CompilerError.UnexpectedType(
+      "Linear evaluation argument does not have computation type.")
 
   def noCompLetContinuation =
     CompilerError.UnexpectedType(
       "Let body does not have computation type.")
 
+  def noCompLinearCaseContinuation =
+    CompilerError.UnexpectedType(
+      "Linear case clause body does not have computation type.")
+
   def noTensorLetValue(value: Tree) =
     CompilerError.UnexpectedType(
-      s"Can not infer type of `${value.show}` as of *: type.")
+      s"Can not infer type as ${TensorTag.define} for tree given by ${value.show}")
 
   def noBangLetValue(value: Tree) =
     CompilerError.UnexpectedType(
-      s"Can not infer type of `${value.show}` as of ! type.")
+      s"Can not infer type as of ${BangTag.define} type for tree given by ${value.show}")
 
-  def notCaseClase(unknown: Tree) =
-    CompilerError.IllegalState(
-      s"$unknown is not Tree.CaseClause")
+  def notCaseClause(unknown: Tree) =
+    CompilerError.Internal(
+      s"not given a case clause by tree ${unknown.show}")
 
   def notGenCtorSig(unknown: Tree) =
-    CompilerError.IllegalState(
-      s"$unknown is not constructor signature")
+    CompilerError.Internal(
+      s"not given a constructor signature by tree ${unknown.show}")
 
-  def notLinearCaseClase(unknown: Tree) =
-    CompilerError.IllegalState(
-      s"$unknown is not Tree.LinearCaseClause")
+  def notLinearCaseClause(unknown: Tree) =
+    CompilerError.Internal(
+      s"not given a linear case clause by tree ${unknown.show}")
 
   def nameInPattAlt(name: Name) =
-    CompilerError.IllegalState(
-      s"Illegal variable ${name.show} in pattern alternative")
+    CompilerError.NameCollision(
+      s"Illegal variable ${name.define} in pattern alternative.")
 
   def declArgsNotMatchType(name: Name) = {
     CompilerError.UnexpectedType(
-      s"Function declaration arguments do not match declared type for declaration ${name.show}.")
+      s"Function declaration arguments do not match declared type for declaration ${name.define}.")
+  }
+
+  def declArgsInfixNotBinary(name: Name) = {
+    CompilerError.UnexpectedType(
+      s"Infix function declaration ${name.define} does not have at least two arguments.")
+  }
+
+  def declArgsInfixLNotBinary(name: Name) = {
+    CompilerError.UnexpectedType(
+      s"Infix Linear function declaration ${name.define} does not have at least two arguments.")
   }
 
   def linearArgNotMatchType(name: Name) = {
     CompilerError.UnexpectedType(
-      s"No linear context found to bind function declaration argument ${name.show}.")
+      s"No linear context found to bind linear argument ${name.define}.")
   }
 
-  def illegalStoupEntry(name: Name, tpe: Type) =
-    CompilerError.UnexpectedType(
-        s"name `${name.show}` of value type: `${tpe.show}` is not allowed in the linear context.")
+  def memberSelection given Mode =
+    CompilerError.Syntax(
+      s"Member selections do not exist for ${mode.show}.")
 
   def illegalStoupDependency(name: Name) =
-    CompilerError.UnexpectedType(
-      s"Reference to on linear variable `${name.show}` not in scope.")
+    CompilerError.UnknownIdentifier(
+      s"Reference to linear variable `${name.define}` not in scope.")
+
+  def illegalStoupEntry(name: Name, tpe: Type) =
+    CompilerError.LinearScope(
+        s"name `${name.define}` of value type `${tpe.show}` is not allowed in the linear context.")
 
   def illegalStoupBang(name: Name) =
-    CompilerError.UnexpectedType(
-      s"linear variable `${name.show}` can not be in scope when evaluating ! terms.")
+    CompilerError.LinearScope(
+      s"linear variable `${name.define}` can not be in scope when evaluating ${BangTag.define} terms.")
 
   def illegalStoupLinearLambda(name: Name) =
-    CompilerError.UnexpectedType(
-      s"linear variable `${name.show}` can not be in scope when evaluating linear lambda terms.")
+    CompilerError.LinearScope(
+      s"linear variable `${name.define}` must not be in scope when introducing a new linear lambda term.")
 
   def illegalStoupValueIdent(z: Name, name: Name, tpe: Type) =
-    CompilerError.UnexpectedType(
-      s"linear variable `${z.show}` can not be in scope when evaluating variable `${name.show}: ${tpe.show}` of value type.")
+    CompilerError.LinearScope(
+      s"linear variable `${z.define}` can not be in scope when evaluating variable `${name.define}` of type `${tpe.show}`.")
 
   def illegalStoupValueLiteral(name: Name) =
-    CompilerError.UnexpectedType(
-      s"linear variable `${name.show}` can not be in scope when evaluating a constant literal.")
+    CompilerError.LinearScope(
+      s"linear variable `${name.define}` can not be in scope when evaluating a constant literal.")
 
-  def memberSelection given Mode =
-    CompilerError.SyntaxError(
-      s"Member selections do not exist for ${mode.show}.")
+  def illegalStoupLambda(name: Name) =
+    CompilerError.NameCollision(
+      s"linear variable `${name.define}` would be illegally shadowed by lambda argument whilst in scope.")
 }

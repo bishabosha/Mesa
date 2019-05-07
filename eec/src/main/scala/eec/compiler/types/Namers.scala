@@ -2,6 +2,8 @@ package eec
 package compiler
 package types
 
+import scala.language.implicitConversions
+
 import ast.Trees._
 import Tree._
 import TreeOps._
@@ -10,13 +12,11 @@ import CompilerErrorOps._
 import core.Contexts._
 import core.Names._
 import core.Modifiers._
-import Modifier.Primitive
 import Name._
 import NameOps._
 import Context._
 import Mode._
-import util.Convert
-import Convert._
+import types.{NamerErrors => Err}
 
 import implied NameOps._
 import implied TreeOps._
@@ -25,23 +25,38 @@ object Namers {
 
   private val anon = EmptyName
 
-  def namedDataDcl(name: Name, ctors: List[Tree])
-                  given Context, Mode: Checked[Unit] = {
+  def (tree: Tree) indexed given Context: Lifted[Unit] = {
+    implied for Mode = Mode.Term
+    index(tree)
+  }
+
+  private def indexAsPattern(tree: Tree) given Context: Lifted[Unit] = {
+    implied for Mode = Mode.Pat
+    index(tree)
+  }
+
+  private def indexAsLinearPattern(tree: Tree) given Context: Lifted[Unit] = {
+    implied for Mode = Mode.LinearPat
+    index(tree)
+  }
+
+  private def namedDataDcl(name: Name, ctors: List[Tree])
+                          given Context, Mode: Lifted[Unit] = {
     for
       _ <- enterData(name)
       _ <- ctors.foldLeftE(())((_, ctor) => index(ctor))
     yield ()
   }
 
-  def namedCtorSig(name: Name)
-                  given Context, Mode: Checked[Unit] = {
+  private def namedCtorSig(name: Name)
+                          given Context, Mode: Lifted[Unit] = {
     for _ <- enterVariable(name)
     yield ()
   }
 
-  def namedDefDef(modifiers: Set[Modifier], sig: DefSig | LinearSig)
-                 (tpeAs: Tree, body: Tree)
-                 given Context, Mode: Checked[Unit] = {
+  private def namedDefDef(modifiers: Set[Modifier], sig: DefSig | LinearSig)
+                         (tpeAs: Tree, body: Tree)
+                         given Context, Mode: Lifted[Unit] = {
     val (name, args) = sig match {
       case LinearSig(name, args, _) => (name, args)
       case DefSig(name, args)       => (name, args)
@@ -50,48 +65,38 @@ object Namers {
       implied for Context = ctx1
       for
         _ <- args.foldLeftE(())((_, n) => enterVariable(n))
-        _ <- sig.linearArg.foldEmptyName(())(enterLinearArg(modifiers))
+        _ <- sig.linearArg.foldEmptyName(())(enterLinear)
         _ <- index(body)
       yield ()
     }
   }
 
-  def enterLinearArg(mods: Set[Modifier])(linearArg: Name) given Context: Checked[Unit] = {
-    val enterArg = {
-      val isPrimitive = mods.contains(Primitive)
-      val isWildcard  = linearArg == Wildcard
-      (isPrimitive && !isWildcard) || !isPrimitive
-    }
-    if enterArg then enterLinear(linearArg)
-    else ()
-  }
-
-  def namedFunctionTerm(args: List[Tree], body: Tree)
-                       (id: Id)
-                       given Context, Mode: Checked[Unit] = {
+  private def namedFunctionTerm(args: List[Tree], body: Tree)
+                               (id: Id)
+                               given Context, Mode: Lifted[Unit] = {
     enterScope(id, anon).flatMap { ctx1 =>
       implied for Context = ctx1
       for
-        _ <- args.foldLeftE(())((_, n) => enterVariable(n.convert))
+        _ <- args.foldLeftE(())((_, n) => enterVariable(n))
         _ <- index(body)
       yield ()
     }
   }
 
-  def namedLinearFunctionTerm(arg: Tree, body: Tree)
-                             (id: Id)
-                             given Context, Mode: Checked[Unit] = {
+  private def namedLinearFunctionTerm(arg: Tree, body: Tree)
+                                     (id: Id)
+                                     given Context, Mode: Lifted[Unit] = {
     enterScope(id, anon).flatMap { ctx1 =>
       implied for Context = ctx1
       for
-        _ <- enterLinear(arg.convert)
+        _ <- enterLinear(arg)
         _ <- index(body)
       yield ()
     }
   }
 
-  def namedPackageDef(pid: Tree, stats: List[Tree])
-                     given Context, Mode: Checked[Unit] = {
+  private def namedPackageDef(pid: Tree, stats: List[Tree])
+                             given Context, Mode: Lifted[Unit] = {
     val cPkgCtx = pid.toNamePairs.foldLeftE(ctx) { (pkgCtx, pair) =>
       val (id, pkgName)   = pair
       implied for Context = pkgCtx
@@ -103,25 +108,25 @@ object Namers {
     }
   }
 
-  def namedApplyTerm(fun: Tree, args: List[Tree])
-                    given Context, Mode: Checked[Unit] = {
+  private def namedApplyTerm(fun: Tree, args: List[Tree])
+                            given Context, Mode: Lifted[Unit] = {
     for
       _ <- index(fun)
       _ <- args.foldLeftE(())((_, arg) => index(arg))
     yield ()
   }
 
-  def namedEvalTerm(fun: Tree, arg: Tree)
-                   given Context, Mode: Checked[Unit] = {
+  private def namedEvalTerm(fun: Tree, arg: Tree)
+                           given Context, Mode: Lifted[Unit] = {
     for
       _ <- index(fun)
       _ <- index(arg)
     yield ()
   }
 
-  def namedLet(patt: Tree, value: Tree, continuation: Tree)
-              (id: Id)
-              given Context, Mode: Checked[Unit] = {
+  private def namedLet(patt: Tree, value: Tree, continuation: Tree)
+                      (id: Id)
+                      given Context, Mode: Lifted[Unit] = {
     for
       _ <- index(value)
       _ <- enterScope(id, anon).flatMap { ctx1 =>
@@ -134,9 +139,9 @@ object Namers {
     yield ()
   }
 
-  def namedLetTensor(x: Tree, z: Tree, s: Tree, t: Tree)
-                    (id: Id)
-                    given Context, Mode: Checked[Unit] = {
+  private def namedLetTensor(x: Tree, z: Tree, s: Tree, t: Tree)
+                            (id: Id)
+                            given Context, Mode: Lifted[Unit] = {
     for
       _ <- index(s)
       _ <- enterScope(id, anon).flatMap { ctx1 =>
@@ -150,8 +155,8 @@ object Namers {
     yield ()
   }
 
-  def namedCaseExpr(selector: Tree, cases: List[Tree])
-                   given Context, Mode: Checked[Unit] = {
+  private def namedCaseExpr(selector: Tree, cases: List[Tree])
+                           given Context, Mode: Lifted[Unit] = {
     for
       _ <- index(selector)
       _ <- cases.foldLeftE(()) { (_, tree) =>
@@ -168,8 +173,8 @@ object Namers {
     yield ()
   }
 
-  def namedCaseClause(pat: Tree, guard: Tree, body: Tree)
-                     given Context, Mode: Checked[Unit] = {
+  private def namedCaseClause(pat: Tree, guard: Tree, body: Tree)
+                             given Context, Mode: Lifted[Unit] = {
     for
       _ <- indexAsPattern(pat)
       _ <- index(guard) // idents here are normal refs to variables in this scope
@@ -177,56 +182,42 @@ object Namers {
     yield ()
   }
 
-  def namedLinearCaseClause(pat: Tree, body: Tree)
-                           given Context, Mode: Checked[Unit] = {
+  private def namedLinearCaseClause(pat: Tree, body: Tree)
+                                   given Context, Mode: Lifted[Unit] = {
     for
       _ <- indexAsLinearPattern(pat)
       _ <- index(body)
     yield ()
   }
 
-  def namedAlternative(alts: List[Tree]) given Context, Mode: Checked[Unit] = {
+  private def namedAlternative(alts: List[Tree])
+                              given Context, Mode: Lifted[Unit] = {
     implied for Mode = Mode.PatAlt
     alts.foldLeftE(())((_, t) => index(t))
   }
 
-  def namedUnapply(args: List[Tree]) given Context, Mode: Checked[Unit] = {
+  private def namedUnapply(args: List[Tree])
+                          given Context, Mode: Lifted[Unit] =
     args.foldLeftE(())((_, t) => index(t))
-  }
 
-  def namedBind(name: Name, pat: Tree)
-               given Context, Mode: Checked[Unit] = {
+  private def namedBind(name: Name, pat: Tree)
+                       given Context, Mode: Lifted[Unit] = {
     for
       _ <- enterVariable(name)
       _ <- index(pat)
     yield ()
   }
 
-  def namedParens(args: List[Tree]) given Context, Mode: Checked[Unit] =
+  private def namedParens(args: List[Tree]) given Context, Mode: Lifted[Unit] =
     args.foldLeftE(())((_, t) => index(t))
 
-  def namedIdentPat(name: Name) given Context, Mode: Checked[Unit] =
+  private def namedIdentPat(name: Name) given Context, Mode: Lifted[Unit] =
     enterVariable(name)
 
-  def namedIdentLinearPat(name: Name) given Context, Mode: Checked[Unit] =
+  private def namedIdentLinearPat(name: Name) given Context, Mode: Lifted[Unit] =
     name.foldWildcard(())(enterLinear)
 
-  def indexAsPattern(tree: Tree) given Context: Checked[Unit] = {
-    implied for Mode = Mode.Pat
-    index(tree)
-  }
-
-  def indexAsLinearPattern(tree: Tree) given Context: Checked[Unit] = {
-    implied for Mode = Mode.LinearPat
-    index(tree)
-  }
-
-  def indexAsExpr(tree: Tree) given Context: Checked[Unit] = {
-    implied for Mode = Mode.Term
-    index(tree)
-  }
-
-  def index(tree: Tree) given Context, Mode: Checked[Unit] = tree match {
+  private def index(tree: Tree) given Context, Mode: Lifted[Unit] = tree match {
     /* Linear Pattern Trees */
     case Ident(n)                 if isLPattern => namedIdentLinearPat(n)
     case Unapply(_,ts)            if isLPattern => namedUnapply(ts)
@@ -258,14 +249,10 @@ object Namers {
     case LinearCaseClause(p,b)    if isTerm     => namedLinearCaseClause(p,b)
     /* any mode */
     case Parens(ts)                             => namedParens(ts)
-    case _: Literal
-       | _: Ident
-       | _: Select
-       | _: Tensor
-       | _: Bang
-       | _: WhyNot
+    case _: (Literal | Ident | Select | Tensor
+            | Bang | WhyNot)
        | EmptyTree                              => // atomic
     /* error case */
-    case _                                      => NamerErrors.namingMissing(tree)
+    case _                                      => Err.namingMissing(tree)
   }
 }
