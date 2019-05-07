@@ -21,7 +21,7 @@
  */
 /*Derived from https://github.com/antlr/grammars-v4/blob/master/scala/Scala.g4
  */
-grammar EEC;
+grammar Mesa;
 
 literal:
 	IntegerLiteral

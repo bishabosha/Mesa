@@ -23,7 +23,7 @@ import Constants._
 import core.Constants.Constant._
 import Modifiers.{Modifier}
 import Modifier._
-import EECParser._
+import MesaParser._
 import types.Types.TypeOps._
 import error.CompilerErrors._
 
@@ -946,11 +946,11 @@ object Parsers {
     }
   }
 
-  private def genParser(input: String): EECParser = {
+  private def genParser(input: String): MesaParser = {
     val charStream  = new ANTLRInputStream(input)
-    val lexer       = new EECLexer(charStream)
+    val lexer       = new MesaLexer(charStream)
     val tokens      = new CommonTokenStream(lexer)
-    val parser      = new EECParser(tokens)
+    val parser      = new MesaParser(tokens)
     lexer.removeErrorListeners
     lexer.addErrorListener(eecErrorListener)
     parser.removeErrorListeners
