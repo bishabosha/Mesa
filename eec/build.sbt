@@ -11,7 +11,7 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := "mesa-core",
-    version := "0.3.1-RC3",
+    version := "0.3.2-RC1",
 
     compileOrder := CompileOrder.JavaThenScala,
 
