@@ -19,10 +19,10 @@ import ast.Trees._
 import org.junit.Test
 import org.junit.Assert._
 
-import implied CompilerErrorOps._
-import implied TreeOps._
-import implied TypeOps._
-import implied NameOps._
+import delegate CompilerErrorOps._
+import delegate TreeOps._
+import delegate TypeOps._
+import delegate NameOps._
 
 
 object BootstrapTests {
@@ -113,8 +113,8 @@ object BootstrapTests {
 
     val idGen = new IdGen
     val ctx   = new RootContext()
-    implied for Context = ctx
-    implied for IdGen   = idGen
+    delegate for Context = ctx
+    delegate for IdGen   = idGen
 
     val pair = for
       _ <- Context.enterBootstrapped

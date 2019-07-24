@@ -29,8 +29,8 @@ import error.CompilerErrors._
 
 import org.antlr.v4.runtime._
 
-import implied TreeOps._
-import implied NameOps._
+import delegate TreeOps._
+import delegate NameOps._
 
 object Parsers {
 
@@ -215,17 +215,18 @@ object Parsers {
     import CompilerErrorOps._
     val name = context.rassocOpId.getText.readAs
     val functor = Ident(name)(freshId(), nt)
-    for
+    val app = for
       functor1 <- fromFunctorType(context.functorType)
       iat      <- fromInfixType(context.infixType)
-    yield iat match {
+    yield InfixApply(functor, functor1, iat)(nt)
+
+    app.flatMap {
       case InfixApply(Ident(other),_,_)
         if other != name && !context.infixType.getText.startsWith("(") =>
           CompilerError.Syntax(
             s"Non associative rhs `${other.show}` to infix type `${name.show}`")
 
-      case _ =>
-        InfixApply(functor, functor1, iat)(nt)
+      case other => other
     }
   }
 
@@ -941,16 +942,16 @@ object Parsers {
         charPositionInLine: Int,
         msg: String,
         e: RecognitionException): Unit = {
-      throw new ParserSyntaxException(
+      throw ParserSyntaxException(
         "line " + line + ":" + charPositionInLine + " " + msg)
     }
   }
 
   private def genParser(input: String): MesaParser = {
-    val charStream  = new ANTLRInputStream(input)
-    val lexer       = new MesaLexer(charStream)
-    val tokens      = new CommonTokenStream(lexer)
-    val parser      = new MesaParser(tokens)
+    val charStream  = CharStreams.fromString(input)
+    val lexer       = MesaLexer(charStream)
+    val tokens      = CommonTokenStream(lexer)
+    val parser      = MesaParser(tokens)
     lexer.removeErrorListeners
     lexer.addErrorListener(eecErrorListener)
     parser.removeErrorListeners

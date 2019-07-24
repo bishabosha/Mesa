@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.2-RC1] - 2019-07-24
+### Changed
+- Upgrade Dotty to `0.16.0-RC3`
+
 ## [0.3.1-RC3] - 2019-05-7
 ### Changed
 - EEC is renamed to Mesa
@@ -98,7 +102,8 @@ All notable changes to this project will be documented in this file.
   - Source files use `.hs` suffix at present to benefit from syntax highlighting.
   - Refer to [eec/src/main/antlr4/EEC.g4](eec/src/main/antlr4/EEC.g4) for a context free grammar.
 
-[Unreleased]: https://github.com/bishabosha/EEC/compare/0.3.1-RC3...develop
+[Unreleased]: https://github.com/bishabosha/EEC/compare/0.3.2-RC1...develop
+[0.3.2-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.3.2-RC1
 [0.3.1-RC3]: https://github.com/bishabosha/EEC/releases/tag/0.3.1-RC3
 [0.3.0-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.3.0-RC1
 [0.2.3-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.2.3-RC1

@@ -1,4 +1,4 @@
-val dottyVersion = "0.14.0-RC1"
+val dottyVersion = "0.16.0-RC3"
 // val dottyVersion = dottyLatestNightlyBuild.get
 
 enablePlugins(Antlr4Plugin)
@@ -11,7 +11,7 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := "mesa-core",
-    version := "0.3.1-RC3",
+    version := "0.3.2-RC1",
 
     compileOrder := CompileOrder.JavaThenScala,
 

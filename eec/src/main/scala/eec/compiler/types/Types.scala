@@ -19,7 +19,7 @@ import Utils.{view, const}
 import StackMachine._
 import Program._
 
-import implied NameOps._
+import delegate NameOps._
 
 object Types {
   import Type._
@@ -127,39 +127,35 @@ object Types {
       }
     }
 
-    private[Types] def (tpe: Type) compute[O]
-                       (compiler: Type => Statement[O]): O = {
-      tpe.compile[Type, O](foldLeft)(compiler)
+    delegate for Interpretable[Type] {
+      def (tpe: Type) interpret[O] (z: O)(f: (O, Type) => O): O = tpe.foldLeft(z)(f)
     }
 
+    type Stat = Statement[Type]
+
     private[Types] def (tpe: Type) mapLeaves(f: Type => Type): Type = {
-      tpe.compute {
+      tpe.compile[Type, Type] {
         case FunctionType(arg, body) =>
-          stack =>
-            val a1 :: a2 :: rest = stack
-            FunctionType(a1, a2) :: rest
+          val a1 :: a2 :: rest = stack
+          FunctionType(a1, a2) :: rest
 
         case LinearFunctionType(arg, body) =>
-          stack =>
-            val a1 :: a2 :: rest = stack
-            LinearFunctionType(a1, a2) :: rest
+          val a1 :: a2 :: rest = stack
+          LinearFunctionType(a1, a2) :: rest
 
         case InfixAppliedType(tpe, a1, a2) =>
-          stack =>
-            val a1 :: a2 :: rest = stack
-            InfixAppliedType(tpe, a1, a2) :: rest
+          val a1 :: a2 :: rest = stack
+          InfixAppliedType(tpe, a1, a2) :: rest
 
         case AppliedType(f, args) =>
-          stack =>
-            val (removed, rest) = stack.splitAt(args.length)
-            AppliedType(f, removed) :: rest
+          val (removed, rest) = stack.splitAt(args.length)
+          AppliedType(f, removed) :: rest
 
         case Product(tpes1) =>
-          stack =>
-            val (removed, rest) = stack.splitAt(tpes1.length)
-            Product(removed) :: rest
+          val (removed, rest) = stack.splitAt(tpes1.length)
+          Product(removed) :: rest
 
-        case tpe1 => f(tpe1) :: _
+        case tpe1 => f(tpe1) :: stack
       }
     }
 
@@ -457,22 +453,21 @@ object Types {
 
     def (tpe: Type) isValueType = !tpe.isComputationType
 
-    private def (tpe: Type) showImpl: String = tpe.compute {
+    private def (tpe: Type) showImpl: String = tpe.compile {
       case FunctionType(arg, body)        => fromFunctionType(arg, body)
       case LinearFunctionType(arg, body)  => fromLinearFunctionType(arg, body)
       case InfixAppliedType(op, a1, a2)   => fromInfixAppliedType(op,a1,a2)
       case AppliedType(f, args)           => fromAppliedType(f, args)
       case Product(tpes1)                 => fromProduct(tpes1)
-      case TypeRef(t)                     => t.show::_
-      case BaseType(t)                    => t.show::_
-      case Variable(t)                    => t.show::_
-      case PackageInfo(parent, name)      => showPackage(parent, name)::_
-      case WildcardType                   => "<any>"::_
-      case EmptyType                      => "<nothing>"::_
+      case TypeRef(t)                     => t.show::stack
+      case BaseType(t)                    => t.show::stack
+      case Variable(t)                    => t.show::stack
+      case PackageInfo(parent, name)      => showPackage(parent, name)::stack
+      case WildcardType                   => "<any>"::stack
+      case EmptyType                      => "<nothing>"::stack
     }
 
-    private def fromFunctionType(arg: Type, body: Type)
-                                (stack: Stack[String]) = {
+    private def fromFunctionType(arg: Type, body: Type): Statement[String] = {
       val a1 :: a2 :: rest = stack
       val a1Final = arg match {
         case _: (FunctionType | LinearFunctionType)  => s"($a1)"
@@ -481,8 +476,7 @@ object Types {
       s"$a1Final -> $a2" :: rest
     }
 
-    private def fromLinearFunctionType(arg: Type, body: Type)
-                                      (stack: Stack[String]) = {
+    private def fromLinearFunctionType(arg: Type, body: Type): Statement[String] = {
       val a1 :: a2 :: rest = stack
       val a1Final = arg match {
         case _: (FunctionType | LinearFunctionType)  => s"($a1)"
@@ -491,8 +485,7 @@ object Types {
       s"$a1Final ->. $a2" :: rest
     }
 
-    private def fromInfixAppliedType(op: Name, a1: Type, a2: Type)
-                                    (stack: Stack[String]) = {
+    private def fromInfixAppliedType(op: Name, a1: Type, a2: Type): Statement[String] = {
       val b1 :: b2 :: rest = stack
       val b1Final = a1 match {
         case AppliedType(BangTag, _ :: Nil) => b1
@@ -512,8 +505,7 @@ object Types {
       s"$b1Final ${op.show} $b2Final" :: rest
     }
 
-    private def fromAppliedType(f: Name, args: List[Type])
-                                (stack: Stack[String]): List[String] = {
+    private def fromAppliedType(f: Name, args: List[Type]): Statement[String] = {
       def checkAll(tpes: List[Type], strs: List[String]) =
         tpes.zip(strs).map(check)
 
@@ -539,8 +531,7 @@ object Types {
       str :: rest
     }
 
-    private def fromProduct(tpes: List[Type])
-                            (stack: Stack[String]) = {
+    private def fromProduct(tpes: List[Type]): Statement[String] = {
       val (removed, rest) = stack.splitAt(tpes.length)
       removed.mkString("(", ", ", ")") :: rest
     }
@@ -567,7 +558,7 @@ object Types {
       s"$quantification$body"
     }
 
-    implied for Show[Type] {
+    delegate for Show[Type] {
 
       val variables: Stream[String] = {
         val alpha = ('a' to 'z').toStream.map(_.toString)
@@ -624,14 +615,14 @@ object Types {
       }
     }
 
-    implied for Define[Type] = displayString
+    delegate for Define[Type] = displayString
 
-    implied for Conversion[List[Type], Type] = {
+    delegate for Conversion[List[Type], Type] = {
       case tpe :: Nil => tpe
       case types      => Product(types)
     }
 
-    implied for Conversion[Type, List[Type]] = {
+    delegate for Conversion[Type, List[Type]] = {
       case Product(ls)  => ls
       case tpe          => tpe :: Nil
     }

@@ -19,8 +19,8 @@ import util.{Show, Utils}
 import core.{ContextErrors => Err}
 import Utils._
 
-import implied NameOps._
-import implied TypeOps._
+import delegate NameOps._
+import delegate TypeOps._
 
 object Contexts {
   import Mode._
@@ -58,7 +58,7 @@ object Contexts {
   }
 
   object ModeOps {
-    implied for Show[Mode] = {
+    delegate for Show[Mode] = {
       case LinearPat    => "linear pattern"
       case Pat | PatAlt => "pattern"
       case Term         => "term"
@@ -158,7 +158,7 @@ object Contexts {
     private def firstTermCtx(name: Name) given Context: Lifted[Context] = {
       @tailrec
       def inner(current: Context): Lifted[Context] = {
-        implied for Context = current
+        delegate for Context = current
         if isLinearOrInScope(name) then
           ctx
         else ctx match {
@@ -173,7 +173,7 @@ object Contexts {
     private def firstTypeCtx(name: Name) given Context: Lifted[Context] = {
       @tailrec
       def inner(current: Context): Lifted[Context] = {
-        implied for Context = current
+        delegate for Context = current
         if isData(name) then
           ctx
         else ctx match {
@@ -187,14 +187,14 @@ object Contexts {
 
     def lookupType(name: Name) given Context: Lifted[Type] = {
       firstTypeCtx(name).flatMap { ctx =>
-        implied for Context = ctx
+        delegate for Context = ctx
         dataType(name)
       }
     }
 
     def lookupConstructors(data: Name) given Context: Lifted[List[(Name, Type)]] = {
       firstTypeCtx(data).flatMap { ctx =>
-        implied for Context = ctx
+        delegate for Context = ctx
         constructorsFor(data)
       }
     }
@@ -212,14 +212,14 @@ object Contexts {
       for
         ctx1 <- firstTermCtx(name)
         o <- lift {
-          implied for Context = ctx1
+          delegate for Context = ctx1
           onFound
         }
       yield o
     }
 
     def isLinear(name: Name) given Context: Boolean =
-      ctx.linearScope.filter(_ == name).isDefined
+      ctx.linearScope.exists(_ == name)
 
     def isData(name: Name) given Context: Boolean =
       ctx.dataTypeTable.keySet.contains(name)
@@ -227,7 +227,7 @@ object Contexts {
     def isDataDeep(name: Name) given Context: Boolean = {
       @tailrec
       def inner(current: Context): Boolean = {
-        implied for Context = current
+        delegate for Context = current
         isData(name) || {
           ctx match {
             case ctx: Fresh => inner(ctx.outer)
@@ -398,7 +398,7 @@ object Contexts {
       } else if idGen.current != Id.init then {
         Err.noFreshIdGen
       } else {
-        implied for Context = root
+        delegate for Context = root
         for ((name, tpe) <- bootstrapped.view) {
           for _ <- enterData(name)
           yield {
@@ -415,7 +415,7 @@ object Contexts {
         case ctx: Fresh       => ctx.outer
       }
       val parentTpe = lift {
-        implied for Context = parentCtx
+        delegate for Context = parentCtx
         termType(parent)
       }
       parentTpe.flatMap {
