@@ -17,9 +17,9 @@ import annotation._
 import util.{Show, Utils}
 import Utils.{eval, foldMap}
 
-import implied Meta.TreeOps._
-import implied Names.NameOps._
-import implied TypeOps._
+import delegate Meta.TreeOps._
+import delegate Names.NameOps._
+import delegate TypeOps._
 
 object Trees {
   import Tree._
@@ -139,13 +139,13 @@ object Trees {
       case _                => Id.empty
     }
 
-    implied for Show[Tree] = t => pprint.apply(
+    delegate for Show[Tree] = t => pprint.apply(
       x = (t: Meta.Tree),
       width = 80,
       height = Int.MaxValue
     ).render
 
-    implied for Conversion[Tree, List[Tree]] = {
+    delegate for Conversion[Tree, List[Tree]] = {
       case EmptyTree          => Nil
       case TreeSeq(args)      => args
       case Parens(args)       => args
@@ -153,13 +153,13 @@ object Trees {
       case t                  => t :: Nil
     }
 
-    implied for Conversion[List[Tree], Tree] = {
+    delegate for Conversion[List[Tree], Tree] = {
       case Nil      => EmptyTree
       case t :: Nil => t
       case ts       => TreeSeq(ts)
     }
 
-    implied uniqName for Conversion[Tree, Name] = {
+    delegate uniqName for Conversion[Tree, Name] = {
       case DefSig(name, _)              => name
       case LinearSig(name, _, _)        => name
       case DefDef(_, sig, _, _)         => sig

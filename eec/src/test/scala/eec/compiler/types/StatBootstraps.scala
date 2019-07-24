@@ -21,29 +21,29 @@ object StatBootstraps {
 
   def typecheck(seq: (String, String)*): Unit = {
     val (idGen, ctx)    = initialCtx
-    implied for IdGen   = idGen
-    implied for Context = ctx
+    delegate for IdGen   = idGen
+    delegate for Context = ctx
     seq.foreach { (f, s) => checkTpe(typeStat(f)(any), s) }
   }
 
   def noType(seq: String*): Unit = {
     val (idGen, ctx)    = initialCtx
-    implied for IdGen   = idGen
-    implied for Context = ctx
+    delegate for IdGen   = idGen
+    delegate for Context = ctx
     seq.foreach { f => failIfUnparsedOrTypedStat(f)(any) }
   }
 
   def someNoType(seq: String*): Unit = {
     val (idGen, ctx)    = initialCtx
-    implied for IdGen   = idGen
-    implied for Context = ctx
+    delegate for IdGen   = idGen
+    delegate for Context = ctx
     failIfAllTyped(seq.mapE { f => typeStat(f)(any) })
   }
 
   def noParse(seq: String*): Unit = {
     val (idGen, ctx)    = initialCtx
-    implied for IdGen   = idGen
-    implied for Context = ctx
+    delegate for IdGen   = idGen
+    delegate for Context = ctx
     seq.toList.foreach { f => failIfParsed(parseDef)(f) }
   }
 }

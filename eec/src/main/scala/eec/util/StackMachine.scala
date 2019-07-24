@@ -1,39 +1,39 @@
-package eec
-package util
+package eec.util
 
-import scala.annotation.tailrec
+import annotation.tailrec
 
 object StackMachine {
-  import Compiler._
-  import Program._
+  export opaques.{Program, Stack, stackInit, stack}
 
-  type Stack     [T] = List[T]
-  type Statement [T] = Stack[T] => Stack[T]
+  type Statement[T] = given opaques.Stack[T] => List[T]
 
-  opaque type Program[T] = List[Statement[T]]
+  trait Interpretable[I] {
+    def (i: I) interpret[O] (z: O)(f: (O, I) => O): O
+  }
+
+  object opaques {
+    opaque type Program[T] = List[Statement[T]]
+    opaque type Stack[T]   = List[T]
+
+    def stackInit[T]: Program[T] = Nil
+    def stack[T] given Stack[T]: List[T] = the[List[T]]
+
+    delegate {
+
+      def (t: Statement[T]) +: [T](p: Program[T]): Program[T] = t :: p
+
+      def (program: Program[T]) unsafeInterpret[T]: T = run(Nil, program).head
+
+      @tailrec private def run[T](stack: Stack[T], program: Program[T]): List[T] = program match {
+        case stat :: stats => run(stat given stack, stats)
+        case Nil           => stack
+      }
+    }
+  }
 
   object Program {
-    inline def of[T]: Program[T] = Nil
-
-    def evalLeft[I,T](compiler: I => Statement[T])
-                     (program: Program[T], i: I): Program[T] =
-      compiler(i) :: program
-
-    def (input: I) compile[I, O]
-        (foldLeft: I => Program[O] => ((Program[O], I) => Program[O]) => Program[O])
+    def (input: I) compile[I: Interpretable, O]
         (compiler: I => Statement[O]): O =
-      foldLeft(input)(of[O])(evalLeft(compiler)).unsafeInterpret
-
-    private def (program: Program[T]) run[T]: Stack[T] = {
-      @tailrec
-      def inner[T](stack: Stack[T], program: Program[T]): Stack[T] =
-        program match {
-          case stat :: stats  => inner(stat(stack), stats)
-          case Nil            => stack
-        }
-      inner(Nil, program)
-    }
-
-    def (program: Program[T]) unsafeInterpret [T] = program.run.head
+      input.interpret(stackInit[O])((p, i) => compiler(i) +: p).unsafeInterpret
   }
 }

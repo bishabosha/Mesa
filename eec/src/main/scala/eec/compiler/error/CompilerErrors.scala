@@ -29,7 +29,7 @@ object CompilerErrors {
 
   object CompilerErrorOps {
 
-    implied for Show[CompilerError] = {
+    delegate for Show[CompilerError] = {
       case e @ NameCollision(msg)     => s"${e.productPrefix}: $msg"
       case e @ LinearScope(msg)       => s"${e.productPrefix}: $msg"
       case e @ UnknownIdentifier(msg) => s"${e.productPrefix}: $msg"

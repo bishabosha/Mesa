@@ -4,6 +4,7 @@ import scala.language.implicitConversions
 
 import scala.util.control.NonFatal
 import scala.annotation.tailrec
+import scala.io.StdIn.readLine
   
 import Commands.{Command, parseCommand, helpText}
 import Command._
@@ -25,12 +26,12 @@ import Typers.typed
 import Types.{Type, TypeOps}
 import Type._
 
-import implied CompilerErrorOps._
-import implied TreeOps._
-import implied TypeOps._
-import implied NameOps._
-import implied Meta.TreeOps._
-import implied Meta.ContextOps._
+import delegate CompilerErrorOps._
+import delegate TreeOps._
+import delegate TypeOps._
+import delegate NameOps._
+import delegate Meta.TreeOps._
+import delegate Meta.ContextOps._
 
 object Repl {
   import pprint2.pprintln
@@ -88,8 +89,8 @@ object Repl {
   private def newContext(enterPrelude: Boolean): Lifted[(IdGen, Context)] = {
     val rootCtx   = new RootContext()
     val rootIdGen = new IdGen
-    implied for Context = rootCtx
-    implied for IdGen = rootIdGen
+    delegate for Context = rootCtx
+    delegate for IdGen = rootIdGen
     for
       _ <- Context.enterBootstrapped
       _ <- lift {
@@ -105,8 +106,8 @@ object Repl {
 
   private def command(state: LoopState, input: String): LoopState = {
 
-    implied for Context = state.ctx
-    implied for IdGen   = state.idGen
+    delegate for Context = state.ctx
+    delegate for IdGen   = state.idGen
 
     def Typed(s: String)(f: String => IdReader[Lifted[Tree]]): LoopState = {
       guarded(state, s) {

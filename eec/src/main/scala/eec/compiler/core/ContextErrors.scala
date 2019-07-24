@@ -6,7 +6,7 @@ import Names._
 import Contexts.Id
 import error.CompilerErrors._
 
-import implied NameOps._
+import delegate NameOps._
 
 object ContextErrors {
 
