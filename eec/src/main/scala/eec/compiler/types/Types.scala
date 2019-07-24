@@ -14,8 +14,7 @@ import Names._
 import Name._
 import error.CompilerErrors._
 import CompilerErrorOps._
-import util.{Show, Define, StackMachine, Utils}
-import Utils.{view, const}
+import util.{Show, Define, StackMachine, view, const}
 import StackMachine._
 import Program._
 

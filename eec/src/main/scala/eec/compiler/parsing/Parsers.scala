@@ -106,11 +106,10 @@ object Parsers {
   }
 
   private def fromBooleanLiteral(context: LiteralContext): Tree = {
-    val bool = context.BooleanLiteral.getText match {
-      case "True" => true
-      case _      => false
+    context.BooleanLiteral.getText match {
+      case "True" => litTrue
+      case _      => litFalse
     }
-    Literal(BooleanConstant(bool))(nt)
   }
 
   private def charText(context: LiteralContext): String = {

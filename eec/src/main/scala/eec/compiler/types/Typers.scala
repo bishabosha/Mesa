@@ -27,8 +27,7 @@ import CompilerErrors._
 import CompilerErrorOps._
 import core.Contexts._
 import Context._
-import util.{Show, Utils}
-import Utils.{foldMap, eval}
+import util.{Show, foldMap, eval}
 import Mode._
 
 import delegate NameOps._

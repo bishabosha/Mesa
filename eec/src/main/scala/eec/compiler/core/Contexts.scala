@@ -15,9 +15,8 @@ import types.Types
 import Types._
 import Type._
 import TypeOps._
-import util.{Show, Utils}
+import util.{Show, view}
 import core.{ContextErrors => Err}
-import Utils._
 
 import delegate NameOps._
 import delegate TypeOps._
