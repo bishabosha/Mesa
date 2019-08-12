@@ -23,7 +23,6 @@ import delegate NameOps._
 object Types {
   import Type._
   import TypeOps._
-  import TypeVariableOps._
 
   enum Type derives Eql {
     case PackageInfo(parent: Type, name: Name)
@@ -79,31 +78,7 @@ object Types {
     )
   }
 
-  opaque type TypeVariableOps = Type
-
-  private object TypeVariableOps {
-    def apply(tpe: Type): TypeVariableOps = tpe
-
-    def (ops: TypeVariableOps) zipWith[O, That](t: Type)
-        (f: (Name, Type) => O)
-        given (bf: CanBuild[O, That]): That = {
-
-      val b = ops.zipFold(t)(bf()) { (acc, arg, app) =>
-        arg match {
-          case Variable(name) => acc += f(name, app)
-          case _              => acc
-        }
-      }
-
-      b.result
-    }
-
-    def (tpe: TypeVariableOps) mapVariables(f: Name => Type): Type = {
-      tpe.mapLeaves {
-        case Variable(name) => f(name)
-        case tpe1           => tpe1
-      }
-    }
+  object TypeOps {
 
     def unifyImpl(tpe: Type, sub: Name, by: Type): Type = {
       val replacement = {
@@ -115,9 +90,6 @@ object Types {
         case other => Variable(other)
       }
     }
-  }
-
-  object TypeOps {
 
     def (tpe: Type) mapTypeRefs(f: Name => Type): Type = {
       tpe.mapLeaves {
@@ -130,7 +102,12 @@ object Types {
       def (tpe: Type) interpret[O] (z: O)(f: (O, Type) => O): O = tpe.foldLeft(z)(f)
     }
 
-    type Stat = Statement[Type]
+    def (tpe: Type) mapVariables(f: Name => Type): Type = {
+      tpe.mapLeaves {
+        case Variable(name) => f(name)
+        case tpe1           => tpe1
+      }
+    }
 
     private[Types] def (tpe: Type) mapLeaves(f: Type => Type): Type = {
       tpe.compile[Type, Type] {
@@ -276,6 +253,20 @@ object Types {
       else inner(z, t1 :: Nil, t2 :: Nil)
     }
 
+    def (ops: Type) zipWith[O, That](t: Type)
+        (f: (Name, Type) => O)
+        given (bf: CanBuild[O, That]): That = {
+
+      val b = ops.zipFold(t)(bf()) { (acc, arg, app) =>
+        arg match {
+          case Variable(name) => acc += f(name, app)
+          case _              => acc
+        }
+      }
+
+      b.result
+    }
+
     def canUnify(arg: Type, app: Type) : Boolean = {
       def inner(z: Boolean, args: List[Type], apps: List[Type]): Boolean = args match {
         case Nil => z
@@ -387,7 +378,7 @@ object Types {
     }
 
     def (subFrom: Type) unifications(subWith: Type): List[(Name, Type)] =
-      TypeVariableOps(subFrom).zipWith(subWith)((_, _))
+      subFrom.zipWith(subWith)((_, _))
 
     def (tpe: Type) unifyFrom(subFrom: Type)(subWith: Type): Type = {
       subFrom.zipFold(subWith)(tpe) { (acc, arg, sub) =>

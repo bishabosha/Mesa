@@ -1,6 +1,7 @@
 package eec.compiler.types
 
 import StatBootstraps._
+import org.junit.{ Test => test }
 
 class StatTest {
 
