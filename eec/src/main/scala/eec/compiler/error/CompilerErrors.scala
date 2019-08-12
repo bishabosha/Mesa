@@ -69,6 +69,11 @@ object CompilerErrors {
       case _                  => f(unlift(o))
     }
 
+    def (o: Lifted[O]) foreach [O, U] (f: O => Unit): Lifted[Unit] = o match {
+      case err: CompilerError => err
+      case _                  => f(unlift(o))
+    }
+
     def (o: Lifted[O]) flatMap [O, U]
         (f: O => Lifted[U]): Lifted[U] = o match {
       case err: CompilerError => err

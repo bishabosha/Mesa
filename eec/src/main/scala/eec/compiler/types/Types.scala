@@ -14,8 +14,7 @@ import Names._
 import Name._
 import error.CompilerErrors._
 import CompilerErrorOps._
-import util.{Show, Define, StackMachine, Utils}
-import Utils.{view, const}
+import util.{Show, Define, StackMachine, view, const}
 import StackMachine._
 import Program._
 
@@ -562,10 +561,11 @@ object Types {
 
       val variables: Stream[String] = {
         val alpha = ('a' to 'z').toStream.map(_.toString)
-        val numeric = for
-          n <- Stream.from(1)
-          x <- alpha
-        yield s"$x$n"
+        val numeric =
+          for
+            n <- Stream.from(1)
+            x <- alpha
+          yield s"$x$n"
         alpha #::: numeric
       }
 

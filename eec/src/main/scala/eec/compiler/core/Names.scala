@@ -99,7 +99,7 @@ object Names {
       case From(n)    => n.define
       case BangTag    => s"(${BangTag.show})"
       case TensorTag  => s"(${TensorTag.show})"
-      case other    => other.show
+      case other      => other.show
     }
 
     delegate for Read[Name] = {

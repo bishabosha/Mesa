@@ -14,8 +14,7 @@ import Modifiers._
 import types.Types._
 import untyped.nt
 import annotation._
-import util.{Show, Utils}
-import Utils.{eval, foldMap}
+import util.{ Show, eval, foldMap }
 
 import delegate Meta.TreeOps._
 import delegate Names.NameOps._

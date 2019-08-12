@@ -1,7 +1,5 @@
 package eec
 
-import repl._
-
 object Main {
 
   def main(args: Array[String]): Unit = {
@@ -12,9 +10,9 @@ object Main {
       println("  -p    => modifier for -e to load the REPL with Prelude definitions.")
       println("  -help => view these options")
     } else if args `sameElements` Array("-e") then {
-      Repl.loop(false)
+      repl.loop(false)
     } else if args.toSet == Set("-e", "-p") then {
-      Repl.loop(true)
+      repl.loop(true)
     } else {
       println("No valid option specified. See options with -help")
     }
