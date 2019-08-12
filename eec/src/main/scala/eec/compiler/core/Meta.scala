@@ -106,11 +106,7 @@ object Meta {
             }
           yield LinearVariable(name, tpe)
         }
-        val data = {
-          for
-            (name, tpe) <- ctx.dataTypeTable
-          yield Data(name, tpe.define)
-        }
+        val data = for (name, tpe) <- ctx.dataTypeTable yield Data(name, tpe.define)
         val defs = {
           for
             pair <- ctx.termScope.filter { pair =>

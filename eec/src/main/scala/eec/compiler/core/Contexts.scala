@@ -34,7 +34,6 @@ object Contexts {
   type Modal[X]         = given Mode => X
   type Contextual[O]    = given Context => O
   type IdReader[O]      = given IdGen => O
-  opaque type Id        = Long
 
   enum Mode derives Eql {
     case Typing, Term, Pat, PatAlt, LinearPat
@@ -65,11 +64,22 @@ object Contexts {
     }
   }
 
+  object opaques {
+    opaque type Id = Long
+    inline val one: Id = 1l
+    inline val zero: Id = 0l
+    inline val noId: Id = -1l
+    def (x: Id) + (y: Id): Id = x + y
+  }
+
+  type Id = opaques.Id
+
   object Id {
-    private[Contexts] val rootId: Id = 0l
-    val empty: Id = -1l
-    val init: Id = 1l
-    def (x: Id) succ : Id = x + 1l
+    import opaques._
+    private[Contexts] val rootId: Id = zero
+    val init: Id = one
+    val empty: Id = noId
+    inline def (x: Id) succ : Id = x + one
   }
 
   final class IdGen {
@@ -140,9 +150,8 @@ object Contexts {
     }
 
     def removeFromCtx(id: Id) given Context: Unit = {
-      for (mapping <- symFor(id) if id != Id.empty) {
+      for mapping <- symFor(id) if id != Id.empty do
         ctx.termScope -= mapping
-      }
     }
 
     def rootCtx given Context = {
@@ -398,12 +407,8 @@ object Contexts {
         Err.noFreshIdGen
       } else {
         delegate for Context = root
-        for ((name, tpe) <- bootstrapped.view) {
-          for _ <- enterData(name)
-          yield {
-            putDataType(name -> tpe)
-          }
-        }
+        for (name, tpe) <- bootstrapped.view do
+          for _ <- enterData(name) do putDataType(name -> tpe)
       }
     }
 

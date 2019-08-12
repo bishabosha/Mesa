@@ -113,10 +113,11 @@ def initialCtx: (IdGen, Context) = {
   delegate for Context = ctx
   delegate for IdGen   = idGen
 
-  val pair = for
-    _ <- Context.enterBootstrapped
-    _ <- Prelude.source.mapE(typeStat(_)(any))
-  yield (idGen, ctx)
+  val pair =
+    for
+      _ <- Context.enterBootstrapped
+      _ <- Prelude.source.mapE(typeStat(_)(any))
+    yield (idGen, ctx)
 
   pair.onError { err => fail(s"[INIT] ${err.show}"); ??? }
 }

@@ -110,11 +110,12 @@ private def command(state: LoopState, input: String): LoopState = {
 
   def Typed(s: String)(f: String => IdReader[Lifted[Tree]]): LoopState = {
     guarded(state, s) {
-      val yieldTyped = for
-        expr  <- f(s)
-        _     <- expr.indexed
-        typed <- expr.typed
-      yield typed
+      val yieldTyped =
+        for
+          expr  <- f(s)
+          _     <- expr.indexed
+          typed <- expr.typed
+        yield typed
 
       yieldTyped.fold
         { error => println(error.show.wrapErr) }
@@ -126,11 +127,12 @@ private def command(state: LoopState, input: String): LoopState = {
 
   def Define(s: String): LoopState = {
     guarded(state, s) {
-      val typed = for
-        exp <- parseDef(s)
-        _   <- exp.indexed
-        tpd <- exp.typed
-      yield tpd
+      val typed =
+        for
+          exp <- parseDef(s)
+          _   <- exp.indexed
+          tpd <- exp.typed
+        yield tpd
 
       typed.fold
         { err => println(err.show.wrapErr) }

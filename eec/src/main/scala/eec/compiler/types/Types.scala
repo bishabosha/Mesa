@@ -561,10 +561,11 @@ object Types {
 
       val variables: Stream[String] = {
         val alpha = ('a' to 'z').toStream.map(_.toString)
-        val numeric = for
-          n <- Stream.from(1)
-          x <- alpha
-        yield s"$x$n"
+        val numeric =
+          for
+            n <- Stream.from(1)
+            x <- alpha
+          yield s"$x$n"
         alpha #::: numeric
       }
 

@@ -2,7 +2,6 @@ package eec
 package compiler
 package parsing
 
-import Parsers._
 import ast.Trees.Tree
 import error.CompilerErrors.Lifted
 import core.Contexts.IdReader
