@@ -23,8 +23,6 @@ import delegate TreeOps._
 import delegate TypeOps._
 import delegate NameOps._
 
-export org.junit.{Test => test}
-
 val any = WildcardType
 
 def (str: String) -|: (other: String) = other -> str

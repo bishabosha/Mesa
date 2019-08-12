@@ -2,6 +2,8 @@ package eec.compiler.types
 
 import ExprBootstraps._
 
+import org.junit.{ Test => test }
+
 class ExprTest {
 
   @test def typecheckInteger() = typecheck(
