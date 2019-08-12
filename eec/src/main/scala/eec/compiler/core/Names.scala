@@ -12,8 +12,8 @@ object Names {
   import Derived._
   import DerivedOps._
 
-  import delegate NameOps._
-  import delegate DerivedOps._
+  import given NameOps._
+  import given DerivedOps._
 
   enum Derived derives Eql {
     case Str(str: String)
@@ -34,18 +34,18 @@ object Names {
   object DerivedOps {
     private[Names] val OpId = """([!#/%&*+-:<=>?@\\^|~]+)""".r
 
-    delegate for Define[Derived] = {
+    given as Define[Derived] = {
       case Str(OpId(str))     => s"($str)"
       case Str(str)           => str
       case Synthetic(id, str) => s"<$str:$id>"
     }
 
-    delegate for Show[Derived] = {
+    given as Show[Derived] = {
       case Str(str)           => str
       case Synthetic(id, str) => s"<$str:$id>"
     }
 
-    delegate for Read[Derived] = Str(_)
+    given as Read[Derived] = Str(_)
   }
 
   object NameOps {
@@ -78,7 +78,7 @@ object Names {
         case _              => None
       }
 
-    delegate for Show[Name] = {
+    given as Show[Name] = {
       case Comp(n)        => n.show
       case From(n)        => n.show
       case BangTag        => "!"
@@ -94,7 +94,7 @@ object Names {
       case EmptyName      => "<empty>"
     }
 
-    delegate for Define[Name] = {
+    given as Define[Name] = {
       case Comp(n)    => n.define
       case From(n)    => n.define
       case BangTag    => s"(${BangTag.show})"
@@ -102,7 +102,7 @@ object Names {
       case other      => other.show
     }
 
-    delegate for Read[Name] = {
+    given as Read[Name] = {
       case "!"        => BangTag
       case "*:"       => TensorTag
       case "_"        => Wildcard

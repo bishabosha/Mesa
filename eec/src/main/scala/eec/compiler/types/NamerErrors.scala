@@ -7,8 +7,8 @@ import ast.Trees._
 import core.Contexts._
 import Mode._
 
-import delegate TreeOps._
-import delegate ModeOps._
+import given TreeOps._
+import given ModeOps._
 
 object NamerErrors {
   def namingMissing(tree: Tree) given Mode = {

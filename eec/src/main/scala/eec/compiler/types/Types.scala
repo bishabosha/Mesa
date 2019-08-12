@@ -18,7 +18,7 @@ import util.{Show, Define, StackMachine, view, const}
 import StackMachine._
 import Program._
 
-import delegate NameOps._
+import given NameOps._
 
 object Types {
   import Type._
@@ -98,7 +98,7 @@ object Types {
       }
     }
 
-    delegate for Interpretable[Type] {
+    given as Interpretable[Type] {
       def (tpe: Type) interpret[O] (z: O)(f: (O, Type) => O): O = tpe.foldLeft(z)(f)
     }
 
@@ -548,7 +548,7 @@ object Types {
       s"$quantification$body"
     }
 
-    delegate for Show[Type] {
+    given as Show[Type] {
 
       val variables: Stream[String] = {
         val alpha = ('a' to 'z').toStream.map(_.toString)
@@ -606,14 +606,14 @@ object Types {
       }
     }
 
-    delegate for Define[Type] = displayString
+    given as Define[Type] = displayString
 
-    delegate for Conversion[List[Type], Type] = {
+    given as Conversion[List[Type], Type] = {
       case tpe :: Nil => tpe
       case types      => Product(types)
     }
 
-    delegate for Conversion[Type, List[Type]] = {
+    given as Conversion[Type, List[Type]] = {
       case Product(ls)  => ls
       case tpe          => tpe :: Nil
     }

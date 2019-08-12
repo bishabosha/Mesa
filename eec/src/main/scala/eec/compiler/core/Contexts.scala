@@ -18,8 +18,8 @@ import TypeOps._
 import util.{Show, view}
 import core.{ContextErrors => Err}
 
-import delegate NameOps._
-import delegate TypeOps._
+import given NameOps._
+import given TypeOps._
 
 object Contexts {
   import Mode._
@@ -56,7 +56,7 @@ object Contexts {
   }
 
   object ModeOps {
-    delegate for Show[Mode] = {
+    given as Show[Mode] = {
       case LinearPat    => "linear pattern"
       case Pat | PatAlt => "pattern"
       case Term         => "term"
@@ -166,7 +166,7 @@ object Contexts {
     private def firstTermCtx(name: Name) given Context: Lifted[Context] = {
       @tailrec
       def inner(current: Context): Lifted[Context] = {
-        delegate for Context = current
+        given as Context = current
         if isLinearOrInScope(name) then
           ctx
         else ctx match {
@@ -181,7 +181,7 @@ object Contexts {
     private def firstTypeCtx(name: Name) given Context: Lifted[Context] = {
       @tailrec
       def inner(current: Context): Lifted[Context] = {
-        delegate for Context = current
+        given as Context = current
         if isData(name) then
           ctx
         else ctx match {
@@ -195,14 +195,14 @@ object Contexts {
 
     def lookupType(name: Name) given Context: Lifted[Type] = {
       firstTypeCtx(name).flatMap { ctx =>
-        delegate for Context = ctx
+        given as Context = ctx
         dataType(name)
       }
     }
 
     def lookupConstructors(data: Name) given Context: Lifted[List[(Name, Type)]] = {
       firstTypeCtx(data).flatMap { ctx =>
-        delegate for Context = ctx
+        given as Context = ctx
         constructorsFor(data)
       }
     }
@@ -220,7 +220,7 @@ object Contexts {
       for
         ctx1 <- firstTermCtx(name)
         o <- lift {
-          delegate for Context = ctx1
+          given as Context = ctx1
           onFound
         }
       yield o
@@ -235,7 +235,7 @@ object Contexts {
     def isDataDeep(name: Name) given Context: Boolean = {
       @tailrec
       def inner(current: Context): Boolean = {
-        delegate for Context = current
+        given as Context = current
         isData(name) || {
           ctx match {
             case ctx: Fresh => inner(ctx.outer)
@@ -406,7 +406,7 @@ object Contexts {
       } else if idGen.current != Id.init then {
         Err.noFreshIdGen
       } else {
-        delegate for Context = root
+        given as Context = root
         for (name, tpe) <- bootstrapped.view do
           for _ <- enterData(name) do putDataType(name -> tpe)
       }
@@ -419,7 +419,7 @@ object Contexts {
         case ctx: Fresh       => ctx.outer
       }
       val parentTpe = lift {
-        delegate for Context = parentCtx
+        given as Context = parentCtx
         termType(parent)
       }
       parentTpe.flatMap {

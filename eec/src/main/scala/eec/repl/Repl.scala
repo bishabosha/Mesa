@@ -26,12 +26,12 @@ import Typers.typed
 import Types.{Type, TypeOps}
 import Type._
 
-import delegate CompilerErrorOps._
-import delegate TreeOps._
-import delegate TypeOps._
-import delegate NameOps._
-import delegate Meta.TreeOps._
-import delegate Meta.ContextOps._
+import given CompilerErrorOps._
+import given TreeOps._
+import given TypeOps._
+import given NameOps._
+import given Meta.TreeOps._
+import given Meta.ContextOps._
 
 import pprint2.pprintln
 
@@ -88,8 +88,8 @@ def loop(enterPrelude: Boolean): Unit = {
 private def newContext(enterPrelude: Boolean): Lifted[(IdGen, Context)] = {
   val rootCtx   = new RootContext()
   val rootIdGen = new IdGen
-  delegate for Context = rootCtx
-  delegate for IdGen = rootIdGen
+  given as Context = rootCtx
+  given as IdGen = rootIdGen
   for
     _ <- Context.enterBootstrapped
     _ <- lift {
@@ -105,8 +105,8 @@ private def newContext(enterPrelude: Boolean): Lifted[(IdGen, Context)] = {
 
 private def command(state: LoopState, input: String): LoopState = {
 
-  delegate for Context = state.ctx
-  delegate for IdGen   = state.idGen
+  given as Context = state.ctx
+  given as IdGen   = state.idGen
 
   def Typed(s: String)(f: String => IdReader[Lifted[Tree]]): LoopState = {
     guarded(state, s) {

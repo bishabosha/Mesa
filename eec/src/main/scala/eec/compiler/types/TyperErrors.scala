@@ -15,10 +15,10 @@ import NameOps._
 import core.Contexts._
 import Mode._
 
-import delegate ModeOps._
-import delegate TreeOps._
-import delegate TypeOps._
-import delegate NameOps._
+import given ModeOps._
+import given TreeOps._
+import given TypeOps._
+import given NameOps._
 
 object TyperErrors {
 

@@ -18,10 +18,10 @@ import ast.Trees._
 
 import org.junit.Assert._
 
-import delegate CompilerErrorOps._
-import delegate TreeOps._
-import delegate TypeOps._
-import delegate NameOps._
+import given CompilerErrorOps._
+import given TreeOps._
+import given TypeOps._
+import given NameOps._
 
 val any = WildcardType
 
@@ -108,8 +108,8 @@ def initialCtx: (IdGen, Context) = {
 
   val idGen = new IdGen
   val ctx   = new RootContext()
-  delegate for Context = ctx
-  delegate for IdGen   = idGen
+  given as Context = ctx
+  given as IdGen   = idGen
 
   val pair =
     for

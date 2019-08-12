@@ -30,10 +30,10 @@ import Context._
 import util.{Show, foldMap, eval}
 import Mode._
 
-import delegate NameOps._
-import delegate TypeOps._
-import delegate CompilerErrorOps._
-import delegate TreeOps._
+import given NameOps._
+import given TypeOps._
+import given CompilerErrorOps._
+import given TreeOps._
 
 object Typers {
   import Stoup._
@@ -63,8 +63,8 @@ object Typers {
   }
 
   def (tree: Tree) typed given Context: Lifted[Tree] = {
-    delegate for Stoup = Blank
-    delegate for Closure = Free
+    given as Stoup = Blank
+    given as Closure = Free
     val res = tree.typedAsExpr(any)
     resetLocalCtx
     res.doOnError(_ => removeFromCtx(tree.uniqId))
@@ -73,25 +73,25 @@ object Typers {
 
   private def (tree: Tree) typedAsExpr(pt: Type)
                                       given Context, Stoup, Closure: Lifted[Tree] = {
-    delegate for Mode = Term
+    given as Mode = Term
     tree.typed(pt)
   }
 
   private def (tree: Tree) typedAsTyping(pt: Type)
                                         given Context, Stoup, Closure: Lifted[Tree] = {
-    delegate for Mode = Typing
+    given as Mode = Typing
     tree.typed(pt)
   }
 
   private def (tree: Tree) typedAsPattern(pt: Type)
                                          given Context, Stoup, Closure: Lifted[Tree] = {
-    delegate for Mode = Pat
+    given as Mode = Pat
     tree.typed(pt)
   }
 
   private def (tree: Tree) typedAsLinearPattern(pt: Type)
                                                given Context, Stoup, Closure: Lifted[Tree] = {
-    delegate for Mode = LinearPat
+    given as Mode = LinearPat
     tree.typed(pt)
   }
 
@@ -228,7 +228,7 @@ object Typers {
                                (id: Id, pt: Type)
                                given Context, Mode, Stoup, Closure: Lifted[Tree] = {
     lookIn(id).flatMap { fCtx =>
-      delegate for Context = fCtx
+      given as Context = fCtx
       for
         args1 <- args.mapE(_.typed(any))
         _ <- args1.foldLeftE(()) { (_, arg) =>
@@ -236,7 +236,7 @@ object Typers {
           name.foldEmptyName(())(assertStoupIsNot(_)(Err.illegalStoupLambda))
         }
         body1 <- lift {
-          delegate for Closure = Closed
+          given as Closure = Closed
           body.typed(any)
         }
         fTpe  <- functionTermTpe(args1, body1)
@@ -249,15 +249,15 @@ object Typers {
                                      (id: Id, pt: Type)
                                      given Context, Mode, Stoup, Closure: Lifted[Tree] = {
     lookIn(id).flatMap { fCtx =>
-      delegate for Context = fCtx
+      given as Context = fCtx
       for
         _     <- assertStoupEmpty(Err.illegalStoupLinearLambda)
         arg1  <- arg.typed(any)
         name  =  arg: Name
         _     <- assertIsLinear(name, arg1.tpe)
         body1 <- lift {
-          delegate for Stoup   = DependsOn(name)
-          delegate for Closure = Closed
+          given as Stoup   = DependsOn(name)
+          given as Closure = Closed
           body.typed(any)
         }
         fTpe  <- linearFunctionTypnt(arg1, body1)
@@ -332,7 +332,7 @@ object Typers {
                              given Context, Mode, Stoup, Closure: Lifted[Tree] = {
     for
       t1  <- lift {
-        delegate for Stoup = Blank
+        given as Stoup = Blank
         t.typed(Bootstraps.VoidType)
       }
     yield WhyNot(t1)(pt)
@@ -343,7 +343,7 @@ object Typers {
                              given Context, Mode, Stoup, Closure: Lifted[Tree] = {
     for
       t1 <- lift {
-        delegate for Stoup = Blank
+        given as Stoup = Blank
         t.typed(any)
       }
       u1  <- u.typed(any)
@@ -460,7 +460,7 @@ object Typers {
     for
       fun1  <- fun.typed(any)
       args1 <- lift {
-        delegate for Stoup = Blank
+        given as Stoup = Blank
         args.mapE(_.typed(any))
       }
       argsProto <- args1.map[Type, List[Type]](_.tpe): Type
@@ -473,7 +473,7 @@ object Typers {
                            given Context, Mode, Stoup, Closure: Lifted[Tree] = {
     for
       fun1 <- lift {
-        delegate for Stoup = Blank
+        given as Stoup = Blank
         fun.typed(any)
       }
       arg1 <- arg.typed(any)
@@ -528,11 +528,11 @@ object Typers {
       t1    <- t.typed(any)
       t1U   <- unwrapCompApply(t1)
       let1  <- lift {
-        delegate for Context = lCtx
+        given as Context = lCtx
         for
           patt1 <- singletonPattern(patt, t1U)
           u1    <- lift {
-            delegate for Stoup = Blank
+            given as Stoup = Blank
             u.typed(pt)
           }
           _ <- assertLetCompContinuation(u1)
@@ -549,14 +549,14 @@ object Typers {
       s1     <- s.typed(any)
       s1U    <- unwrapTensorType(s1)
       tensor <- lift {
-        delegate for Context = lCtx
+        given as Context = lCtx
         val (xTpe, zTpe)    = s1U
         for
           x1    <- singletonPattern(x, xTpe)
           z1    <- singletonLinearPattern(z, zTpe)
           stoup =  typedLinearVariable.foldEmptyName(Blank)(DependsOn(_))
           t1    <- lift {
-            delegate for Stoup = stoup
+            given as Stoup = stoup
             t.typed(pt)
           }
           _ <- assertLetCompContinuation(t1)
@@ -630,7 +630,7 @@ object Typers {
                            given Context, Mode, Stoup, Closure: Lifted[Tree] = {
     for
       selector1  <- lift {
-        delegate for Stoup = Blank
+        given as Stoup = Blank
         selector.typed(any)
       }
       cases1 <- typeAsCaseClauses(cases, selector1.tpe)(pt)(unifyPattern)
@@ -642,7 +642,7 @@ object Typers {
                              (id: Id, pt: Type)
                              given Context, Mode, Stoup, Closure: Lifted[Tree] = {
     lookIn(id).flatMap { ccCtx =>
-      delegate for Context = ccCtx
+      given as Context = ccCtx
       for
         pat1   <- pat.typedAsPattern(selTpe)
         guard1 <- guard.typedAsExpr(Bootstraps.BooleanType)
@@ -666,12 +666,12 @@ object Typers {
                                    (id: Id, pt: Type)
                                    given Context, Mode, Stoup, Closure: Lifted[Tree] = {
     lookIn(id).flatMap { ccCtx =>
-      delegate for Context = ccCtx
+      given as Context = ccCtx
       for
         pat1  <- pat.typedAsLinearPattern(selTpe)
         stoup =  typedLinearVariable.foldEmptyName(Blank)(DependsOn(_))
         body1 <- lift {
-          delegate for Stoup = stoup
+          given as Stoup = stoup
           body.typedAsExpr(pt)
         }
         _ <- assertLinearCaseCompContinuation(body1)
@@ -698,7 +698,7 @@ object Typers {
   private def typedAlternative(patterns: List[Tree])
                               (pt: Type)
                               given Context, Mode, Stoup, Closure: Lifted[Tree] = {
-    delegate for Mode = Mode.PatAlt
+    given as Mode = Mode.PatAlt
     for
       patterns1 <- patterns.mapE(_.typed(pt))
       tpe       <- patterns1.sameType(pt)
@@ -750,7 +750,7 @@ object Typers {
     def accumulatePackages(z: (Context, Tree), current: (Id, Name)) = {
       val (ctx, parent)   = z
       val (id, name)      = current
-      delegate for Context = ctx
+      given as Context = ctx
       declareInParent(parent, id, name)
     }
 
@@ -774,7 +774,7 @@ object Typers {
       pair <- typePackaging(pid)
       (pkgCtx, pid1) = pair
       stats1 <- lift {
-        delegate for Context = pkgCtx
+        given as Context = pkgCtx
         stats.mapE(_.typed(any))
       }
     yield PackageDef(pid1, stats1)(pid1.tpe)
@@ -873,9 +873,9 @@ object Typers {
       bodyCtx  <- lookIn(sig.id)
       newStoup =  sig1.linearArg.foldEmptyName(stoup)(DependsOn(_))
       body1 <- lift {
-        delegate for Context = bodyCtx
-        delegate for Stoup   = newStoup
-        delegate for Closure = Closed
+        given as Context = bodyCtx
+        given as Stoup   = newStoup
+        given as Closure = Closed
         body.typed(ret)
       }
     yield {
@@ -921,7 +921,7 @@ object Typers {
       Err.declArgsInfixNotBinary(name)
     } else {
       lookIn(id).flatMap { bodyCtx =>
-        delegate for Context = bodyCtx
+        given as Context = bodyCtx
         for _ <- mapArgs(args, pts)
         yield DefSig(name, args)(id, pt)
       }
@@ -938,7 +938,7 @@ object Typers {
       Err.declArgsInfixLNotBinary(name)
     } else {
       lookIn(id).flatMap { bodyCtx =>
-        delegate for Context = bodyCtx
+        given as Context = bodyCtx
         for
           _ <- mapArgs(args, pts)
           _ <- mapLinearArg(linear, pts.last)

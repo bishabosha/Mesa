@@ -29,8 +29,8 @@ import error.CompilerErrors._
 
 import org.antlr.v4.runtime._
 
-import delegate TreeOps._
-import delegate NameOps._
+import given TreeOps._
+import given NameOps._
 
 private[parsing] val eecParser =
   genParser `andThen` { _.translationUnit }
