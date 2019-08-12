@@ -1,8 +1,8 @@
-# Mesa 0.3.2-RC1
+# Mesa 0.3.3-RC1
 
 ## Requirements
 * sbt 1.2.8
-* Dotty 0.16.0-RC3 <http://dotty.epfl.ch>
+* Dotty 0.17.0-RC1 <http://dotty.epfl.ch>
 
 ## Usage
 
