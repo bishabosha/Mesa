@@ -14,17 +14,15 @@ import Names._
 import Name._
 import error.CompilerErrors._
 import CompilerErrorOps._
-import util.{Show, Define, StackMachine, Utils}
-import Utils.{view, const}
+import util.{Show, Define, StackMachine, view, const}
 import StackMachine._
 import Program._
 
-import delegate NameOps._
+import given NameOps._
 
 object Types {
   import Type._
   import TypeOps._
-  import TypeVariableOps._
 
   enum Type derives Eql {
     case PackageInfo(parent: Type, name: Name)
@@ -80,31 +78,7 @@ object Types {
     )
   }
 
-  opaque type TypeVariableOps = Type
-
-  private object TypeVariableOps {
-    def apply(tpe: Type): TypeVariableOps = tpe
-
-    def (ops: TypeVariableOps) zipWith[O, That](t: Type)
-        (f: (Name, Type) => O)
-        given (bf: CanBuild[O, That]): That = {
-
-      val b = ops.zipFold(t)(bf()) { (acc, arg, app) =>
-        arg match {
-          case Variable(name) => acc += f(name, app)
-          case _              => acc
-        }
-      }
-
-      b.result
-    }
-
-    def (tpe: TypeVariableOps) mapVariables(f: Name => Type): Type = {
-      tpe.mapLeaves {
-        case Variable(name) => f(name)
-        case tpe1           => tpe1
-      }
-    }
+  object TypeOps {
 
     def unifyImpl(tpe: Type, sub: Name, by: Type): Type = {
       val replacement = {
@@ -116,9 +90,6 @@ object Types {
         case other => Variable(other)
       }
     }
-  }
-
-  object TypeOps {
 
     def (tpe: Type) mapTypeRefs(f: Name => Type): Type = {
       tpe.mapLeaves {
@@ -127,11 +98,16 @@ object Types {
       }
     }
 
-    delegate for Interpretable[Type] {
+    given as Interpretable[Type] {
       def (tpe: Type) interpret[O] (z: O)(f: (O, Type) => O): O = tpe.foldLeft(z)(f)
     }
 
-    type Stat = Statement[Type]
+    def (tpe: Type) mapVariables(f: Name => Type): Type = {
+      tpe.mapLeaves {
+        case Variable(name) => f(name)
+        case tpe1           => tpe1
+      }
+    }
 
     private[Types] def (tpe: Type) mapLeaves(f: Type => Type): Type = {
       tpe.compile[Type, Type] {
@@ -277,6 +253,20 @@ object Types {
       else inner(z, t1 :: Nil, t2 :: Nil)
     }
 
+    def (ops: Type) zipWith[O, That](t: Type)
+        (f: (Name, Type) => O)
+        given (bf: CanBuild[O, That]): That = {
+
+      val b = ops.zipFold(t)(bf()) { (acc, arg, app) =>
+        arg match {
+          case Variable(name) => acc += f(name, app)
+          case _              => acc
+        }
+      }
+
+      b.result
+    }
+
     def canUnify(arg: Type, app: Type) : Boolean = {
       def inner(z: Boolean, args: List[Type], apps: List[Type]): Boolean = args match {
         case Nil => z
@@ -388,7 +378,7 @@ object Types {
     }
 
     def (subFrom: Type) unifications(subWith: Type): List[(Name, Type)] =
-      TypeVariableOps(subFrom).zipWith(subWith)((_, _))
+      subFrom.zipWith(subWith)((_, _))
 
     def (tpe: Type) unifyFrom(subFrom: Type)(subWith: Type): Type = {
       subFrom.zipFold(subWith)(tpe) { (acc, arg, sub) =>
@@ -558,14 +548,15 @@ object Types {
       s"$quantification$body"
     }
 
-    delegate for Show[Type] {
+    given as Show[Type] {
 
       val variables: Stream[String] = {
         val alpha = ('a' to 'z').toStream.map(_.toString)
-        val numeric = for
-          n <- Stream.from(1)
-          x <- alpha
-        yield s"$x$n"
+        val numeric =
+          for
+            n <- Stream.from(1)
+            x <- alpha
+          yield s"$x$n"
         alpha #::: numeric
       }
 
@@ -615,14 +606,14 @@ object Types {
       }
     }
 
-    delegate for Define[Type] = displayString
+    given as Define[Type] = displayString
 
-    delegate for Conversion[List[Type], Type] = {
+    given as Conversion[List[Type], Type] = {
       case tpe :: Nil => tpe
       case types      => Product(types)
     }
 
-    delegate for Conversion[Type, List[Type]] = {
+    given as Conversion[Type, List[Type]] = {
       case Product(ls)  => ls
       case tpe          => tpe :: Nil
     }

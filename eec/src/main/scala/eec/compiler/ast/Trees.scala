@@ -14,12 +14,11 @@ import Modifiers._
 import types.Types._
 import untyped.nt
 import annotation._
-import util.{Show, Utils}
-import Utils.{eval, foldMap}
+import util.{ Show, eval, foldMap }
 
-import delegate Meta.TreeOps._
-import delegate Names.NameOps._
-import delegate TypeOps._
+import given Meta.TreeOps._
+import given Names.NameOps._
+import given TypeOps._
 
 object Trees {
   import Tree._
@@ -139,13 +138,13 @@ object Trees {
       case _                => Id.empty
     }
 
-    delegate for Show[Tree] = t => pprint.apply(
+    given as Show[Tree] = t => pprint.apply(
       x = (t: Meta.Tree),
       width = 80,
       height = Int.MaxValue
     ).render
 
-    delegate for Conversion[Tree, List[Tree]] = {
+    given as Conversion[Tree, List[Tree]] = {
       case EmptyTree          => Nil
       case TreeSeq(args)      => args
       case Parens(args)       => args
@@ -153,13 +152,13 @@ object Trees {
       case t                  => t :: Nil
     }
 
-    delegate for Conversion[List[Tree], Tree] = {
+    given as Conversion[List[Tree], Tree] = {
       case Nil      => EmptyTree
       case t :: Nil => t
       case ts       => TreeSeq(ts)
     }
 
-    delegate uniqName for Conversion[Tree, Name] = {
+    given uniqName as Conversion[Tree, Name] = {
       case DefSig(name, _)              => name
       case LinearSig(name, _, _)        => name
       case DefDef(_, sig, _, _)         => sig

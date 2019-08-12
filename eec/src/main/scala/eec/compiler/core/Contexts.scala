@@ -15,12 +15,11 @@ import types.Types
 import Types._
 import Type._
 import TypeOps._
-import util.{Show, Utils}
+import util.{Show, view}
 import core.{ContextErrors => Err}
-import Utils._
 
-import delegate NameOps._
-import delegate TypeOps._
+import given NameOps._
+import given TypeOps._
 
 object Contexts {
   import Mode._
@@ -35,7 +34,6 @@ object Contexts {
   type Modal[X]         = given Mode => X
   type Contextual[O]    = given Context => O
   type IdReader[O]      = given IdGen => O
-  opaque type Id        = Long
 
   enum Mode derives Eql {
     case Typing, Term, Pat, PatAlt, LinearPat
@@ -58,7 +56,7 @@ object Contexts {
   }
 
   object ModeOps {
-    delegate for Show[Mode] = {
+    given as Show[Mode] = {
       case LinearPat    => "linear pattern"
       case Pat | PatAlt => "pattern"
       case Term         => "term"
@@ -66,11 +64,22 @@ object Contexts {
     }
   }
 
+  object opaques {
+    opaque type Id = Long
+    inline val one: Id = 1l
+    inline val zero: Id = 0l
+    inline val noId: Id = -1l
+    def (x: Id) + (y: Id): Id = x + y
+  }
+
+  type Id = opaques.Id
+
   object Id {
-    private[Contexts] val rootId: Id = 0l
-    val empty: Id = -1l
-    val init: Id = 1l
-    def (x: Id) succ : Id = x + 1l
+    import opaques._
+    private[Contexts] val rootId: Id = zero
+    val init: Id = one
+    val empty: Id = noId
+    inline def (x: Id) succ : Id = x + one
   }
 
   final class IdGen {
@@ -141,9 +150,8 @@ object Contexts {
     }
 
     def removeFromCtx(id: Id) given Context: Unit = {
-      for (mapping <- symFor(id) if id != Id.empty) {
+      for mapping <- symFor(id) if id != Id.empty do
         ctx.termScope -= mapping
-      }
     }
 
     def rootCtx given Context = {
@@ -158,7 +166,7 @@ object Contexts {
     private def firstTermCtx(name: Name) given Context: Lifted[Context] = {
       @tailrec
       def inner(current: Context): Lifted[Context] = {
-        delegate for Context = current
+        given as Context = current
         if isLinearOrInScope(name) then
           ctx
         else ctx match {
@@ -173,7 +181,7 @@ object Contexts {
     private def firstTypeCtx(name: Name) given Context: Lifted[Context] = {
       @tailrec
       def inner(current: Context): Lifted[Context] = {
-        delegate for Context = current
+        given as Context = current
         if isData(name) then
           ctx
         else ctx match {
@@ -187,14 +195,14 @@ object Contexts {
 
     def lookupType(name: Name) given Context: Lifted[Type] = {
       firstTypeCtx(name).flatMap { ctx =>
-        delegate for Context = ctx
+        given as Context = ctx
         dataType(name)
       }
     }
 
     def lookupConstructors(data: Name) given Context: Lifted[List[(Name, Type)]] = {
       firstTypeCtx(data).flatMap { ctx =>
-        delegate for Context = ctx
+        given as Context = ctx
         constructorsFor(data)
       }
     }
@@ -212,7 +220,7 @@ object Contexts {
       for
         ctx1 <- firstTermCtx(name)
         o <- lift {
-          delegate for Context = ctx1
+          given as Context = ctx1
           onFound
         }
       yield o
@@ -227,7 +235,7 @@ object Contexts {
     def isDataDeep(name: Name) given Context: Boolean = {
       @tailrec
       def inner(current: Context): Boolean = {
-        delegate for Context = current
+        given as Context = current
         isData(name) || {
           ctx match {
             case ctx: Fresh => inner(ctx.outer)
@@ -398,13 +406,9 @@ object Contexts {
       } else if idGen.current != Id.init then {
         Err.noFreshIdGen
       } else {
-        delegate for Context = root
-        for ((name, tpe) <- bootstrapped.view) {
-          for _ <- enterData(name)
-          yield {
-            putDataType(name -> tpe)
-          }
-        }
+        given as Context = root
+        for (name, tpe) <- bootstrapped.view do
+          for _ <- enterData(name) do putDataType(name -> tpe)
       }
     }
 
@@ -415,7 +419,7 @@ object Contexts {
         case ctx: Fresh       => ctx.outer
       }
       val parentTpe = lift {
-        delegate for Context = parentCtx
+        given as Context = parentCtx
         termType(parent)
       }
       parentTpe.flatMap {

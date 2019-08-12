@@ -18,25 +18,25 @@ import Context._
 import Mode._
 import types.{NamerErrors => Err}
 
-import delegate NameOps._
-import delegate TreeOps._
+import given NameOps._
+import given TreeOps._
 
 object Namers {
 
   private val anon = EmptyName
 
   def (tree: Tree) indexed given Context: Lifted[Unit] = {
-    delegate for Mode = Mode.Term
+    given as Mode = Mode.Term
     index(tree)
   }
 
   private def indexAsPattern(tree: Tree) given Context: Lifted[Unit] = {
-    delegate for Mode = Mode.Pat
+    given as Mode = Mode.Pat
     index(tree)
   }
 
   private def indexAsLinearPattern(tree: Tree) given Context: Lifted[Unit] = {
-    delegate for Mode = Mode.LinearPat
+    given as Mode = Mode.LinearPat
     index(tree)
   }
 
@@ -62,7 +62,7 @@ object Namers {
       case DefSig(name, args)       => (name, args)
     }
     enterScope(sig.id, name).flatMap { ctx1 =>
-      delegate for Context = ctx1
+      given as Context = ctx1
       for
         _ <- args.foldLeftE(())((_, n) => enterVariable(n))
         _ <- sig.linearArg.foldEmptyName(())(enterLinear)
@@ -75,7 +75,7 @@ object Namers {
                                (id: Id)
                                given Context, Mode: Lifted[Unit] = {
     enterScope(id, anon).flatMap { ctx1 =>
-      delegate for Context = ctx1
+      given as Context = ctx1
       for
         _ <- args.foldLeftE(())((_, n) => enterVariable(n))
         _ <- index(body)
@@ -87,7 +87,7 @@ object Namers {
                                      (id: Id)
                                      given Context, Mode: Lifted[Unit] = {
     enterScope(id, anon).flatMap { ctx1 =>
-      delegate for Context = ctx1
+      given as Context = ctx1
       for
         _ <- enterLinear(arg)
         _ <- index(body)
@@ -99,11 +99,11 @@ object Namers {
                              given Context, Mode: Lifted[Unit] = {
     val cPkgCtx = pid.toNamePairs.foldLeftE(ctx) { (pkgCtx, pair) =>
       val (id, pkgName)   = pair
-      delegate for Context = pkgCtx
+      given as Context = pkgCtx
       enterScope(id, pkgName)
     }
     cPkgCtx.flatMap { pkgCtx =>
-      delegate for Context = pkgCtx
+      given as Context = pkgCtx
       stats.foldLeftE(())((_, stat) => index(stat))
     }
   }
@@ -130,7 +130,7 @@ object Namers {
     for
       _ <- index(value)
       _ <- enterScope(id, anon).flatMap { ctx1 =>
-        delegate for Context = ctx1
+        given as Context = ctx1
         for
           _ <- indexAsPattern(patt)
           _ <- index(continuation)
@@ -145,7 +145,7 @@ object Namers {
     for
       _ <- index(s)
       _ <- enterScope(id, anon).flatMap { ctx1 =>
-        delegate for Context = ctx1
+        given as Context = ctx1
         for
           _ <- indexAsPattern(x)
           _ <- indexAsLinearPattern(z)
@@ -163,7 +163,7 @@ object Namers {
         tree match {
           case tree: (CaseClause | LinearCaseClause) =>
             enterScope(tree.id, anon).flatMap { ctx1 =>
-              delegate for Context = ctx1
+              given as Context = ctx1
               index(tree)
             }
 
@@ -192,7 +192,7 @@ object Namers {
 
   private def namedAlternative(alts: List[Tree])
                               given Context, Mode: Lifted[Unit] = {
-    delegate for Mode = Mode.PatAlt
+    given as Mode = Mode.PatAlt
     alts.foldLeftE(())((_, t) => index(t))
   }
 

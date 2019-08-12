@@ -18,7 +18,7 @@ object StackMachine {
     def stackInit[T]: Program[T] = Nil
     def stack[T] given Stack[T]: List[T] = the[List[T]]
 
-    delegate {
+    given {
 
       def (t: Statement[T]) +: [T](p: Program[T]): Program[T] = t :: p
 

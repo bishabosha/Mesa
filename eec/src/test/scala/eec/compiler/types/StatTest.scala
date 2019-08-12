@@ -1,20 +1,20 @@
 package eec.compiler.types
 
-import BootstrapTests._
 import StatBootstraps._
+import org.junit.{ Test => test }
 
 class StatTest {
 
-  @Test def typecheckTrivial() = typecheck(
+  @test def typecheckTrivial() = typecheck(
     "()" -|: "unit: () = ()"
   )
 
-  @Test def typecheckWildcard() = typecheck(
+  @test def typecheckWildcard() = typecheck(
     "forall a b. a -> b -> a" -|:
     """ const x _: A -> B -> A = x """
   )
 
-  @Test def typecheckLinearSig() = typecheck(
+  @test def typecheckLinearSig() = typecheck(
     "forall a b# c#. a -> b# ->. c# +: b#" -|:
     """ InRproxy _ [r] : A -> (R# ->. L# +: R#) = InR[r] """,
 
@@ -28,29 +28,29 @@ class StatTest {
     """ linearFail _ [_] : () -> (() ->. ()) = () """,
   )
 
-  @Test def failLinearSum() = noType(
+  @test def failLinearSum() = noType(
     """ evaluation [a]: A# ->. () |: () =
           Left () """ // error - `a` is not allowed to be in scope
   )
 
-  @Test def failLinearBang() = noType(
+  @test def failLinearBang() = noType(
     """ evaluation [a]: A# ->. !() =
           !() """ // error - `a` is not allowed to be in scope
   )
 
-  @Test def failLinearConstant() = noType(
+  @test def failLinearConstant() = noType(
     """ evaluation [a]: A# ->. () =
           0 """, // error - `a` is not allowed to be in scope
     """ evaluation [_]: A# ->. () =
           0 """ // error - `_` is not allowed to be in scope
   )
 
-  @Test def failRecursion() = noType(
+  @test def failRecursion() = noType(
     """ fix f: (t -> !t) -> !t =
           let !x = f x in !x """  // error: x in f x is undefined
   )
 
-  @Test def typecheckCompUnification() = typecheck(
+  @test def typecheckCompUnification() = typecheck(
     "forall a#. a# -> ()" -|:
     """ eval c : a# -> () = () """,
 
@@ -61,13 +61,13 @@ class StatTest {
     "()" -|: """ baz: () = eval \(c: z#) => c """
   )
 
-  @Test def failNonCompUnification() = someNoType(
+  @test def failNonCompUnification() = someNoType(
     "eval c: a# -> () = ()", // ok
 
     "foo: () = eval 0" // error: Integer is not a computation type
   )
 
-  @Test def fixWithConst() = typecheck(
+  @test def fixWithConst() = typecheck(
     "forall a b. a -> b -> a" -|:
     """ const a b : A -> B -> A = a """,
 
@@ -75,7 +75,7 @@ class StatTest {
     """ res0: !Integer = fix (const 0) """
   )
 
-  @Test def projectTuplesLinear() = typecheck(
+  @test def projectTuplesLinear() = typecheck(
     "forall a# b#. (a#, b#) ->. a#" -|:
     """ fst1[pair] : (A#, B#) ->. A# =
           case pair of (a, _) =>. a """,
@@ -92,7 +92,7 @@ class StatTest {
   /** cantDuplicate is bad because sequentialEval can not have an arg that
    *  depends on a linear variable
    */
-  @Test def noDuplicateState2() = someNoType(
+  @test def noDuplicateState2() = someNoType(
     """ duplicateState [e]: A# ->. (A#, A#) =
           (e, e) """, // ok
 
@@ -107,7 +107,7 @@ class StatTest {
           sequentialEval (duplicateState e) """, // error: dependency on e
   )
 
-  @Test def typecheckSum() = typecheck(
+  @test def typecheckSum() = typecheck(
     "forall a. () |: a" -|:
     "l: () |: q = Left ()",
 
@@ -121,7 +121,7 @@ class StatTest {
     "v: (y |: ()) |: z = Left (Right ())"
   )
 
-  @Test def typecheckLiftBind() = typecheck(
+  @test def typecheckLiftBind() = typecheck(
     "forall a b#. (a -> b#) -> !a -> b#" -|:
     """ lift f x: (a -> b#) -> !a -> b# =
           let !y = x in f y """,
@@ -131,7 +131,7 @@ class StatTest {
           lift f ma """,
   )
 
-  @Test def linearNonDuplication() = typecheck(
+  @test def linearNonDuplication() = typecheck(
     "forall a#. a# ->. ()" -|:
     """ safeDuplication [a] : A# ->. () =
           case (a, a) of
@@ -139,13 +139,13 @@ class StatTest {
             (_, r) =>. () """
   )
 
-  @Test def typecheckLinearLambdaEval() = typecheck(
+  @test def typecheckLinearLambdaEval() = typecheck(
     "forall a#. Void# ->. a#" -|:
     """ absurdProxy: Void# ->. A# =
           \(v: Void#) =>. absurd[v] """,
   )
 
-  @Test def typecheckLambdaApply() = typecheck(
+  @test def typecheckLambdaApply() = typecheck(
     "forall a. () -> a" -|:
     """ primitive f a : () -> A """,
 
@@ -154,30 +154,30 @@ class StatTest {
           \(u: ()) => f u """
   )
 
-  @Test def failMatchVariable() =  noType(
+  @test def failMatchVariable() =  noType(
     "f e: a -> !a = case e of Left x => !x",  // error: Sum l r is not a
     "g e: a -> !a = case e of (x, _) => !x",  // error: Tuple is not a
     "h e: a -> !a = case e of (_, _) => !e",  // error: Tuple is not a
     "i e: a -> !a = case e of ()     => !e"   // error: Tuple is not a
   )
 
-  @Test def typecheckChoice() = typecheck(
+  @test def typecheckChoice() = typecheck(
     "Choice" -|: """ data Choice = Yes | No """
   )
 
-  @Test def typecheckProduct1() = typecheck(
+  @test def typecheckProduct1() = typecheck(
     "forall a. Product1 a" -|: """ data Product1 A = Product1 A """
   )
 
-  @Test def typecheckNewUnit() = typecheck(
+  @test def typecheckNewUnit() = typecheck(
     "Unit" -|: """ data Unit = Unit """ // error: first ctor must have an argument
   )
 
-  @Test def failNewVoid() = noParse(
+  @test def failNewVoid() = noParse(
     """ data Empty """      // error: cant define empty types
   )
 
-  @Test def typecheckMaybe() = typecheck(
+  @test def typecheckMaybe() = typecheck(
     "forall a. Maybe a" -|:
     """ data Maybe a = Just a | Nothing """,
 
@@ -188,7 +188,7 @@ class StatTest {
             Nothing => Right (); """
   )
 
-  @Test def typecheckMaybeC() = typecheck(
+  @test def typecheckMaybeC() = typecheck(
     "forall a#. MaybeC a#" -|:
     """ data MaybeC a# = JustC[a#] | NothingC """,
 
@@ -199,7 +199,7 @@ class StatTest {
             NothingC =>. InR[()]; """
   )
 
-  @Test def typecheckMatchBoolean() = typecheck(
+  @test def typecheckMatchBoolean() = typecheck(
     "Boolean -> ()" -|:
     """ match_bool b: Boolean -> () =
           case b of
@@ -226,7 +226,7 @@ class StatTest {
             (True, False) | (False, True) | (True, True) | (False, False) => () """,
   )
 
-  @Test def typecheckMatchSumArbitraryDepth() = typecheck(
+  @test def typecheckMatchSumArbitraryDepth() = typecheck(
     "forall a b c d e. (a |: b) |: c |: d -> (a -> !e) -> (b -> !e) -> (c -> !e) -> (d -> !e) -> !e" -|:
     """ cat4_alt0 e wu xu yu zu: (w |: x) |: y |: z -> (w -> !u) -> (x -> !u) -> (y -> !u) -> (z -> !u) -> !u =
           case e of
@@ -252,7 +252,7 @@ class StatTest {
             Right (Right (Right d)) => zu d """
   )
 
-  @Test def typecheckLinearMatchSumArbitraryDepth() = typecheck(
+  @test def typecheckLinearMatchSumArbitraryDepth() = typecheck(
     "forall a# b c# d# e#. (a# ->. !b) -> (c# ->. !b) -> (d# ->. !b) -> (e# ->. !b) -> (a# +: c#) +: d# +: e# ->. !b" -|:
     """ cat4_alt0 wu xu yu zu [e] : (w# ->. !u) -> (x# ->. !u) -> (y# ->. !u) -> (z# ->. !u) -> ((w# +: x#) +: y# +: z# ->. !u) =
           case e of

@@ -1,7 +1,6 @@
 package eec
 package repl
 
-
 object Commands {
   import Command._
 

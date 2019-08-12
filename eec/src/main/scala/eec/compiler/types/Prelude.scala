@@ -2,7 +2,7 @@ package eec.compiler.types
 
 import eec.compiler.core.Contexts.{Context, IdGen}
 import eec.compiler.error.CompilerErrors.{CompilerErrorOps,Lifted}
-import eec.compiler.parsing.EntryPoint.parseDef
+import eec.compiler.parsing.parseDef
 import Namers.indexed
 import Typers.typed
 import CompilerErrorOps._

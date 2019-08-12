@@ -29,7 +29,7 @@ object CompilerErrors {
 
   object CompilerErrorOps {
 
-    delegate for Show[CompilerError] = {
+    given as Show[CompilerError] = {
       case e @ NameCollision(msg)     => s"${e.productPrefix}: $msg"
       case e @ LinearScope(msg)       => s"${e.productPrefix}: $msg"
       case e @ UnknownIdentifier(msg) => s"${e.productPrefix}: $msg"
@@ -65,6 +65,11 @@ object CompilerErrors {
     }
 
     def (o: Lifted[O]) map [O, U] (f: O => U): Lifted[U] = o match {
+      case err: CompilerError => err
+      case _                  => f(unlift(o))
+    }
+
+    def (o: Lifted[O]) foreach [O, U] (f: O => Unit): Lifted[Unit] = o match {
       case err: CompilerError => err
       case _                  => f(unlift(o))
     }
