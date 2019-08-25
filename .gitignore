@@ -1,7 +1,7 @@
 dumps
 
-eec/cp
-eec/gnotes
+mesa/cp
+mesa/gnotes
 
 *.log
 *.bc
@@ -10,7 +10,7 @@ eec/gnotes
 *.tokens
 *.interp
 src_managed
-eec_*
+mesa_*
 *.sc
 
 *.DS_Store
@@ -36,6 +36,8 @@ project/local-plugins.sbt
 local.sbt
 
 .vscode/
+.metals/
+.bloop/
 
 # Dotty IDE
 .dotty-ide-dev-port
