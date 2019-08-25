@@ -13,11 +13,12 @@ object Commands {
     case TypeFile(path: String)
     case SetPrompt(prompt: String)
     case Unknown(input: String)
-    case Reset, Quit, ShowHelp, Ctx
+    case ChangeDirectory(path: String)
+    case Reset, Quit, ShowHelp, Pwd, Ctx
   }
 
   val helpText: String =
-    """The REPL has several commands available:
+   """|The REPL has several commands available:
       |
       | :help           => Show this help
       | :ast    <expr>  => Print the AST for the given expression
@@ -29,6 +30,8 @@ object Commands {
       | :prompt <word>  => Change the REPL prompt
       | :reset          => Reset the context of the REPL session
       | :ctx            => Show the current Context
+      | :cd     <file>  => Change the working directory
+      | :pwd            => Print the working directory
       | :q              => Quit the REPL""".stripMargin
 
   def parseCommand(line: String): Command = {
@@ -37,17 +40,19 @@ object Commands {
     def (s: String) trimOrEmpty: String = Option(s).fold("")(_.trim)
 
     object Parsers {
-      val resetCommand  = """:reset(?:\s*)""".r
-      val quitCommand   = """:q(?:\s*)""".r
+      val resetCommand  = """:reset""".r
+      val quitCommand   = """:q""".r
       val astExpr       = """:ast(?:\s+?(.*))?""".r
       val astTop        = """:astt(?:\s+?(.*))?""".r
       val typeExpr      = """:t(?:\s+?(.*))?""".r
       val define        = """:def(?:\s+?(.*))?""".r
       val astFile       = """:astf(?:\s+((?:\S(?:\s*)?)*))?""".r
       val typeFile      = """:tf(?:\s+((?:\S(?:\s*)?)*))?""".r
+      val changeDir     = """:cd(?:\s+((?:\S(?:\s*)?)*))?""".r
       val setPrompt     = """:prompt(?:\s*?(\S*))?""".r
-      val ctx           = """:ctx(?:\s*)""".r
-      val showHelp      = """:help(?:\s*)""".r
+      val ctx           = """:ctx""".r
+      val pwd           = """:pwd""".r
+      val showHelp      = """:help""".r
     }
 
     line.trim match {
@@ -60,6 +65,8 @@ object Commands {
       case typeFile(file)       => TypeFile(file.trimOrEmpty)
       case setPrompt(newPrompt) => SetPrompt(newPrompt.trimOrEmpty)
       case ctx()                => Ctx
+      case pwd()                => Pwd
+      case changeDir(dir)       => ChangeDirectory(dir.trimOrEmpty)
       case showHelp()           => ShowHelp
       case resetCommand()       => Reset
       case unknown              => Unknown(unknown)

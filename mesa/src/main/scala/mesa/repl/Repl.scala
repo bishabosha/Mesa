@@ -25,6 +25,10 @@ import Namers.indexed
 import Typers.typed
 import Types.{Type, TypeOps}
 import Type._
+import java.nio.file.{Paths => JPaths}
+import java.nio.file.{Files => JFiles}
+import java.io.{File => JFile}
+import java.util.stream.Collectors
 
 import given CompilerErrorOps._
 import given TreeOps._
@@ -77,7 +81,7 @@ def loop(enterPrelude: Boolean): Unit = {
   newContext(enterPrelude).fold
     { err => println(s"${err.show}. Quitting...".wrapErr) }
     { (idGen, ctx) =>
-      val pwd = System.getProperty("user.dir")
+      val pwd = JPaths.get("").toAbsolutePath.toString
       val initial = LoopState(defaultPrompt, false, pwd, enterPrelude, idGen, ctx)
       print(defaultPrompt.asPrompt)
       val state = command(initial, readLine)
@@ -193,6 +197,20 @@ private def command(state: LoopState, input: String): LoopState = {
       pprintln(ctx: Seq[Meta.Context])
       state
 
+    case Pwd =>
+      println(state.pwd)
+      state
+
+    case ChangeDirectory(dir) =>
+      changeDirectory(state.pwd, dir).fold
+        { err =>
+          println(err.show.wrapErr)
+          state
+        }
+        { pwd => println(s"Changed directory to $pwd")
+          state.copy(pwd = pwd)
+        }
+
     case Quit =>
       println("Quitting...")
       state.copy(break = true)
@@ -202,25 +220,44 @@ private def command(state: LoopState, input: String): LoopState = {
       state
 
     case Unknown(input) =>
-      guarded(state, input) {
+      if input.isEmpty then {
+        state
+      } else {
         println(s"unrecognised command: `$input`. Try `:help`.".wrapErr)
         state
       }
   }
 }
 
-private def loadFile(pwd: String, name: String): Lifted[String] = {
-  var file: scala.io.BufferedSource = null
-  try {
-    file = scala.io.Source.fromFile(s"$pwd/$name")
-    file.getLines.mkString("\n")
-  } catch {
-    case e: Exception if NonFatal(e) =>
-      CompilerError.IllegalInput(e.getMessage)
-  } finally {
-    if file `ne` null then {
-      file.close()
-    }
+private val relative = s"(?!${JFile.separator}).*".r
+
+private def changeDirectory(pwd: String, path: String): Lifted[String] = liftedIO {
+  path match {
+    case ""                                                      => JPaths.get("").toAbsolutePath.toString
+    case relative() if JFiles.isDirectory(JPaths.get(pwd, path)) => JPaths.get(pwd, path).normalize.toString
+    case _          if JFiles.isDirectory(JPaths.get(path))      => JPaths.get(path).normalize.toString
+
+    case _ => CompilerError.IllegalInput(s"Not a directory: $path")
+  }
+}
+
+private def loadFile(pwd: String, path: String): Lifted[String] = liftedIO {
+  path match {
+    case relative() if JFiles.isReadable(JPaths.get(pwd, path)) =>
+      JFiles.lines(JPaths.get(pwd, path)).collect(Collectors.joining("\n"))
+
+    case _ if JFiles.isReadable(JPaths.get(path)) =>
+      JFiles.lines(JPaths.get(path)).collect(Collectors.joining("\n"))
+
+    case _ => CompilerError.IllegalInput(s"Not a file: $path")
+  }
+}
+
+private inline def liftedIO[T](op: => Lifted[T]): Lifted[T] = {
+  try op
+  catch {
+    case e: java.io.IOException => CompilerError.IllegalInput(e.getMessage)
+    case NonFatal(e)            => CompilerError.Internal(e.getMessage)
   }
 }
 

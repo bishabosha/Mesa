@@ -42,6 +42,8 @@ This repository is for implementing a programming language based on the enriched
 * `:ast` to print the AST of an expression.
 * `:astt` to print the AST of a top level definition.
 * `:astf` to print the AST of a source file in the current directory.
+* `:cd` to change the working directory
+* `:pwd` to print the working directory
 * `:q` to quit the REPL.
 
 ## References
