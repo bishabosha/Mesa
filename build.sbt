@@ -25,6 +25,23 @@ lazy val mesa = project
 
     commonSettings,
   )
+  .dependsOn(util)
+
+lazy val `eec-core` = project
+  .settings(
+    name := "mesa-eec",
+    version := Common.mesaVersion,
+    libraryDependencies += ("org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.2").withDottyCompat(scalaVersion.value),
+    commonSettings,
+  )
+  .dependsOn(util)
+
+lazy val util = project
+  .settings(
+    name := "mesa-util",
+    version := Common.mesaVersion,
+    commonSettings,
+  )
 
 lazy val loadMesa = { s: State =>
   "project mesa" :: s
