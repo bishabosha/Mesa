@@ -1,10 +1,12 @@
-val dottyVersion = "0.17.0-RC1"
+val dottyVersion = "0.18.1-RC1"
 // val dottyVersion = dottyLatestNightlyBuild.get
 
 lazy val commonSettings = Seq(
   scalaVersion := dottyVersion,
 
-  libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test"
+  libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
+
+  scalacOptions += "-noindent"
 )
 
 lazy val mesa = project
@@ -14,9 +16,8 @@ lazy val mesa = project
 
     compileOrder := CompileOrder.JavaThenScala,
 
-    libraryDependencies += ("com.lihaoyi" %% "pprint" % "0.5.3").withDottyCompat(scalaVersion.value),
-
-    libraryDependencies += "org.scala-lang" % "scala-reflect" % "2.12.8",
+    libraryDependencies += ("com.lihaoyi" %% "pprint" % "0.5.5").withDottyCompat(scalaVersion.value),
+    libraryDependencies += "org.scala-lang" % "scala-reflect" % "2.13.0",
 
     libraryDependencies ++= Seq(
       "org.antlr" % "antlr4-runtime" % "4.7.2",

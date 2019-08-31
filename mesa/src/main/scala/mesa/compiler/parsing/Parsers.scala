@@ -333,7 +333,7 @@ private def fromExprSeqAsApply(exprs: java.util.List[ExprContext])
   import CompilerErrorOps._
   for
     exprs <- exprs.asScala.mapE(fromExpr)
-    Seq(expr, arg) = exprs
+    collection.Seq(expr, arg) = exprs
   yield Apply(expr, arg)(nt)
 }
 
@@ -933,7 +933,7 @@ private def fromStat(context: StatContext) given IdGen: Lifted[Tree] = {
 
 private val mesaErrorListener: BaseErrorListener = new {
   override def syntaxError(
-      recognizer: Recognizer[_,_],
+      recognizer: Recognizer[?,?],
       offendingSymbol: AnyRef,
       line: Int,
       charPositionInLine: Int,

@@ -1,8 +1,8 @@
 package mesa.eec
 
 import mesa.util.StackMachine.{InterpretableK, Program, stack, Statement, Stack}
-import mesa.util.Show
 import Program.compile
+import mesa.util.Show
 
 import annotation.tailrec
 
@@ -18,18 +18,22 @@ object Trees {
     case Eval[T, U](f: Tree[T => U], t: Tree[T])                                            extends Tree[U]
     case Lam[T,U](x: Name, t: Tree[U])                                                      extends Tree[T => U]
     case Lin[T,U](x: Name, t: Tree[U])                                                      extends Tree[T => U]
-    case Lit[T](x: () => T)                                                                 extends Tree[T]
     case CaseExpr[L, R, U](e: Tree[Either[L, R]], x: Name, l: Tree[U], y: Name, r: Tree[U]) extends Tree[U]
-    case Fst[A,B]                                                                           extends Tree[((A, B)) => A]
-    case Snd[A,B]                                                                           extends Tree[((A, B)) => B]
-    case Inl[A,B]                                                                           extends Tree[A => Either[A, B]]
-    case Inr[A,B]                                                                           extends Tree[B => Either[A,B]]
+    case Fst[A,B]()                                                                         extends Tree[((A, B)) => A]
+    case Snd[A,B]()                                                                         extends Tree[((A, B)) => B]
+    case Inl[A,B]()                                                                         extends Tree[A => Either[A,B]]
+    case Inr[A,B]()                                                                         extends Tree[B => Either[A,B]]
     case Bang[T](t: Tree[T])                                                                extends Tree[T]
-    case WhyNot[T](e: Tree[Nothing])                                                        extends Tree[Nothing => T]
+    case WhyNot[T](e: Tree[Nothing])                                                        extends Tree[T]
     case Tensor[A,B](t: Tree[A], z: Tree[B])                                                extends Tree[(A,B)]
     case Let[T,U](n: Name, t: Tree[T], u: Tree[U])                                          extends Tree[U]
     case LetT[A,B,U](x: Name, z: Name, s: Tree[(A,B)], t: Tree[U])                          extends Tree[U]
+
+    /* These trees are for purposes of embedding Scala values in a tree */
+    case Value[T](x: () => T)                                                               extends Tree[T]
+    case Splice[T](index: Int)                                                              extends Tree[T]
   }
+
 
   object Tree {
 
@@ -62,12 +66,12 @@ object Trees {
     import Tree._
 
     def wrapIfComplex[U](t: Tree[U], s: String) = t match {
-      case Point | _:Var[_] | _:Lit[_] | _:Pair[_,_] => s
+      case Point | _:Var[?] | _:Value[?] | _:Pair[?,?] => s
       case _                                         => s"($s)"
     }
 
     def wrapIfExpr1[U](t: Tree[U], s: String) = t match {
-      case _:Lam[_,_] | _:Lin[_,_] | _:Let[_,_] | _:LetT[_,_,_] | _:CaseExpr[_,_,_] => s"($s)"
+      case _:Lam[?,?] | _:Lin[?,?] | _:Let[?,?] | _:LetT[?,?,?] | _:CaseExpr[?,?,?] => s"($s)"
       case _                                                                        => s
     }
 
@@ -90,7 +94,8 @@ object Trees {
 
       case Eval(f,t) =>
         val f1::t1::s1 = stack
-        s"$f1[$t1]"::s1
+        val f2 = wrapIfExpr1(f, f1)
+        s"$f2[$t1]"::s1
 
       case Lam(x,t) =>
         val t1::s1 = stack
@@ -122,13 +127,14 @@ object Trees {
         val t2 = wrapIfComplex(t,t1)
         s"?$t2"::s1
 
-      case Point  => "*" :: stack
-      case Fst()    => "fst" :: stack
-      case Snd()    => "snd" :: stack
-      case Inl()    => "inl" :: stack
-      case Inr()    => "inr" :: stack
-      case Lit(x) => x.toString :: stack
-      case Var(x) => x :: stack
+      case Point     => "*" :: stack
+      case Fst()     => "fst" :: stack
+      case Snd()     => "snd" :: stack
+      case Inl()     => "inl" :: stack
+      case Inr()     => "inr" :: stack
+      case Value(x)  => s"{| ${x().toString} |}" :: stack
+      case Splice(n) => s"<splice:$n>" :: stack
+      case Var(x)    => x :: stack
     }
   }
 }

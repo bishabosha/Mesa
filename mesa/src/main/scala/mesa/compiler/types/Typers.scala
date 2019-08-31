@@ -379,7 +379,7 @@ object Typers {
                          given Context, Mode, Stoup, Closure: Lifted[Tree] = {
     ts.foldMap(unit) { ts =>
       for ts1 <- typeAsTuple(ts, pt)
-      yield Parens(ts1)(ts1.map[Type, List[Type]](_.tpe))
+      yield Parens(ts1)(ts1.map[Type](_.tpe))
     }
   }
 
@@ -463,7 +463,7 @@ object Typers {
         given as Stoup = Blank
         args.mapE(_.typed(any))
       }
-      argsProto <- args1.map[Type, List[Type]](_.tpe): Type
+      argsProto <- args1.map[Type](_.tpe): Type
       tpe       <- checkFunWithProto(fun1, argsProto)(pt)
     yield Apply(fun1, args1)(tpe)
   }

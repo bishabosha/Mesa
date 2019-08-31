@@ -1,20 +1,19 @@
-package mesa
-package compiler
-package types
+package mesa.compiler.types
 
 import scala.language.implicitConversions
 
-import scala.collection.generic.CanBuild
+import scala.collection.Factory
+import scala.collection.BuildFrom
 import scala.annotation.tailrec
 
-import ast.Trees._
+import mesa.compiler.ast.Trees._
 import Tree._
-import core.Names
+import mesa.compiler.core.Names
 import Names._
 import Name._
-import error.CompilerErrors._
+import mesa.compiler.error.CompilerErrors._
 import CompilerErrorOps._
-import util.{Show, Define, StackMachine, view, const}
+import mesa.util.{Show, Define, StackMachine, view, const}
 import StackMachine._
 import Program._
 
@@ -253,11 +252,10 @@ object Types {
       else inner(z, t1 :: Nil, t2 :: Nil)
     }
 
-    def (ops: Type) zipWith[O, That](t: Type)
-        (f: (Name, Type) => O)
-        given (bf: CanBuild[O, That]): That = {
+    def (ops: Type) zipWith[O, Col](t: Type)
+        (f: (Name, Type) => O) given (factory: Factory[O, Col]): Col = {
 
-      val b = ops.zipFold(t)(bf()) { (acc, arg, app) =>
+      val b = ops.zipFold(t)(factory.newBuilder) { (acc, arg, app) =>
         arg match {
           case Variable(name) => acc += f(name, app)
           case _              => acc
@@ -550,14 +548,14 @@ object Types {
 
     given as Show[Type] {
 
-      val variables: Stream[String] = {
-        val alpha = ('a' to 'z').toStream.map(_.toString)
+      val variables = {
+        val alpha = LazyList('a' to 'z': _*)
         val numeric =
           for
-            n <- Stream.from(1)
+            n <- LazyList.from(1)
             x <- alpha
           yield s"$x$n"
-        alpha #::: numeric
+        alpha.map(_.toString) #::: numeric
       }
 
       def (xs: Seq[String]) filterVariables(ys: Seq[String]) =

@@ -11,7 +11,7 @@ object StackMachine {
     def (i: I) interpret[O] (z: O)(f: (O, I) => O): O
   }
 
-  trait InterpretableK[F[_]] {
+  trait InterpretableK[F[?]] {
     def (i: F[T]) interpretK[T, O](z: O)(f: [t] => (O, F[t]) => O): O
   }
 
@@ -40,7 +40,7 @@ object StackMachine {
         (compiler: I => Statement[O]): O =
       input.interpret(stackInit[O])((p, i) => compiler(i) +: p).unsafeInterpret
 
-    def (input: F[T]) compile[F[_]: InterpretableK, T, O]
+    def (input: F[T]) compile[F[?]: InterpretableK, T, O]
         (compiler: F[Any] => Statement[O]): O = {
       input.interpretK(stackInit[O])(([t] => (p: Program[O], i: F[t]) => compiler(i.asInstanceOf[F[Any]]) +: p).asInstanceOf).unsafeInterpret
     }

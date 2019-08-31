@@ -67,7 +67,7 @@ object TyperErrors {
     CompilerError.UnexpectedType(
       s"Tried to use sum constructor `${name.define}` of type `${fTpe.show}` as a linear coproduct constructor.")
 
-  def tupleNoMatch(pt: Type, ptAsTuple: List[_]) = {
+  def tupleNoMatch(pt: Type, ptAsTuple: List[?]) = {
     if ptAsTuple.length == 1 then
       typeNotTuple(pt)
     else

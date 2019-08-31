@@ -3,7 +3,7 @@ package compiler
 package error
 
 import scala.annotation.tailrec
-import scala.collection.generic.CanBuildFrom
+import scala.collection.Factory
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
@@ -90,11 +90,11 @@ object CompilerErrors {
       }
     }
 
-    def (c: CC[A]) mapE [CC[A] <: Iterable[A], A, O, That]
+    def (c: CC[A]) mapE [CC[A] <: Iterable[A], A, O]
         (f: A => Lifted[O])
-        given (bf: CanBuildFrom[CC[A], O, That]): Lifted[That] = {
+        given (factory: Factory[O, CC[O]]): Lifted[CC[O]] = {
       @tailrec
-      def inner(acc: mutable.Builder[O, That], it: Iterator[A]): Lifted[That] = {
+      def inner(acc: mutable.Builder[O, CC[O]], it: Iterator[A]): Lifted[CC[O]] = {
         if it.hasNext then f(it.next) match {
           case err: CompilerError => err
           case o                  => inner(acc += unlift(o), it)
@@ -103,7 +103,7 @@ object CompilerErrors {
         }
       }
 
-      inner(bf(c), c.iterator)
+      inner(factory.newBuilder, c.iterator)
     }
 
     def (l: Iterable[A]) foldLeftE[A, O]
