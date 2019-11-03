@@ -1,7 +1,7 @@
 # Mesa
 
 ## Current Release
-0.3.4-SNAPSHOT
+0.3.5-SNAPSHOT
 
 ## About
 This repository is for implementing a programming language based on the enriched effect calculus by Egger, Ejlers and Simpson (2014).
@@ -17,11 +17,11 @@ This repository is for implementing a programming language based on the enriched
   - Print the current environment of terms and types.
 
 * Linear types that enforce the *linear usage of effects*.
-  - Proof of isomorphisms in Proposition 4.1. of Egger, Ejlers and Simpson (2014) can be found in [eec/Isomorphisms.hs](eec/Isomorphisms.hs).
+  - Proof of isomorphisms in Proposition 4.1. of Egger, Ejlers and Simpson (2014) can be found in [mesa/Isomorphisms.hs](mesa/Isomorphisms.hs).
 
 * Haskell-like syntax
   - Source files use `.hs` suffix at present to benefit from syntax highlighting.
-  - Refer to [eec/src/main/antlr4/EEC.g4](eec/src/main/antlr4/EEC.g4) for a context free grammar.
+  - Refer to [mesa/src/main/antlr4/Mesa.g4](mesa/src/main/antlr4/Mesa.g4) for a context free grammar.
 
 ## Author
 * James Thompson, BSc. University of Bath.

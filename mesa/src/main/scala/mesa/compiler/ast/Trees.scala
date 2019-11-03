@@ -16,9 +16,9 @@ import untyped.nt
 import annotation._
 import util.{ Show, eval, foldMap }
 
-import given Meta.TreeOps._
-import given Names.NameOps._
-import given TypeOps._
+import Meta.TreeOps.given
+import Names.NameOps.given
+import TypeOps.given
 
 object Trees {
   import Tree._
@@ -74,7 +74,7 @@ object Trees {
         case patt::patts => patt match {
 
           case Unapply(name, args) =>
-            val statement = { stack: StackT =>
+            val statement = { (stack: StackT) =>
               val (args1, rest) = stack.splitAt(args.length)
               val args2 = args1.view.zip(args).map { (str, arg) =>
                 arg match {
@@ -88,7 +88,7 @@ object Trees {
             inner(statement::program, args:::patts)
 
           case Parens(args) =>
-            val statement = { stack: StackT =>
+            val statement = { (stack: StackT) =>
               val (args1, rest) = stack.splitAt(args.length)
               val argsStr = args1.mkString("(", ", ", ")")
               argsStr::rest
@@ -102,7 +102,7 @@ object Trees {
             inner((str::_)::program, patts)
 
           case Alternative(patts1) =>
-            val statement = { stack: StackT =>
+            val statement = { (stack: StackT) =>
               val (args1, stack1) = stack.splitAt(patts1.length)
               val argsStr = args1.mkString(" | ")
               argsStr::stack1
@@ -110,7 +110,7 @@ object Trees {
             inner(statement::program, patts1:::patts)
 
           case Bind(x,patt) =>
-            val statement = { stack: StackT =>
+            val statement = { (stack: StackT) =>
               val patt1::stack1 = stack
               val pattStr = patt match {
                 case (_:(Ident | Parens | Literal) | Unapply(_,Nil)) => patt1
@@ -138,13 +138,13 @@ object Trees {
       case _                => Id.empty
     }
 
-    given as Show[Tree] = t => pprint.apply(
+    given Show[Tree] = t => pprint.apply(
       x = (t: Meta.Tree),
       width = 80,
       height = Int.MaxValue
     ).render
 
-    given as Conversion[Tree, List[Tree]] = {
+    given Conversion[Tree, List[Tree]] = {
       case EmptyTree          => Nil
       case TreeSeq(args)      => args
       case Parens(args)       => args
@@ -152,13 +152,13 @@ object Trees {
       case t                  => t :: Nil
     }
 
-    given as Conversion[List[Tree], Tree] = {
+    given Conversion[List[Tree], Tree] = {
       case Nil      => EmptyTree
       case t :: Nil => t
       case ts       => TreeSeq(ts)
     }
 
-    given uniqName as Conversion[Tree, Name] = {
+    given uniqName: Conversion[Tree, Name] = {
       case DefSig(name, _)              => name
       case LinearSig(name, _, _)        => name
       case DefDef(_, sig, _, _)         => sig

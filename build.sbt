@@ -1,12 +1,10 @@
-val dottyVersion = "0.18.1-RC1"
+val dottyVersion = "0.20.0-RC1"
 // val dottyVersion = dottyLatestNightlyBuild.get
 
 lazy val commonSettings = Seq(
   scalaVersion := dottyVersion,
 
-  libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
-
-  scalacOptions += "-noindent"
+  libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test"
 )
 
 lazy val mesa = project

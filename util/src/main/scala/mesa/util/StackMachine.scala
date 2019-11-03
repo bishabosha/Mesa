@@ -5,14 +5,14 @@ import annotation.tailrec
 object StackMachine {
   export opaques.{Program, Stack, stackInit, stack}
 
-  type Statement[T] = given opaques.Stack[T] => List[T]
+  type Statement[T] = (given opaques.Stack[T]) => List[T]
 
   trait Interpretable[I] {
-    def (i: I) interpret[O] (z: O)(f: (O, I) => O): O
+    def [O](i: I) interpret (z: O)(f: (O, I) => O): O
   }
 
   trait InterpretableK[F[?]] {
-    def (i: F[T]) interpretK[T, O](z: O)(f: [t] => (O, F[t]) => O): O
+    def [T, O](i: F[T]) interpretK(z: O)(f: [t] => (O, F[t]) => O): O
   }
 
   object opaques {
@@ -20,28 +20,26 @@ object StackMachine {
     opaque type Stack[T]   = List[T]
 
     def stackInit[T]: Program[T] = Nil
-    def stack[T] given Stack[T]: List[T] = the[List[T]]
+    def stack[T](given Stack[T]): List[T] = summon[List[T]]
 
     given {
 
-      def (t: Statement[T]) +: [T](p: Program[T]): Program[T] = t :: p
+      def [T](t: Statement[T]) +: (p: Program[T]): Program[T] = t :: p
 
-      def (program: Program[T]) unsafeInterpret[T]: T = run(Nil, program).head
+      def [T](program: Program[T]) unsafeInterpret: T = run(Nil, program).head
 
       @tailrec private def run[T](stack: Stack[T], program: Program[T]): List[T] = program match {
-        case stat :: stats => run(stat given stack, stats)
+        case stat :: stats => run(stat(given stack), stats)
         case Nil           => stack
       }
     }
   }
 
   object Program {
-    def (input: I) compile[I: Interpretable, O]
-        (compiler: I => Statement[O]): O =
+    def [I: Interpretable, O](input: I) compile(compiler: I => Statement[O]): O =
       input.interpret(stackInit[O])((p, i) => compiler(i) +: p).unsafeInterpret
 
-    def (input: F[T]) compile[F[?]: InterpretableK, T, O]
-        (compiler: F[Any] => Statement[O]): O = {
+    def [F[?]: InterpretableK, T, O](input: F[T]) compile(compiler: F[Any] => Statement[O]): O = {
       input.interpretK(stackInit[O])(([t] => (p: Program[O], i: F[t]) => compiler(i.asInstanceOf[F[Any]]) +: p).asInstanceOf).unsafeInterpret
     }
   }

@@ -29,8 +29,8 @@ import error.CompilerErrors._
 
 import org.antlr.v4.runtime._
 
-import given TreeOps._
-import given NameOps._
+import TreeOps.given
+import NameOps.given
 
 private[parsing] val mesaParser =
   genParser `andThen` { _.translationUnit }
@@ -41,16 +41,13 @@ private[parsing] val statParser =
 private[parsing] val exprParser =
   genParser `andThen` { _.exprAsTop }
 
-private[parsing] def fromStatAsTop(context: StatAsTopContext)
-                                  given IdGen: Lifted[Tree] =
+private[parsing] def fromStatAsTop(context: StatAsTopContext)(given IdGen): Lifted[Tree] =
   fromStat(context.stat)
 
-private[parsing] def fromExprAsTop(context: ExprAsTopContext)
-                                  given IdGen: Lifted[Tree] =
+private[parsing] def fromExprAsTop(context: ExprAsTopContext)(given IdGen): Lifted[Tree] =
   fromExpr(context.expr)
 
-private[parsing] def fromTranslationUnit(context: TranslationUnitContext)
-                                        given IdGen: Lifted[Tree] = {
+private[parsing] def fromTranslationUnit(context: TranslationUnitContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     pkgId <- fromPackageInfo(context.packageInfo)
@@ -67,16 +64,14 @@ private class ParserSyntaxException(msg: String) extends Exception(msg)
 
 private inline def defined[A <: AnyRef](a: A): Boolean = a `ne` null
 
-private def freshId() given IdGen: Id = idGen.fresh()
+private def freshId()(given IdGen): Id = idGen.fresh()
 
 private val fromSyntax: PartialFunction[Throwable, CompilerError] = {
   case error: ParserSyntaxException =>
     CompilerError.Syntax(error.getMessage)
 }
 
-def (parser: String => C) toTreeParser[C]
-    (toTree: IdReader[C => Lifted[Tree]])
-    (input: String) given IdGen: Lifted[Tree] = {
+def [C](parser: String => C) toTreeParser(toTree: IdReader[C => Lifted[Tree]])(input: String)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     context <- parser(input).recover(fromSyntax)
@@ -148,29 +143,29 @@ private def fromLiteral(context: LiteralContext): Lifted[Tree] = {
     fromStringLiteral(context)
 }
 
-private def fromId(context: IdContext) given IdGen: Tree = {
+private def fromId(context: IdContext)(given IdGen): Tree = {
   if defined(context.alphaId) then
     fromAlphaId(context.alphaId)
   else
     fromOpId(context)
 }
 
-private def fromOpId(context: IdContext) given IdGen: Tree = {
+private def fromOpId(context: IdContext)(given IdGen): Tree = {
   Ident(context.OpId.getText.readAs)(freshId(), nt)
 }
 
-private def fromAlphaId(context: AlphaIdContext) given IdGen: Tree = {
+private def fromAlphaId(context: AlphaIdContext)(given IdGen): Tree = {
   val name = context.getText.readAs
   Ident(name)(freshId(), nt)
 }
 
-private def namesToTree(lst: List[Name]) given IdGen: Tree = lst match {
+private def namesToTree(lst: List[Name])(given IdGen): Tree = lst match {
   case n :: Nil   => Ident(n)(freshId(), nt)
   case n :: tail  => Select(namesToTree(tail), n)(freshId(), nt)
   case Nil        => EmptyTree
 }
 
-private def fromQualId(context: QualIdContext) given IdGen: Tree = {
+private def fromQualId(context: QualIdContext)(given IdGen): Tree = {
   val tokens = {
     context
       .id
@@ -181,7 +176,7 @@ private def fromQualId(context: QualIdContext) given IdGen: Tree = {
   namesToTree(tokens.reverse)
 }
 
-private def fromStableId(context: StableIdContext) given IdGen: Tree = {
+private def fromStableId(context: StableIdContext)(given IdGen): Tree = {
   val alpha = fromAlphaId(context.alphaId)
   if defined(context.id) then
     Select(alpha, context.id.getText.readAs)(freshId(), nt)
@@ -189,8 +184,7 @@ private def fromStableId(context: StableIdContext) given IdGen: Tree = {
     alpha
 }
 
-private def fromType(context: TypeContext)
-                    given IdGen: Lifted[Tree] = {
+private def fromType(context: TypeContext)(given IdGen): Lifted[Tree] = {
   if defined(context.func) then
     fromFunc(context.func)
   else if defined(context.lFunc) then
@@ -199,16 +193,14 @@ private def fromType(context: TypeContext)
     fromInfixType(context.infixType)
 }
 
-private def fromInfixType(context: InfixTypeContext)
-                          given IdGen: Lifted[Tree] = {
+private def fromInfixType(context: InfixTypeContext)(given IdGen): Lifted[Tree] = {
   if defined(context.functorType) then
     fromFunctorType(context.functorType)
   else
     fromInfixAppliedType(context.infixAppliedType)
 }
 
-private def fromInfixAppliedType(context: InfixAppliedTypeContext)
-                                given IdGen: Lifted[Tree] = {
+private def fromInfixAppliedType(context: InfixAppliedTypeContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val name = context.rassocOpId.getText.readAs
   val functor = Ident(name)(freshId(), nt)
@@ -227,8 +219,7 @@ private def fromInfixAppliedType(context: InfixAppliedTypeContext)
   }
 }
 
-private def fromLFunc(context: LFuncContext)
-                      given IdGen: Lifted[Tree] = {
+private def fromLFunc(context: LFuncContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     infix <- fromInfixType(context.infixType)
@@ -236,7 +227,7 @@ private def fromLFunc(context: LFuncContext)
   yield LinearFunction(infix, tpe)(freshId(), nt)
 }
 
-private def fromFunc(context: FuncContext) given IdGen: Lifted[Tree] = {
+private def fromFunc(context: FuncContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     infix <- fromInfixType(context.infixType)
@@ -253,31 +244,27 @@ private def fromFunc(context: FuncContext) given IdGen: Lifted[Tree] = {
   }
 }
 
-private def fromFunctorType(context: FunctorTypeContext)
-                            given IdGen: Lifted[Tree] = {
+private def fromFunctorType(context: FunctorTypeContext)(given IdGen): Lifted[Tree] = {
   if defined(context.simpleType) then
     fromSimpleType(context.simpleType)
   else
     fromPrefixType(context.prefixType)
 }
 
-private def fromProductType(context: ProductTypeContext)
-                            given IdGen: Lifted[Tree] = {
+private def fromProductType(context: ProductTypeContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for types <- context.`type`.asScala.mapE(fromType)
   yield parensFromBuffer(types)
 }
 
-private def fromPrefixType(context: PrefixTypeContext)
-                          given IdGen: Lifted[Tree] = {
+private def fromPrefixType(context: PrefixTypeContext)(given IdGen): Lifted[Tree] = {
   if defined(context.Bang) then
     fromBangType(context)
   else
     fromFunctorType(context)
 }
 
-private def fromFunctorType(context: PrefixTypeContext)
-                            given IdGen: Lifted[Tree] = {
+private def fromFunctorType(context: PrefixTypeContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for simpleTypes <- context.simpleType.asScala.mapE(fromSimpleType) yield {
     val tag  = fromQualId(context.qualId)
@@ -286,8 +273,7 @@ private def fromFunctorType(context: PrefixTypeContext)
   }
 }
 
-private def fromBangType(context: PrefixTypeContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromBangType(context: PrefixTypeContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val tag = Ident(Name.BangTag)(freshId(), nt)
   for simpleTypes <- context.simpleType.asScala.mapE(fromSimpleType) yield {
@@ -296,8 +282,7 @@ private def fromBangType(context: PrefixTypeContext)
   }
 }
 
-private def fromSimpleType(context: SimpleTypeContext)
-                          given IdGen: Lifted[Tree] = {
+private def fromSimpleType(context: SimpleTypeContext)(given IdGen): Lifted[Tree] = {
   if defined(context.qualId) then
     fromQualId(context.qualId)
   else if defined(context.CompId) then
@@ -306,10 +291,10 @@ private def fromSimpleType(context: SimpleTypeContext)
     fromProductType(context.productType)
 }
 
-private def fromCompId(context: SimpleTypeContext) given IdGen: Tree =
+private def fromCompId(context: SimpleTypeContext)(given IdGen): Tree =
   Ident(context.CompId.getText.readAs.promoteComp)(freshId(), nt)
 
-private def fromExpr(context: ExprContext) given IdGen: Lifted[Tree] = {
+private def fromExpr(context: ExprContext)(given IdGen): Lifted[Tree] = {
   if defined(context.lambda) then
     fromLambda(context.lambda)
   else if defined(context.lLambda) then
@@ -328,8 +313,7 @@ private def fromExpr(context: ExprContext) given IdGen: Lifted[Tree] = {
     fromExprSeqAsApply(context.expr)
 }
 
-private def fromExprSeqAsApply(exprs: java.util.List[ExprContext])
-                              given IdGen: Lifted[Tree] = {
+private def fromExprSeqAsApply(exprs: java.util.List[ExprContext])(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     exprs <- exprs.asScala.mapE(fromExpr)
@@ -337,7 +321,7 @@ private def fromExprSeqAsApply(exprs: java.util.List[ExprContext])
   yield Apply(expr, arg)(nt)
 }
 
-private def fromLambda(context: LambdaContext) given IdGen: Lifted[Tree] = {
+private def fromLambda(context: LambdaContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     body     <- fromExpr(context.expr)
@@ -345,8 +329,7 @@ private def fromLambda(context: LambdaContext) given IdGen: Lifted[Tree] = {
   yield Function(bindings, body)(freshId(), nt)
 }
 
-private def fromLLambda(context: LLambdaContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromLLambda(context: LLambdaContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     body    <- fromExpr(context.expr)
@@ -354,8 +337,7 @@ private def fromLLambda(context: LLambdaContext)
   yield LinearFunction(binding, body)(freshId(), nt)
 }
 
-private def fromLetExpr(context: LetExprContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromLetExpr(context: LetExprContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     patt  <- fromSimplePattern(context.simplePattern)
@@ -367,8 +349,7 @@ private def fromLetExpr(context: LetExprContext)
   }
 }
 
-private def fromLetTensorExpr(context: LetTensorExprContext)
-                              given IdGen: Lifted[Tree] = {
+private def fromLetTensorExpr(context: LetTensorExprContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     pattX <- fromSimplePattern(context.simplePattern)
@@ -381,8 +362,7 @@ private def fromLetTensorExpr(context: LetTensorExprContext)
   }
 }
 
-private def fromCaseExpr(context: CaseExprContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromCaseExpr(context: CaseExprContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     selector <- fromExpr(context.expr)
@@ -390,8 +370,7 @@ private def fromCaseExpr(context: CaseExprContext)
   yield CaseExpr(selector, cases)(nt)
 }
 
-private def fromLCaseExpr(context: LCaseExprContext)
-                          given IdGen: Lifted[Tree] = {
+private def fromLCaseExpr(context: LCaseExprContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     selector <- fromExpr(context.expr)
@@ -399,7 +378,7 @@ private def fromLCaseExpr(context: LCaseExprContext)
   yield LinearCaseExpr(selector, cases)(nt)
 }
 
-private def fromIfElse(context: Expr1Context) given IdGen: Lifted[Tree] = {
+private def fromIfElse(context: Expr1Context)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for exprs <- context.expr.asScala.mapE(fromExpr) yield {
     val caseTrue  = CaseClause(litTrue, EmptyTree, exprs(1))(freshId(), nt)
@@ -409,15 +388,14 @@ private def fromIfElse(context: Expr1Context) given IdGen: Lifted[Tree] = {
   }
 }
 
-private def fromExpr1(context: Expr1Context) given IdGen: Lifted[Tree] = {
+private def fromExpr1(context: Expr1Context)(given IdGen): Lifted[Tree] = {
   if defined(context.infixExpr) then
     fromInfixExpr(context.infixExpr)
   else
     fromIfElse(context)
 }
 
-private def fromInfixApplication(context: InfixExprContext)
-                                given IdGen: Lifted[Tree] = {
+private def fromInfixApplication(context: InfixExprContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val id = {
     if defined(context.OpId) then
@@ -431,8 +409,7 @@ private def fromInfixApplication(context: InfixExprContext)
   }
 }
 
-private def fromInfixExpr(context: InfixExprContext)
-                          given IdGen: Lifted[Tree] = {
+private def fromInfixExpr(context: InfixExprContext)(given IdGen): Lifted[Tree] = {
   if defined(context.prefixExpr) then
     fromPrefixExpr(context.prefixExpr)
   else if defined(context.tensorExpr) then
@@ -447,8 +424,7 @@ private def wrapBang(tree: Tree): Lifted[Tree] =
 private def wrapWhyNot(tree: Tree): Lifted[Tree] =
   Tree.WhyNot(tree)(nt)
 
-private def fromTensorExpr(context: TensorExprContext)
-                          given IdGen: Lifted[Tree] = {
+private def fromTensorExpr(context: TensorExprContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     x <- fromSimpleExpr(context.simpleExpr)
@@ -456,8 +432,7 @@ private def fromTensorExpr(context: TensorExprContext)
   yield Tree.Tensor(x, z)(nt)
 }
 
-private def fromPrefixExpr(context: PrefixExprContext)
-                          given IdGen: Lifted[Tree] = {
+private def fromPrefixExpr(context: PrefixExprContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val simpleExpr = fromSimpleExpr(context.simpleExpr)
   if defined(context.Bang) then
@@ -468,8 +443,7 @@ private def fromPrefixExpr(context: PrefixExprContext)
     simpleExpr
 }
 
-private def fromSimpleExpr(context: SimpleExprContext)
-                          given IdGen: Lifted[Tree] = {
+private def fromSimpleExpr(context: SimpleExprContext)(given IdGen): Lifted[Tree] = {
   if defined(context.literal) then
     fromLiteral(context.literal)
   else if defined(context.OpId) then
@@ -485,8 +459,7 @@ private def fromSimpleExpr(context: SimpleExprContext)
 private def fromOpIdExpr(context: SimpleExprContext): Tree =
   Ident(context.OpId.getText.readAs)(Id.empty, nt)
 
-private def fromEval(context: SimpleExprContext)
-                    given IdGen: Lifted[Tree] = {
+private def fromEval(context: SimpleExprContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     expr <- fromSimpleExpr(context.simpleExpr)
@@ -494,22 +467,19 @@ private def fromEval(context: SimpleExprContext)
   yield Eval(expr, eval)(nt)
 }
 
-private def fromCases(context: CasesContext)
-                      given IdGen: Lifted[Tree] = {
+private def fromCases(context: CasesContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for caseClauses <- context.caseClause.asScala.mapE(fromCaseClause)
   yield caseClauses.toList: Tree
 }
 
-private def fromLCases(context: LCasesContext)
-                      given IdGen: Lifted[Tree] = {
+private def fromLCases(context: LCasesContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for caseClauses <- context.lCaseClause.asScala.mapE(fromLCaseClause)
   yield caseClauses.toList: Tree
 }
 
-private def fromCaseClause(context: CaseClauseContext)
-                          given IdGen: Lifted[Tree] = {
+private def fromCaseClause(context: CaseClauseContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     pat   <- fromPattern(context.pattern)
@@ -523,8 +493,7 @@ private def fromCaseClause(context: CaseClauseContext)
   yield CaseClause(pat, guard, body)(freshId(), nt)
 }
 
-private def fromLCaseClause(context: LCaseClauseContext)
-                            given IdGen: Lifted[Tree] = {
+private def fromLCaseClause(context: LCaseClauseContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     pat  <- fromLPattern(context.lPattern)
@@ -532,15 +501,13 @@ private def fromLCaseClause(context: LCaseClauseContext)
   yield LinearCaseClause(pat, body)(freshId(), nt)
 }
 
-private def fromExprsInParens(context: ExprsInParensContext)
-                              given IdGen: Lifted[Tree] = {
+private def fromExprsInParens(context: ExprsInParensContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for exprs <- context.expr.asScala.mapE(fromExpr)
   yield parensFromBuffer(exprs)
 }
 
-private def fromLPattern(context: LPatternContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromLPattern(context: LPatternContext)(given IdGen): Lifted[Tree] = {
   if defined(context.Wildcard) then
     wildcardIdent
   else if defined(context.Varid) then
@@ -555,29 +522,25 @@ private def fromLPattern(context: LPatternContext)
     unit
 }
 
-private def fromLUnapply(context: LPatternContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromLUnapply(context: LPatternContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val functor = context.Patid.getText.readAs
   for binding <- Option(context.lPattern).mapE(fromLPattern)
   yield Unapply(functor, binding.toList)(nt)
 }
 
-private def fromLPatterns(context: LPatternsContext)
-                          given IdGen: Lifted[Tree] = {
+private def fromLPatterns(context: LPatternsContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for patterns <- context.lPattern.asScala.mapE(fromLPattern)
   yield parensFromBuffer(patterns)
 }
 
-private def fromVaridLPattern(context: LPatternContext)
-                              given IdGen: Tree = {
+private def fromVaridLPattern(context: LPatternContext)(given IdGen): Tree = {
   val name = context.Varid.getText.readAs
   Ident(name)(freshId(), nt)
 }
 
-private def fromPattern(context: PatternContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromPattern(context: PatternContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for patterns <- context.pattern1.asScala.mapE(fromPattern1) yield {
     if patterns.size == 1 then
@@ -587,11 +550,10 @@ private def fromPattern(context: PatternContext)
   }
 }
 
-private def fromPattern1(context: Pattern1Context)
-                        given IdGen: Lifted[Tree] =
+private def fromPattern1(context: Pattern1Context)(given IdGen): Lifted[Tree] =
   fromPattern2(context.pattern2)
 
-private def fromBind(context: Pattern2Context) given IdGen: Lifted[Tree] = {
+private def fromBind(context: Pattern2Context)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val name = context.Varid.getText.readAs
   if defined(context.pattern3) then {
@@ -602,34 +564,29 @@ private def fromBind(context: Pattern2Context) given IdGen: Lifted[Tree] = {
   }
 }
 
-private def fromPattern2(context: Pattern2Context)
-                        given IdGen: Lifted[Tree] = {
+private def fromPattern2(context: Pattern2Context)(given IdGen): Lifted[Tree] = {
   if defined(context.Varid) then
     fromBind(context)
   else
     fromPattern3(context.pattern3)
 }
 
-private def fromPattern3(context: Pattern3Context)
-                        given IdGen: Lifted[Tree] =
+private def fromPattern3(context: Pattern3Context)(given IdGen): Lifted[Tree] =
   fromSimplePattern(context.simplePattern)
 
-private def fromVaridPattern(context: SimplePatternContext)
-                            given IdGen: Tree = {
+private def fromVaridPattern(context: SimplePatternContext)(given IdGen): Tree = {
   val name = context.Varid.getText.readAs
   Ident(name)(freshId(), nt)
 }
 
-private def fromFunctorPattern(context: SimplePatternContext)
-                              given IdGen: Lifted[Tree] = {
+private def fromFunctorPattern(context: SimplePatternContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val functor = context.Patid.getText.readAs
   for args <- context.pattern.asScala.mapE(fromPattern)
   yield Unapply(functor, args.toList)(nt)
 }
 
-private def fromSimplePattern(context: SimplePatternContext)
-                              given IdGen: Lifted[Tree] = {
+private def fromSimplePattern(context: SimplePatternContext)(given IdGen): Lifted[Tree] = {
   if defined(context.Wildcard) then
     wildcardIdent
   else if context.getText == "()" then
@@ -644,8 +601,7 @@ private def fromSimplePattern(context: SimplePatternContext)
     fromPatterns(context.patterns)
 }
 
-private def fromPatterns(context: PatternsContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromPatterns(context: PatternsContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for patterns <- context.pattern.asScala.mapE(fromPattern)
   yield parensFromBuffer(patterns)
@@ -660,22 +616,19 @@ private def parensFromBuffer(trees: mutable.Buffer[Tree]): Tree = {
     Parens(trees.toList)(nt)
 }
 
-private def fromGuard(context: GuardContext) given IdGen: Lifted[Tree] =
+private def fromGuard(context: GuardContext)(given IdGen): Lifted[Tree] =
   fromInfixExpr(context.infixExpr)
 
-private def fromBindings(context: BindingsContext)
-                        given IdGen: Lifted[Tree] =
+private def fromBindings(context: BindingsContext)(given IdGen): Lifted[Tree] =
   fromBindingsTagged(context.bindingsTagged)
 
-private def fromBindingsTagged(context: BindingsTaggedContext)
-                              given IdGen: Lifted[Tree] = {
+private def fromBindingsTagged(context: BindingsTaggedContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for bindings <- context.binding.asScala.mapE(fromBinding)
   yield bindings.toList: Tree
 }
 
-private def fromBinding(context: BindingContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromBinding(context: BindingContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val name: Name  = {
     if defined(context.id) then
@@ -687,7 +640,7 @@ private def fromBinding(context: BindingContext)
   yield Tagged(name, typ)(nt)
 }
 
-private def fromDcl(context: DclContext) given IdGen: Lifted[Tree] = {
+private def fromDcl(context: DclContext)(given IdGen): Lifted[Tree] = {
   if defined(context.primitiveDcl) then
     fromPrimitiveDcl(context.primitiveDcl)
   else if defined(context.lDataDcl) then
@@ -696,14 +649,12 @@ private def fromDcl(context: DclContext) given IdGen: Lifted[Tree] = {
     fromDataDcl(context.dataDcl)
 }
 
-private def fromPrimitiveDcl(context: PrimitiveDclContext)
-                            given IdGen: Lifted[Tree] = {
+private def fromPrimitiveDcl(context: PrimitiveDclContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   fromPrimDcl(context.primDecl).map(_.addModifiers(Set(Primitive)))
 }
 
-private def fromDataDcl(context: DataDclContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromDataDcl(context: DataDclContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   fromTypeDcl(context.typeDcl) match {
     case Left(name, args) =>
@@ -716,8 +667,7 @@ private def fromDataDcl(context: DataDclContext)
   }
 }
 
-private def fromLDataDcl(context: LDataDclContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromLDataDcl(context: LDataDclContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   fromLTypeDcl(context.lTypeDcl) match {
     case Left(name, args) =>
@@ -730,8 +680,7 @@ private def fromLDataDcl(context: LDataDclContext)
   }
 }
 
-private def fromLTypeDcl(context: LTypeDclContext)
-                        given IdGen: Either[(Name, List[Name]),(Name, Name, Name)] = {
+private def fromLTypeDcl(context: LTypeDclContext)(given IdGen): Either[(Name, List[Name]),(Name, Name, Name)] = {
   val args = context.lTpeId.asScala.map(fromLTpeId)
   if defined(context.alphaId) then {
     val name = context.alphaId.getText.readAs
@@ -749,8 +698,7 @@ private def fromLTpeId(context: LTpeIdContext): Name = {
     context.alphaId.getText.readAs
 }
 
-private def fromTypeDcl(context: TypeDclContext)
-                        given IdGen: Either[(Name, List[Name]),(Name, Name, Name)] = {
+private def fromTypeDcl(context: TypeDclContext)(given IdGen): Either[(Name, List[Name]),(Name, Name, Name)] = {
   val names = context.alphaId.asScala.map(_.getText.readAs)
   if names.size == 1 then {
     val name = names(0)
@@ -766,28 +714,24 @@ private def fromTypeDcl(context: TypeDclContext)
   }
 }
 
-private def fromConstructors(context: ConstructorsContext)
-                            given IdGen: Lifted[List[Tree]] = {
+private def fromConstructors(context: ConstructorsContext)(given IdGen): Lifted[List[Tree]] = {
   import CompilerErrorOps._
   context.ctor.asScala.mapE(fromCtor).map(_.toList)
 }
 
-private def fromLConstructors(context: LConstructorsContext)
-                              given IdGen: Lifted[List[Tree]] = {
+private def fromLConstructors(context: LConstructorsContext)(given IdGen): Lifted[List[Tree]] = {
   import CompilerErrorOps._
   context.lCtor.asScala.mapE(fromLCtor).map(_.toList)
 }
 
-private def fromCtor(context: CtorContext)
-                    given IdGen: Lifted[Tree] = {
+private def fromCtor(context: CtorContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val name = context.Patid.getText.readAs
   for args <- context.`type`.asScala.mapE(fromType)
   yield CtorSig(name, args.toList)(nt)
 }
 
-private def fromLCtor(context: LCtorContext)
-                      given IdGen: Lifted[Tree] = {
+private def fromLCtor(context: LCtorContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val name = context.Patid.getText.readAs
   if defined(context.`type`) then {
@@ -798,8 +742,7 @@ private def fromLCtor(context: LCtorContext)
   }
 }
 
-private def fromPrimDcl(context: PrimDeclContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromPrimDcl(context: PrimDeclContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   val sig = {
     if defined(context.defSig) then
@@ -811,11 +754,11 @@ private def fromPrimDcl(context: PrimDeclContext)
   yield DefDef(Set(), sig, typ, EmptyTree)(nt)
 }
 
-private def fromLSig(context: LSigContext) given IdGen: Tree =
+private def fromLSig(context: LSigContext)(given IdGen): Tree =
   if defined(context.infixLSig) then fromInfixLSig(context.infixLSig)
   else fromLSigImpl(context)
 
-private def fromLSigImpl(context: LSigContext) given IdGen: Tree = {
+private def fromLSigImpl(context: LSigContext)(given IdGen): Tree = {
   var name     = (fromAlphaId(context.alphaId): Name)
   val paramids = context.paramName.asScala.map(fromParamName)
   if paramids.size == 1 then
@@ -824,7 +767,7 @@ private def fromLSigImpl(context: LSigContext) given IdGen: Tree = {
     LinearSig(name, paramids.init.toList, paramids.last)(freshId(), nt)
 }
 
-private def fromInfixLSig(context: InfixLSigContext) given IdGen: Tree = {
+private def fromInfixLSig(context: InfixLSigContext)(given IdGen): Tree = {
   if defined(context.prefixOpLSig) then
     fromPrefixOpLSig(context.prefixOpLSig)
   else if defined(context.OpId) then
@@ -833,20 +776,19 @@ private def fromInfixLSig(context: InfixLSigContext) given IdGen: Tree = {
     fromInfixAlphaLSig(context)
 }
 
-private def fromPrefixOpLSig(context: PrefixOpLSigContext) given IdGen: Tree = {
+private def fromPrefixOpLSig(context: PrefixOpLSigContext)(given IdGen): Tree = {
   var args = context.paramName.asScala.map(fromParamName).toList
   val name = context.OpId.getText.readAs
   LinearSig(name, args.init, args.last)(freshId(), nt)
 }
 
-private def fromInfixOpLSig(context: InfixLSigContext) given IdGen: Tree = {
+private def fromInfixOpLSig(context: InfixLSigContext)(given IdGen): Tree = {
   var args = context.paramName.asScala.map(fromParamName).toList
   var name = context.OpId.getText.readAs
   LinearSig(name, args.init, args.last)(freshId(), nt)
 }
 
-private def fromInfixAlphaLSig(context: InfixLSigContext)
-                              given IdGen: Tree = {
+private def fromInfixAlphaLSig(context: InfixLSigContext)(given IdGen): Tree = {
   var args  = context.paramName.asScala.map(fromParamName).toList
   val name  = (fromAlphaId(context.alphaId): Name)
   LinearSig(name, args.init, args.last)(freshId(), nt)
@@ -856,10 +798,10 @@ private def fromParamName(context: ParamNameContext): Name =
   if defined(context.Wildcard) then Name.Wildcard
   else context.Varid.getText.readAs
 
-private def fromDef(context: DefContext) given IdGen: Lifted[Tree] =
+private def fromDef(context: DefContext)(given IdGen): Lifted[Tree] =
   fromDefDef(context.defDef)
 
-private def fromDefDef(context: DefDefContext) given IdGen: Lifted[Tree] = {
+private def fromDefDef(context: DefDefContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for
     expr <- fromExpr(context.expr)
@@ -873,20 +815,20 @@ private def fromDefDef(context: DefDefContext) given IdGen: Lifted[Tree] = {
   yield DefDef(Set(), sig, typ, expr)(nt)
 }
 
-private def fromDefSig(context: DefSigContext) given IdGen: Tree = {
+private def fromDefSig(context: DefSigContext)(given IdGen): Tree = {
   if defined(context.infixDefSig) then
     fromInfixDefSig(context.infixDefSig)
   else
     fromPrefixDefSig(context)
 }
 
-private def fromPrefixDefSig(context: DefSigContext) given IdGen: Tree = {
+private def fromPrefixDefSig(context: DefSigContext)(given IdGen): Tree = {
   var name      = (fromAlphaId(context.alphaId): Name)
   var paramids  = context.paramName.asScala.map(fromParamName).toList
   DefSig(name, paramids)(freshId(), nt)
 }
 
-private def fromInfixDefSig(context: InfixDefSigContext) given IdGen: Tree = {
+private def fromInfixDefSig(context: InfixDefSigContext)(given IdGen): Tree = {
   if defined(context.prefixOpSig) then
     fromPrefixOpSig(context.prefixOpSig)
   else if defined(context.OpId) then
@@ -895,36 +837,34 @@ private def fromInfixDefSig(context: InfixDefSigContext) given IdGen: Tree = {
     fromInfixAlphaSig(context)
 }
 
-private def fromInfixOpSig(context: InfixDefSigContext) given IdGen: Tree = {
+private def fromInfixOpSig(context: InfixDefSigContext)(given IdGen): Tree = {
   var args = context.paramName.asScala.map(fromParamName).toList
   var name = context.OpId.getText.readAs
   DefSig(name, args)(freshId(), nt)
 }
 
-private def fromInfixAlphaSig(context: InfixDefSigContext)
-                              given IdGen: Tree = {
+private def fromInfixAlphaSig(context: InfixDefSigContext)(given IdGen): Tree = {
   var args  = context.paramName.asScala.map(fromParamName).toList
   val name  = (fromAlphaId(context.alphaId): Name)
   DefSig(name, args)(freshId(), nt)
 }
 
-private def fromPrefixOpSig(context: PrefixOpSigContext) given IdGen: Tree = {
+private def fromPrefixOpSig(context: PrefixOpSigContext)(given IdGen): Tree = {
   var args = context.paramName.asScala.map(fromParamName).toList
   val name = context.OpId.getText.readAs
   DefSig(name, args)(freshId(), nt)
 }
 
-private def fromPackageInfo(context: PackageInfoContext) given IdGen: Tree =
+private def fromPackageInfo(context: PackageInfoContext)(given IdGen): Tree =
   fromQualId(context.qualId)
 
-private def fromStatSeq(context: StatSeqContext)
-                        given IdGen: Lifted[Tree] = {
+private def fromStatSeq(context: StatSeqContext)(given IdGen): Lifted[Tree] = {
   import CompilerErrorOps._
   for stats <- context.stat.asScala.mapE(fromStat)
   yield stats.toList: Tree
 }
 
-private def fromStat(context: StatContext) given IdGen: Lifted[Tree] = {
+private def fromStat(context: StatContext)(given IdGen): Lifted[Tree] = {
   if defined(context.`def`) then
     fromDef(context.`def`)
   else

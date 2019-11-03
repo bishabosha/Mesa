@@ -1,10 +1,10 @@
 import mesa.eec._
 import mesa.util.Show
 
-def puts[A](a: A) given Show[A] =
+def puts[A](a: A)(given Show[A]) =
   println(a.show)
 
-given as Show[String] = identity
+given Show[String] = identity
 
 puts(eec"*")
 puts(eec"""f (\x.y) b""")
@@ -37,5 +37,3 @@ puts(K)
 puts(S)
 
 puts(Bind)
-
-

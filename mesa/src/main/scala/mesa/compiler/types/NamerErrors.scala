@@ -7,11 +7,11 @@ import ast.Trees._
 import core.Contexts._
 import Mode._
 
-import given TreeOps._
-import given ModeOps._
+import TreeOps.given
+import ModeOps.given
 
 object NamerErrors {
-  def namingMissing(tree: Tree) given Mode = {
+  def namingMissing(tree: Tree)(given Mode) = {
     CompilerError.Internal(
       s"No implementation for naming in mode ${mode.show} for tree given by ${tree.show}")
   }

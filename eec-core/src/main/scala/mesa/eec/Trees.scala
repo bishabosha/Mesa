@@ -37,8 +37,8 @@ object Trees {
 
   object Tree {
 
-    given as InterpretableK[Tree] {
-      def (tree: Tree[T]) interpretK[T,O](z: O)(f: [t] => (O, Tree[t]) => O): O = {
+    given InterpretableK[Tree] {
+      def [T,O](tree: Tree[T]) interpretK(z: O)(f: [t] => (O, Tree[t]) => O): O = {
         @tailrec
         def inner(z: O, ts: List[Tree[?]]): O = ts match {
           case Nil => z
@@ -62,7 +62,7 @@ object Trees {
     }
   }
 
-  given [T] as Show[Tree[T]] {
+  given [T]: Show[Tree[T]] {
     import Tree._
 
     def wrapIfComplex[U](t: Tree[U], s: String) = t match {

@@ -15,10 +15,10 @@ import NameOps._
 import core.Contexts._
 import Mode._
 
-import given ModeOps._
-import given TreeOps._
-import given TypeOps._
-import given NameOps._
+import ModeOps.given
+import TreeOps.given
+import TypeOps.given
+import NameOps.given
 
 object TyperErrors {
 
@@ -97,7 +97,7 @@ object TyperErrors {
   def linearUnapplyArgLengthGT1 =
     CompilerError.UnexpectedType("Linear case clause must have a single path.")
 
-  def typecheckFail(typed: Tree)(tpe1: Type, pt: Type) given Mode = {
+  def typecheckFail(typed: Tree)(tpe1: Type, pt: Type)(given Mode) = {
     CompilerError.UnexpectedType(
       s"Check failed. Type ${typed.tpe.show} != ${pt.show} in ${mode.show} for tree given by ${typed.show}")
   }
@@ -110,7 +110,7 @@ object TyperErrors {
     CompilerError.UnknownIdentifier(
       s"Unresolved type variable ${name.define} in constructor ${ctor.define} of ${data.define}.")
 
-  def typingMissing(tree: Tree) given Mode =
+  def typingMissing(tree: Tree)(given Mode) =
     CompilerError.Internal(
       s"No implementation for typing in mode ${mode.show} for tree given by ${tree.show}")
 
@@ -203,7 +203,7 @@ object TyperErrors {
       s"No linear context found to bind linear argument ${name.define}.")
   }
 
-  def memberSelection given Mode =
+  def memberSelection(given Mode) =
     CompilerError.Syntax(
       s"Member selections do not exist for ${mode.show}.")
 

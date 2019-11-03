@@ -12,8 +12,8 @@ object Names {
   import Derived._
   import DerivedOps._
 
-  import given NameOps._
-  import given DerivedOps._
+  import NameOps.given
+  import DerivedOps.given
 
   enum Derived derives Eql {
     case Str(str: String)
@@ -34,18 +34,18 @@ object Names {
   object DerivedOps {
     private[Names] val OpId = """([!#/%&*+-:<=>?@\\^|~]+)""".r
 
-    given as Define[Derived] = {
+    given Define[Derived] = {
       case Str(OpId(str))     => s"($str)"
       case Str(str)           => str
       case Synthetic(id, str) => s"<$str:$id>"
     }
 
-    given as Show[Derived] = {
+    given Show[Derived] = {
       case Str(str)           => str
       case Synthetic(id, str) => s"<$str:$id>"
     }
 
-    given as Read[Derived] = Str(_)
+    given Read[Derived] = Str(_)
   }
 
   object NameOps {
@@ -58,11 +58,11 @@ object Names {
 
     def (name: Name) nonEmpty = name != EmptyName
 
-    def (name: Name) foldEmptyName[O, U](empty: => O)(f: Name => U): O | U =
+    def [O, U](name: Name) foldEmptyName(empty: => O)(f: Name => U): O | U =
       if name == EmptyName then empty
       else f(name)
 
-    def (name: Name) foldWildcard[O, U](wildcard: => O)(f: Name => U): O | U =
+    def [O, U](name: Name) foldWildcard(wildcard: => O)(f: Name => U): O | U =
       if name == Wildcard then wildcard
       else f(name)
 
@@ -78,7 +78,7 @@ object Names {
         case _              => None
       }
 
-    given as Show[Name] = {
+    given Show[Name] = {
       case Comp(n)        => n.show
       case From(n)        => n.show
       case BangTag        => "!"
@@ -94,7 +94,7 @@ object Names {
       case EmptyName      => "<empty>"
     }
 
-    given as Define[Name] = {
+    given Define[Name] = {
       case Comp(n)    => n.define
       case From(n)    => n.define
       case BangTag    => s"(${BangTag.show})"
@@ -102,7 +102,7 @@ object Names {
       case other      => other.show
     }
 
-    given as Read[Name] = {
+    given Read[Name] = {
       case "!"        => BangTag
       case "*:"       => TensorTag
       case "_"        => Wildcard
@@ -113,7 +113,7 @@ object Names {
       case "Char"     => CharTag
       case "Void"     => VoidTag
       case "Void#"    => VoidCompTag
-      case str        => From(the[Read[Derived]].readAs(str))
+      case str        => From(summon[Read[Derived]].readAs(str))
     }
   }
 }

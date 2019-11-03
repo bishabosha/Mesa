@@ -17,7 +17,7 @@ import mesa.util.{Show, Define, StackMachine, view, const}
 import StackMachine._
 import Program._
 
-import given NameOps._
+import NameOps.given
 
 object Types {
   import Type._
@@ -97,8 +97,8 @@ object Types {
       }
     }
 
-    given as Interpretable[Type] {
-      def (tpe: Type) interpret[O] (z: O)(f: (O, Type) => O): O = tpe.foldLeft(z)(f)
+    given Interpretable[Type] {
+      def [O](tpe: Type) interpret(z: O)(f: (O, Type) => O): O = tpe.foldLeft(z)(f)
     }
 
     def (tpe: Type) mapVariables(f: Name => Type): Type = {
@@ -134,9 +134,7 @@ object Types {
       }
     }
 
-    def (tpe: Type) foldLeft[O]
-        (z: O)
-        (f: (O, Type) => O): O = {
+    def [O](tpe: Type) foldLeft(z: O)(f: (O, Type) => O): O = {
       @tailrec
       def inner(z: O, tpes: List[Type]): O = tpes match {
         case Nil => z
@@ -159,9 +157,7 @@ object Types {
       inner(z, tpe :: Nil)
     }
 
-    def (tpe: Type) foldLeftLifted[O]
-        (z: Lifted[O])
-        (f: (O, Type) => Lifted[O]): Lifted[O] = {
+    def [O](tpe: Type) foldLeftLifted(z: Lifted[O])(f: (O, Type) => Lifted[O]): Lifted[O] = {
       @tailrec
       def inner(z: Lifted[O], tpes: List[Type]): Lifted[O] = {
         z match {
@@ -191,10 +187,7 @@ object Types {
       inner(z, tpe :: Nil)
     }
 
-    def (t1: Type) zipFold [O, That]
-        (t2: Type)
-        (z: O)
-        (f: (O, Type, Type) => O): O = {
+    def [O, That](t1: Type) zipFold(t2: Type)(z: O)(f: (O, Type, Type) => O): O = {
 
       @tailrec
       def inner(z: O, args: List[Type], apps: List[Type]): O = args match {
@@ -252,8 +245,7 @@ object Types {
       else inner(z, t1 :: Nil, t2 :: Nil)
     }
 
-    def (ops: Type) zipWith[O, Col](t: Type)
-        (f: (Name, Type) => O) given (factory: Factory[O, Col]): Col = {
+    def [O, Col](ops: Type) zipWith(t: Type)(f: (Name, Type) => O)(given factory: Factory[O, Col]): Col = {
 
       val b = ops.zipFold(t)(factory.newBuilder) { (acc, arg, app) =>
         arg match {
@@ -296,7 +288,7 @@ object Types {
       inner(true, arg :: Nil, app :: Nil)
     }
 
-    def (tpe: Type) =!= (other: Type): Boolean = {
+    def (tpe: Type) =:= (other: Type): Boolean = {
       tpe   == other        ||
       tpe   == WildcardType ||
       other == WildcardType
@@ -327,7 +319,7 @@ object Types {
                       (orElse: (Type, Type) => U): U = {
       val tpe1 = tpe.unify(pt)
       val pt1  = pt.unify(tpe1)
-      if pt1 =!= tpe1 then f(tpe1)
+      if pt1 =:= tpe1 then f(tpe1)
       else orElse(tpe1, pt1)
     }
 
@@ -546,7 +538,7 @@ object Types {
       s"$quantification$body"
     }
 
-    given as Show[Type] {
+    given Show[Type] {
 
       val variables = {
         val alpha = LazyList('a' to 'z': _*)
@@ -604,14 +596,14 @@ object Types {
       }
     }
 
-    given as Define[Type] = displayString
+    given Define[Type] = displayString
 
-    given as Conversion[List[Type], Type] = {
+    given Conversion[List[Type], Type] = {
       case tpe :: Nil => tpe
       case types      => Product(types)
     }
 
-    given as Conversion[Type, List[Type]] = {
+    given Conversion[Type, List[Type]] = {
       case Product(ls)  => ls
       case tpe          => tpe :: Nil
     }

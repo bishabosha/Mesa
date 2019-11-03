@@ -10,7 +10,7 @@ import Modifiers._
 import Contexts._
 import types.Types._
 
-import given TypeOps._
+import TypeOps.given
 
 object Meta {
   import Tree._
@@ -18,7 +18,7 @@ object Meta {
   import Context._
   import Constant._
 
-  import given NameOps._
+  import NameOps.given
 
   enum Name derives Eql {
     case From(str: String)
@@ -75,8 +75,8 @@ object Meta {
   }
 
   object NameOps {
-    import given Names.NameOps._
-    given as Conversion[Names.Name, Name] = {
+    import Names.NameOps.given
+    given Conversion[Names.Name, Name] = {
       case f: (Names.Name.From | Names.Name.Comp) => From(f.show)
       case Names.Name.BangTag                     => BangTag
       case Names.Name.TensorTag                   => TensorTag
@@ -94,7 +94,7 @@ object Meta {
 
   object ContextOps {
 
-    given as Conversion[Contexts.Context, Seq[Context]] {
+    given Conversion[Contexts.Context, Seq[Context]] {
 
       def branch(ctx: Contexts.Context): Seq[Context] = {
         val linearScopeOpt = {
@@ -158,7 +158,7 @@ object Meta {
   }
 
   object TreeOps {
-    given toTree as Conversion[Trees.Tree, Tree] = {
+    given toTree: Conversion[Trees.Tree, Tree] = {
       case Trees.Tree.Select(tree, name)  => Select(toTree(tree), name)
       case Trees.Tree.Ident(name)         => Ident(name)
 

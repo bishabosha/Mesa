@@ -18,10 +18,10 @@ import ast.Trees._
 
 import org.junit.Assert._
 
-import given CompilerErrorOps._
-import given TreeOps._
-import given TypeOps._
-import given NameOps._
+import CompilerErrorOps.given
+import TreeOps.given
+import TypeOps.given
+import NameOps.given
 
 val any = WildcardType
 
@@ -41,24 +41,26 @@ def failIfUnparsedOrTypedStat: String => Type => Contextual[IdReader[Unit]] =
   failIfUnparsedOrTyped(parseDef)
 
 def typeCore(f: String => IdReader[Lifted[Tree]])
-                    (str: String)
-                    (pt: Type) given IdGen, Context: Lifted[Tree] =
+            (str: String)
+            (pt: Type)
+            (given IdGen, Context): Lifted[Tree] =
   for
     exp <- f(str)
     tpd <- typeAfterParse(pt)(exp)
   yield tpd
 
 def typeAfterParse(pt: Type)
-                          (exp: Tree)
-                          given IdGen, Context: Lifted[Tree] =
+                  (exp: Tree)
+                  (given IdGen, Context): Lifted[Tree] =
   for
     _   <- exp.indexed
     tpd <- exp.typed
   yield tpd
 
 def failIfUnparsedOrTyped(f: String => IdReader[Lifted[Tree]])
-                          (str: String)
-                          (pt: Type) given IdGen, Context: Unit = {
+                         (str: String)
+                         (pt: Type)
+                         (given IdGen, Context): Unit = {
   f(str).fold
     { err => fail(err.show) }
     { tpd =>
@@ -68,7 +70,7 @@ def failIfUnparsedOrTyped(f: String => IdReader[Lifted[Tree]])
 
 def failIfParsed(f: String => IdReader[Lifted[Tree]])
                 (str: String)
-                given IdGen: Unit = {
+                (given IdGen): Unit = {
   f(str).fold
     { err => () }
     { exp => fail(s"Parsed expr sucessfully:\n${exp.show}") }
@@ -108,8 +110,8 @@ def initialCtx: (IdGen, Context) = {
 
   val idGen = new IdGen
   val ctx   = new RootContext()
-  given as Context = ctx
-  given as IdGen   = idGen
+  given Context = ctx
+  given IdGen   = idGen
 
   val pair =
     for

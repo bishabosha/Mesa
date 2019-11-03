@@ -5,7 +5,7 @@ import scala.language.implicitConversions
 import scala.util.control.NonFatal
 import scala.annotation.tailrec
 import scala.io.StdIn.readLine
-  
+
 import Commands.{Command, parseCommand, helpText}
 import Command._
 import mesa.compiler.{ast, core, parsing, error, types}
@@ -30,12 +30,12 @@ import java.nio.file.{Files => JFiles}
 import java.io.{File => JFile}
 import java.util.stream.Collectors
 
-import given CompilerErrorOps._
-import given TreeOps._
-import given TypeOps._
-import given NameOps._
-import given Meta.TreeOps._
-import given Meta.ContextOps._
+import CompilerErrorOps.given
+import TreeOps.given
+import TypeOps.given
+import NameOps.given
+import Meta.TreeOps.given
+import Meta.ContextOps.given
 
 import pprint2.pprintln
 
@@ -92,8 +92,8 @@ def loop(enterPrelude: Boolean): Unit = {
 private def newContext(enterPrelude: Boolean): Lifted[(IdGen, Context)] = {
   val rootCtx   = new RootContext()
   val rootIdGen = new IdGen
-  given as Context = rootCtx
-  given as IdGen = rootIdGen
+  given Context = rootCtx
+  given IdGen = rootIdGen
   for
     _ <- Context.enterBootstrapped
     _ <- lift {
@@ -109,8 +109,8 @@ private def newContext(enterPrelude: Boolean): Lifted[(IdGen, Context)] = {
 
 private def command(state: LoopState, input: String): LoopState = {
 
-  given as Context = state.ctx
-  given as IdGen   = state.idGen
+  given Context = state.ctx
+  given IdGen   = state.idGen
 
   def Typed(s: String)(f: String => IdReader[Lifted[Tree]]): LoopState = {
     guarded(state, s) {
