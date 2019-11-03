@@ -6,10 +6,8 @@ All notable changes to this project will be documented in this file.
 ## [0.3.5-RC1] - 2019-11-03
 ### Changed
 - Upgrade Dotty to `0.20.0-RC1`
-
-## [0.3.4-RC1] - 2019-08-31
-### Changed
-- Upgrade Dotty to `0.18.1-RC1`
+### Added
+- `eec-core` prototype for developing a core language
 
 ## [0.3.3-RC1] - 2019-08-13
 ### Changed
@@ -116,7 +114,6 @@ All notable changes to this project will be documented in this file.
 
 [Unreleased]: https://github.com/bishabosha/EEC/compare/0.3.5-RC1...develop
 [0.3.5-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.3.5-RC1
-[0.3.4-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.3.4-RC1
 [0.3.3-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.3.3-RC1
 [0.3.2-RC1]: https://github.com/bishabosha/EEC/releases/tag/0.3.2-RC1
 [0.3.1-RC3]: https://github.com/bishabosha/EEC/releases/tag/0.3.1-RC3
