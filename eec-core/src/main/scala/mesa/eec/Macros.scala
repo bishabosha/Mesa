@@ -18,48 +18,59 @@ object Macros {
       import qctx.tasty.{Tree => _, _, given}
       val expr = t.compile[Tree, U, Expr[Tree[?]]] {
         case Pair(_,_) =>
-          val '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 = stack
-          '{Pair[$t1, $t2]($a1.asInstanceOf[Tree[$t1]], $b1.asInstanceOf[Tree[$t2]])}::s1
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 =>
+            '{Pair[$t1, $t2]($a1.asInstanceOf[Tree[$t1]], $b1.asInstanceOf[Tree[$t2]])}::s1
 
         case Tensor(_,_) =>
-          val '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 = stack
-          '{Tensor[$t1, $t2]($a1.asInstanceOf[Tree[$t1]], $b1.asInstanceOf[Tree[$t2]])}::s1
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 =>
+            '{Tensor[$t1, $t2]($a1.asInstanceOf[Tree[$t1]], $b1.asInstanceOf[Tree[$t2]])}::s1
 
         case App(_,_) =>
-          val '{ $f1: Tree[Function1[$t1,$t2]] } :: '{ $x1: Tree[$t3] } :: s1 = stack
-          '{App($f1.asInstanceOf[Tree[$t1 => $t2]], $x1.asInstanceOf[Tree[$t1]])}::s1
+          (stack: @unchecked) match
+          case '{ $f1: Tree[Function1[$t1,$t2]] } :: '{ $x1: Tree[$t3] } :: s1 =>
+            '{App($f1.asInstanceOf[Tree[$t1 => $t2]], $x1.asInstanceOf[Tree[$t1]])}::s1
 
         case Eval(_,_) =>
-          val '{ $f1: Tree[Function1[$t1,$t2]] } :: '{ $x1: Tree[$t3] } :: s1 = stack
-          '{Eval($f1.asInstanceOf[Tree[$t1 => $t2]], $x1.asInstanceOf[Tree[$t1]])}::s1
+          (stack: @unchecked) match
+          case '{ $f1: Tree[Function1[$t1,$t2]] } :: '{ $x1: Tree[$t3] } :: s1 =>
+            '{Eval($f1.asInstanceOf[Tree[$t1 => $t2]], $x1.asInstanceOf[Tree[$t1]])}::s1
 
         case Lam(x1,_) =>
-          val '{ $a1: Tree[$t1] } :: s1 = stack
-          '{Lam(${Expr(x1)}, $a1.asInstanceOf[Tree[$t1]])}::s1
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: s1 =>
+            '{Lam(${Expr(x1)}, $a1.asInstanceOf[Tree[$t1]])}::s1
 
         case Lin(x1,_) =>
-          val '{ $a1: Tree[$t1] } ::s1 = stack
-          '{Lin(${Expr(x1)}, $a1.asInstanceOf[Tree[$t1]])}::s1
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: s1 =>
+            '{Lin(${Expr(x1)}, $a1.asInstanceOf[Tree[$t1]])}::s1
 
         case CaseExpr(_,x,_,y,_) =>
-          val '{ $e1: Tree[Either[$t1, $t2]] } :: '{ $l1: Tree[$t3] } :: '{ $r1: Tree[$t4] } :: s1 = stack
-          '{CaseExpr($e1.asInstanceOf[Tree[Either[$t1, $t2]]],${Expr(x)}, $l1.asInstanceOf[Tree[$t3]], ${Expr(y)}, $r1.asInstanceOf[Tree[$t3]])}::s1
+          (stack: @unchecked) match
+          case '{ $e1: Tree[Either[$t1, $t2]] } :: '{ $l1: Tree[$t3] } :: '{ $r1: Tree[$t4] } :: s1 =>
+            '{CaseExpr($e1.asInstanceOf[Tree[Either[$t1, $t2]]],${Expr(x)}, $l1.asInstanceOf[Tree[$t3]], ${Expr(y)}, $r1.asInstanceOf[Tree[$t3]])}::s1
 
         case Let(x,_,_) =>
-          val '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 = stack
-          '{Let(${Expr(x)},$a1.asInstanceOf[Tree[$t1]], $b1.asInstanceOf[Tree[$t2]])}::s1
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 =>
+            '{Let(${Expr(x)},$a1.asInstanceOf[Tree[$t1]], $b1.asInstanceOf[Tree[$t2]])}::s1
 
         case LetT(x,z,_,_) =>
-          val '{ $a1: Tree[Tuple2[$t1, $t2]] } :: '{ $b1: Tree[$t3] } :: s1 = stack
-          '{LetT(${Expr(x)}, ${Expr(z)}, $a1.asInstanceOf[Tree[($t1, $t2)]], $b1.asInstanceOf[Tree[$t3]])}::s1
+          (stack: @unchecked) match
+          case '{ $a1: Tree[Tuple2[$t1, $t2]] } :: '{ $b1: Tree[$t3] } :: s1 =>
+            '{LetT(${Expr(x)}, ${Expr(z)}, $a1.asInstanceOf[Tree[($t1, $t2)]], $b1.asInstanceOf[Tree[$t3]])}::s1
 
         case Bang(t) =>
-          val '{ $a1: Tree[$t1] } :: s1 = stack
-          '{Bang[$t1]($a1.asInstanceOf[Tree[$t1]])}::s1
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: s1 =>
+            '{Bang[$t1]($a1.asInstanceOf[Tree[$t1]])}::s1
 
         case WhyNot(t) =>
-          val '{ $a1: Tree[Nothing] } :: s1 = stack
-          '{WhyNot($a1.asInstanceOf[Tree[Nothing]])}::s1
+          (stack: @unchecked) match
+          case '{ $a1: Tree[?] } :: s1 =>
+            '{WhyNot($a1.asInstanceOf[Tree[Nothing]])}::s1
 
         case Point     => '{Point} :: stack
         case Fst()     => '{Fst()} :: stack
