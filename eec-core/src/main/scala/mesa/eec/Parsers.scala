@@ -25,7 +25,7 @@ object Parsers extends JavaTokenParsers {
   def pExpr[T]: P[T] = (bang | whyNot | fst | snd | inl | inr | eval | aexpr).asInstanceOf[P[T]]
   def aexpr[T]: P[T] = (ref | unit | pair | wrap | splice).asInstanceOf[P[T]]
 
-  def app[T]: P[T] = rep1(expr1)                     ^^ { case ts => ts.reduceLeft(([t, u] => (f: Tree[t => u], a: Tree[t]) => App(f,a)).asInstanceOf).asInstanceOf }
+  def app[T]: P[T] = rep1(expr1)                     ^^ { case ts => ts.reduceLeft(((f: Tree[Any], a: Tree[Any]) => App[Any, Any](f.asInstanceOf[Tree[Any => Any]],a))).asInstanceOf[Tree[T]] }
   def lam[T,U]: P[T => U] = "\\"~>!id~!"."~!expr[U]  ^^ { case x~_~t => Lam(x,t) }
   def lin[T,U]: P[T => U] = "^\\"~>!id~!"."~!expr[U] ^^ { case x~_~t => Lin(x,t) }
 
