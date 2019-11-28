@@ -42,7 +42,7 @@ object StackMachine {
     def [F[?]: InterpretableK, T, O](input: F[T]) compile(step: F[Any] => Statement[O]): O =
       input.interpretK[T, Program[O]](stackInit)(step.toCompiler[F,O]).unsafeInterpret
 
-    def [F[?], O](step: F[Any] => Statement[O]) toCompiler =
-      ([t] => (p: Program[O], i: F[t]) => step(i.asInstanceOf[F[Any]]) +: p)
+    def [F[?], O](step: F[Any] => Statement[O]) toCompiler = [t] =>
+      (p: Program[O], i: F[t]) => step(i.asInstanceOf[F[Any]]) +: p
   }
 }
