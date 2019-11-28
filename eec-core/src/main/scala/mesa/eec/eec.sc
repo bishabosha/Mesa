@@ -7,7 +7,7 @@ def puts[A](a: A)(given Show[A]) =
 given Show[String] = identity
 
 puts(eec"*")
-puts(eec"""f (\x.y) b""")
+puts(eec"""(\x.\y.y) (\x.y) *""")
 puts(eec"let !x *: z be s in inr z")
 puts(eec"let !y be x in *")
 puts(eec"!a")
@@ -20,9 +20,9 @@ puts(eec"snd (*, (a, b))")
 puts(eec"inl *")
 puts(eec"inr *")
 puts(eec"!a *: b")
-puts(eec"!a *: (b g)")
+puts(eec"""!a *: ((\x.x) g)""")
 puts(eec"f (a b) (c d e)")
-puts(eec"case z of {inl l.f a b; inr r.*}")
+puts(eec"""case inl z of {inl l.(\x.\y.*) a b; inr r.*}""")
 puts(eec"""(\x.x) (\x.x)""")
 puts(eec"""(^\x.x)[${23}]""")
 
