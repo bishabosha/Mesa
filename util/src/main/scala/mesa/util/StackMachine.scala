@@ -2,40 +2,41 @@ package mesa.util
 
 import annotation.tailrec
 
-object StackMachine {
+object StackMachine with
   export opaques.{Program, Stack, stackInit, stack}
 
   type Statement[T] = (given opaques.Stack[T]) => List[T]
 
-  trait Interpretable[I] {
+  trait Interpretable[I] with
     def [O](i: I) interpret (z: O)(f: (O, I) => O): O
-  }
 
-  trait InterpretableK[F[?]] {
+  trait InterpretableK[F[?]] with
     def [T, O](i: F[T]) interpretK(z: O)(f: [t] => (O, F[t]) => O): O
-  }
 
-  object opaques {
+  object opaques with
+
     opaque type Program[T] = List[Statement[T]]
     opaque type Stack[T]   = List[T]
 
     def stackInit[T]: Program[T] = Nil
     def stack[T](given Stack[T]): List[T] = summon[List[T]]
 
-    given {
+    given Object with
 
       def [T](t: Statement[T]) +: (p: Program[T]): Program[T] = t :: p
 
       def [T](program: Program[T]) unsafeInterpret: T = run(Nil, program).head
 
-      @tailrec private def run[T](stack: Stack[T], program: Program[T]): List[T] = program match {
+      @tailrec private def run[T](stack: Stack[T], program: Program[T]): List[T] = program match
         case stat :: stats => run(stat(given stack), stats)
         case Nil           => stack
-      }
-    }
-  }
 
-  object Program {
+    end given
+
+  end opaques
+
+  object Program with
+
     def [I: Interpretable, O](input: I) compile(step: I => Statement[O]): O =
       input.interpret[Program[O]](stackInit)((p, i) => step(i) +: p).unsafeInterpret
 
@@ -44,5 +45,7 @@ object StackMachine {
 
     def [F[?], O](step: F[Any] => Statement[O]) toCompiler = [t] =>
       (p: Program[O], i: F[t]) => step(i.asInstanceOf[F[Any]]) +: p
-  }
-}
+
+  end Program
+
+end StackMachine

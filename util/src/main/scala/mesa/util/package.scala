@@ -1,6 +1,5 @@
 package mesa.util
 
-import scala.annotation.tailrec
 import scala.collection.SeqView
 import scala.collection.IndexedSeq
 
