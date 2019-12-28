@@ -36,11 +36,13 @@ object StackMachine {
   }
 
   object Program {
-    def [I: Interpretable, O](input: I) compile(compiler: I => Statement[O]): O =
-      input.interpret(stackInit[O])((p, i) => compiler(i) +: p).unsafeInterpret
+    def [I: Interpretable, O](input: I) compile(step: I => Statement[O]): O =
+      input.interpret[Program[O]](stackInit)((p, i) => step(i) +: p).unsafeInterpret
 
-    def [F[?]: InterpretableK, T, O](input: F[T]) compile(compiler: F[Any] => Statement[O]): O = {
-      input.interpretK(stackInit[O])(([t] => (p: Program[O], i: F[t]) => compiler(i.asInstanceOf[F[Any]]) +: p).asInstanceOf).unsafeInterpret
-    }
+    def [F[?]: InterpretableK, T, O](input: F[T]) compile(step: F[Any] => Statement[O]): O =
+      input.interpretK[T, Program[O]](stackInit)(step.toCompiler[F,O]).unsafeInterpret
+
+    def [F[?], O](step: F[Any] => Statement[O]) toCompiler = [t] =>
+      (p: Program[O], i: F[t]) => step(i.asInstanceOf[F[Any]]) +: p
   }
 }
