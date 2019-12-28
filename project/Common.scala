@@ -1,3 +1,3 @@
 object Common {
-  val mesaVersion = "0.3.5-SNAPSHOT"
+  val mesaVersion = "0.3.6-SNAPSHOT"
 }

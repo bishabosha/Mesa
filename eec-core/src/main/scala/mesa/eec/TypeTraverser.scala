@@ -12,7 +12,7 @@ object TypeTraverser with
 
   type ![A] = (A & !.type) // remember to unwrap expressions of this type to prevent classcastexception
 
-  given BangOps: [A](x: A) with
+  given BangOps: [A](x: A) extended with
     def unary_! : ![A] = x.asInstanceOf[![A]]
 
   def traverseTypesImpl[T: Type](expr: Expr[T])(given qctx: QuoteContext): Expr[Unit] =

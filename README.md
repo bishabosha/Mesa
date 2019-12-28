@@ -1,7 +1,7 @@
 # Mesa
 
 ## Current Release
-0.3.5-SNAPSHOT
+0.3.6-SNAPSHOT
 
 ## About
 This repository is for implementing a programming language based on the enriched effect calculus by Egger, Ejlers and Simpson (2014).
