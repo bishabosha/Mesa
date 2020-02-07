@@ -30,8 +30,7 @@ object Macros {
         case Project(_, e) =>
           (stack: @unchecked) match
           case '{ $p1: Tree[$t1] } :: s1 =>
-            val e1: Expr[Int & Singleton] = Expr(e)
-            '{Project[Any,Any,Int & Singleton]($p1.asInstanceOf[Tree[(Any, Any)]], $e1)} :: s1
+            '{Project($p1.asInstanceOf[Tree[(Any, Any)]], ${Expr(e: Int & Singleton)}).asInstanceOf[Tree[Any]]} :: s1
 
         case App(_,_) =>
           (stack: @unchecked) match

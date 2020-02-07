@@ -64,10 +64,15 @@ object Kernel
 
   end step
 
-  private def rec(s: State): ErasedTree =
+  private def run(s: State): State =
     println(s"step: ${s.show}")
-    if s.finalState then s._1
-    else rec(step(s))
+    if s.finalState then s
+    else run(step(s))
+
+  private def rec(s: State): ErasedTree =
+    run(s) match
+    case (t, Nil, (m,f)::_) => throw TypeError(s"Tried to apply non-function $t to $m")
+    case (t, _, _)          => t
 
   private def bind(env: Environment, bindings: (Name, ErasedTree)*): Environment =
     bindings.foldRight(env)((p, env) => Closure(p._1, p._2, Nil)::env)
@@ -130,10 +135,14 @@ object Kernel
   private def [T](e: ErasedTree) as: Tree[T] = e.asInstanceOf[Tree[T]]
 
   def run[T](t: Tree[T]): Unit =
-    println(compile(t).merge)
+    println(eval(t).merge)
 
-  def compile[T](t: Tree[T]): Either[TypeError, T] =
-    try rec(start(t)) match
-      case Pure(t) => Right(t.asInstanceOf[T])
-      case term    => Left(TypeError(s"Program terminated with ${term.show}"))
+  def reduce[T](t: Tree[T]): Either[TypeError, Tree[T]] =
+    try Right(rec(start(t)).as)
     catch case e: TypeError => Left(e)
+
+  def eval[T](t: Tree[T]): Either[TypeError, T] =
+    reduce(t).flatMap {
+      case Pure(t) => Right(t)
+      case term    => Left(TypeError(s"Program terminated with ${term.show}"))
+    }
