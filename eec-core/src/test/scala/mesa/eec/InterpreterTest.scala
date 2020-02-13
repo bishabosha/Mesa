@@ -37,7 +37,7 @@ class InterpretorTest
   @test def letBangEvaluates: Unit =
     var x = 0
     val program = eec"""
-    let !x be !${x = 1; 99} in x
+    let !x be ${x = 1; 99} in x
     """
     Kernel.eval(program) match
     case Right(result) =>
@@ -59,20 +59,20 @@ class InterpretorTest
   @test def letTensorEvaluatesOnlyLeft: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    let !_ *: _ be !${xs ::= 0} *: (let !t be !${xs ::= 1} in *) in
+    let !_ *: _ be !No *: (let !t be !${xs ::= 0} in *) in
     *
     """
     Kernel.reduce(program) match
     case Right(res) =>
-      assert(xs == 0 :: Nil)
+      assert(xs == Nil)
       assert(res == eec"*")
     case Left(err) => throw err
 
-  @test def sequenceSideEffects: Unit =
+  @test def sequenceSideEffectsWithBang: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    let !x *: m be !${xs ::= 0; 35} *: (!${xs ::= 1}) in
-    let !_      be m                                  in
+    let !x be ${xs ::= 0; 35} in
+    let !_ be ${xs ::= 1}     in
     x
     """
     Kernel.eval(program) match
@@ -180,7 +180,7 @@ class InterpretorTest
   @test def nestedComputation: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    let !result be !((^\x.x)[let !m be !${xs ::= 0; 56} in m]) in
+    let !result be ((^\x.x)[let !m be ${xs ::= 0; 56} in !m]) in
     result
     """
     Kernel.eval(program) match
@@ -192,7 +192,7 @@ class InterpretorTest
   @test def caseExprReducesInl: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    case inl (let !t be !${xs ::= 0} in Yes) of { inl l.l; inr _.* }
+    case inl (let !t be ${xs ::= 0} in Yes) of { inl l.l; inr _.* }
     """
     Kernel.reduce(program) match
     case Right(term) =>
@@ -203,7 +203,7 @@ class InterpretorTest
   @test def caseExprReducesInr: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    case inr (let !t be !${xs ::= 0} in Yes) of { inl _.*; inr r.r }
+    case inr (let !t be ${xs ::= 0} in Yes) of { inl _.*; inr r.r }
     """
     Kernel.reduce(program) match
     case Right(term) =>

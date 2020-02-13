@@ -92,35 +92,28 @@ object Macros {
           case '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 =>
             '{LetT(${Expr(x)}, ${Expr(z)}, $a1.asInstanceOf[Tree[(Any, Any)]], $b1)} :: s1
 
-        case Point     => '{Point}                  :: stack
-        case Splice(n) => '{Lazy(() => ${args(n)})} :: stack
-        case Var(x)    => '{Var(${Expr(x)})}        :: stack
+        case Point     => '{Point}              :: stack
+        case Splice(n) => '{effect(${args(n)})} :: stack
+        case Var(x)    => '{Var(${Expr(x)})}    :: stack
         case Pure(x)   =>  { qctx.error(s"Access to value $x from wrong staging level"); ??? }
         case Lazy(_)   =>  { qctx.error(s"Access to thunk from wrong staging level"); ??? }
       }
       expr.asInstanceOf[Expr[mesa.eec.Trees.Tree[U]]]
     }
 
-    def encode(parts: Seq[Expr[String]])(given QuoteContext): String = {
-      val sb = new StringBuilder()
-
-      def appendPart(part: Expr[String]) = {
+    def encode(parts: Seq[Expr[String]])(given QuoteContext): String =
+      val sb = StringBuilder()
+      def appendPart(part: Expr[String]): Unit =
         val Const(value: String) = part
         sb ++= value
-      }
-
-      def appendHole(index: Int) = {
+      def appendHole(index: Int): Unit =
         sb ++= Hole.encode(index)
-      }
-
-      for ((part, index) <- parts.init.zipWithIndex) {
+      for (part, index) <- parts.init.zipWithIndex do
         appendPart(part)
         appendHole(index)
-      }
       appendPart(parts.last)
-
       sb.toString
-    }
+    end encode
 
     ((scExpr, argsExpr): @unchecked) match {
       case ('{ StringContext(${ExprSeq(parts)}: _*) }, ExprSeq(args)) =>

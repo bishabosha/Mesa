@@ -17,9 +17,9 @@ object Kernel:
     case Pi(e: Environment, i: Int)
     case Sigma(e: Environment, inl: Name, l: ErasedTree, inr: Name, r: ErasedTree)
     case Bind(e: Environment, x: Name, u: ErasedTree)
-    case Compute(e: Environment, x: Name, u: ErasedTree)
+    case Reduce(e: Environment, x: Name, u: ErasedTree)
     case UnZip(e: Environment, x: Name, y: Name, u: ErasedTree)
-    case ComputeLeft(e: Environment, x: Name, y: Name, yVal: ErasedTree, u: ErasedTree)
+    case ReduceLeft(e: Environment, x: Name, y: Name, yVal: ErasedTree, u: ErasedTree)
 
   given Show[Continuation] = { case p: Product => p.productPrefix.toLowerCase }
 
@@ -41,38 +41,30 @@ object Kernel:
     case ( Pair(x,_), _, Pi(e,0) :: ks ) => (x, e, ks)
     case ( Pair(_,y), _, Pi(e,1) :: ks ) => (y, e, ks)
     case ( err      , _, Pi(_,i) :: _  ) => typeError(s"expected (_,_) as argument to ${List("fst","snd")(i)} but got: ${err.show}")
-    end stepPi
 
     def stepSigma: State = (s: @unchecked) match
     case ( Inl(inl), _, Sigma(e,x,l,_,_) :: ks ) => (l, bind(e, x -> inl), ks)
     case ( Inr(inr), _, Sigma(e,_,_,y,r) :: ks ) => (r, bind(e, y -> inr), ks)
     case ( err     , _, Sigma(_,_,_,_,_) :: _  ) => typeError(s"expected either (inl _) or (inr _) but got: ${err.show}")
-    end stepSigma
 
     def stepBind: State = (s: @unchecked) match
-    case ( Bang(effect), e, Bind(f,x,u) :: ks ) => (effect, e, Compute(f,x,u) :: ks)
-    case ( err         , _, Bind(_,_,_) :: _  ) => typeError(s"expected (!_) but got: ${err.show}")
-    end stepBind
+    case ( Bang(value), e, Bind(f,x,u) :: ks ) => (value, e                       , Reduce(f,x,u) :: ks)
+    case ( l @ Lazy(_), e, Bind(f,x,u) :: ks ) => (u    , bind(e, x -> compute(l)), ks                 )
+    case ( err        , _, Bind(_,_,_) :: _  ) => typeError(s"expected (!_) but got: ${err.show}")
 
-    def stepCompute: State = (s: @unchecked) match
-    case ( Lazy(thunk), _, Compute(e,x,u) :: ks ) => (u, bind(e, x -> Pure(thunk())), ks) // this step should be moved to bind, lazy should have ! type
-    case ( result     , _, Compute(e,x,u) :: ks ) => (u, bind(e, x -> result)       , ks)
-    end stepCompute
+    def stepReduce: State = (s: @unchecked) match
+    case ( result, _, Reduce(e,x,u) :: ks ) => (u, bind(e, x -> result), ks)
 
     def stepUnZip: State = (s: @unchecked) match
-    case ( Tensor(effect, next), e, UnZip(f,x,y,u) :: ks ) => (effect, e, ComputeLeft(f,x,y,next,u) :: ks)
-    case ( err                 , _, UnZip(_,_,_,_) :: _  ) => typeError(s"expected (!_*:_) but got: ${err.show}")
-    end stepUnZip
+    case ( Tensor(value, next), e, UnZip(f,x,y,u) :: ks ) => (value, e, ReduceLeft(f,x,y,next,u) :: ks)
+    case ( err                , _, UnZip(_,_,_,_) :: _  ) => typeError(s"expected (!_*:_) but got: ${err.show}")
 
-    def stepComputeLeft: State = (s: @unchecked) match
-    case ( Lazy(thunk), _, ComputeLeft(e,x,y,next,u) :: ks ) => (u, bind(e, x -> Pure(thunk()), y -> next), ks) // this step should be moved to unzip, lazy should have ! type, tensor syntax should change
-    case ( result     , _, ComputeLeft(e,x,y,next,u) :: ks ) => (u, bind(e, x -> result, y -> next)       , ks)
-    end stepComputeLeft
+    def stepReduceLeft: State = (s: @unchecked) match
+    case ( result, _, ReduceLeft(e,x,y,next,u) :: ks ) => (u, bind(e, x -> result, y -> next) , ks)
 
     def stepApply: State = (s: @unchecked) match
     case ( Lambda(x,t), e, Apply(f,m) :: ks ) => (t, Closure(x,m,f)::e, ks )
     case ( err        , _, Apply(_,m) :: ks ) => throw TypeError(s"Tried to apply non-function ${err.show} to ${m.show}")
-    end stepApply
 
     def stepRoot: State = (s: @unchecked) match
     case ( v @ Var(x)         , Closure(y,n,f)::e, ks ) => if x == y then (n,f,ks) else (v,e,ks)
@@ -86,14 +78,14 @@ object Kernel:
   @tailrec private def run(s: State): ErasedTree =
     println(s"step: ${Show.show(s)}")
     if s.finalState then s.continuation match
-      case (_: Pi)          :: _ => run(s.stepPi)
-      case (_: Apply)       :: _ => run(s.stepApply)
-      case (_: Sigma)       :: _ => run(s.stepSigma)
-      case (_: Bind)        :: _ => run(s.stepBind)
-      case (_: Compute)     :: _ => run(s.stepCompute)
-      case (_: UnZip)       :: _ => run(s.stepUnZip)
-      case (_: ComputeLeft) :: _ => run(s.stepComputeLeft)
-      case Nil                   => s.head
+      case (_: Pi)         :: _ => run(s.stepPi)
+      case (_: Apply)      :: _ => run(s.stepApply)
+      case (_: Sigma)      :: _ => run(s.stepSigma)
+      case (_: Bind)       :: _ => run(s.stepBind)
+      case (_: Reduce)     :: _ => run(s.stepReduce)
+      case (_: UnZip)      :: _ => run(s.stepUnZip)
+      case (_: ReduceLeft) :: _ => run(s.stepReduceLeft)
+      case Nil                  => s.head
     else
       run(s.stepRoot)
   end run
@@ -144,8 +136,6 @@ object Kernel:
   case (Var(_)  , Nil, _  ) => true
   case _                    => false
   end finalState
-
-  private def [T](e: ErasedTree).as: Tree[T] = e.asInstanceOf[Tree[T]]
 
   def reduce[T](t: Tree[T]): Either[TypeError, Tree[T]] =
     try Right(run(start(t)).as)
