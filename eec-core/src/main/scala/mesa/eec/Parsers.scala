@@ -26,21 +26,21 @@ object Parsers extends JavaTokenParsers {
   def aexpr[T]: P[T] = (ref | unit | pair | wrap | splice).asInstanceOf[P[T]]
 
   def app[T]  : P[T]      = rep1(expr1)              ^^ { case ts => ts.reduceLeft(((f, a) => App(f.asInstanceOf[Tree[Any => Any]],a))).asInstanceOf[Tree[T]] }
-  def lam[T,U]: P[T => U] = "\\"~>!id~!"."~!expr[U]  ^^ { case x~_~t => Lam(x,t) }
+  def lam[T,U]: P[T => U] = "\\"~>!pat~!"."~!expr[U] ^^ { case x~_~t => Lam(x,t) }
   def lin[T,U]: P[T => U] = "^\\"~>!id~!"."~!expr[U] ^^ { case x~_~t => Lin(x,t) }
 
-  def let[T,U]: P[U] = "let"~>"!"~>id~"be"~!expr[T]~!"in"~!expr[U] ^^ {
+  def let[T,U]: P[U] = "let"~>"!"~>pat~"be"~!expr[T]~!"in"~!expr[U] ^^ {
     case x~_~t~_~u => Let(x,t,u)
   }
 
-  def letT[T,U,V]: P[V] = "let"~>"!"~>id~"*:"~!id~!"be"~!expr[(T,U)]~!"in"~!expr[V] ^^ {
+  def letT[T,U,V]: P[V] = "let"~>"!"~>pat~"*:"~!pat~!"be"~!expr[(T,U)]~!"in"~!expr[V] ^^ {
     case x~_~y~_~s~_~t => LetT(x,y,s,t)
   }
 
   def cse[L,R,U]: P[U] = {
     "case"~>!expr[Either[L,R]]~!"of"~!"{"~!
-      "inl"~!id~!"."~!expr[U]~!";"~!
-      "inr"~!id~!"."~!expr[U]<~!
+      "inl"~!pat~!"."~!expr[U]~!";"~!
+      "inr"~!pat~!"."~!expr[U]<~!
     "}" ^^ { case e~_~_~_~x~_~l~_~_~y~_~r => CaseExpr(e,x,l,y,r) }
   }
 
@@ -60,8 +60,10 @@ object Parsers extends JavaTokenParsers {
   def splice[T]: P[T]     = HoleStart ~> HoleChar.*               ^^ { case cs    => Splice(cs.length) }
 
   val reservedWords = Set(
-    "case", "of", "let", "be", "in", "fst", "snd", "inl", "inr"
+    "case", "of", "let", "be", "in", "fst", "snd", "inl", "inr", "_"
   )
+
+  val pat = "_" | id
 
   val id = Parser { input =>
     ident(input).filterWithError(

@@ -3,6 +3,7 @@ package mesa.eec
 import mesa.util.StackMachine.{InterpretableK, Program, stack, Statement, Stack}
 import Program.compile
 import mesa.util.Show
+import runtime.ScalaRunTime.stringOf
 
 import annotation.tailrec
 
@@ -131,15 +132,15 @@ object Trees {
         val t1::u1::s1 = stack
         s"let !$x *: $z be $t1 in $u1"::s1
 
-      case Point     => "*"            :: stack
-      case Bang()    => "!"            :: stack
-      case WhyNot()  => "?"            :: stack
-      case Inl()     => "inl"          :: stack
-      case Inr()     => "inr"          :: stack
-      case Pure(x)   => s"%( $x )"     :: stack
-      case Lazy(_)   => s"{<thunk>}"   :: stack
-      case Splice(n) => s"<splice:$n>" :: stack
-      case Var(x)    => x              :: stack
+      case Point     => "*"                   :: stack
+      case Bang()    => "!"                   :: stack
+      case WhyNot()  => "?"                   :: stack
+      case Inl()     => "inl"                 :: stack
+      case Inr()     => "inr"                 :: stack
+      case Pure(x)   => s"~(${stringOf(x)})"  :: stack
+      case Lazy(_)   => s"~<thunk>"           :: stack
+      case Splice(n) => s"~<splice:$n>"       :: stack
+      case Var(x)    => x                     :: stack
 
     }
   }
