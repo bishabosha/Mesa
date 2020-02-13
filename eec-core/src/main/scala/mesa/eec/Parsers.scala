@@ -44,12 +44,12 @@ object Parsers extends JavaTokenParsers {
     "}" ^^ { case e~_~_~_~x~_~l~_~_~y~_~r => CaseExpr(e,x,l,y,r) }
   }
 
-  def bang[T]  : P[T]           = "!"   ~> aexpr[T]       ^^ { case e => App(Bang(),e)   }
-  def whyNot[T]: P[T]           = "?"   ~> aexpr[Nothing] ^^ { case e => App(WhyNot(),e) }
-  def fst[A,B] : P[A]           = "fst" ~> aexpr[(A,B)]   ^^ { case e => Project(e, 0)   }
-  def snd[A,B] : P[B]           = "snd" ~> aexpr[(A,B)]   ^^ { case e => Project(e, 1)   }
-  def inl[A,B] : P[Either[A,B]] = "inl" ~> aexpr[A]       ^^ { case e => App(Inl(),e)    }
-  def inr[A,B] : P[Either[A,B]] = "inr" ~> aexpr[B]       ^^ { case e => App(Inr(),e)    }
+  def bang[T]  : P[T]           = "!"   ~> aexpr[T]       ^^ { case e => Bang(e)   }
+  def whyNot[T]: P[T]           = "?"   ~> aexpr[Nothing] ^^ { case e => WhyNot(e) }
+  def fst[A,B] : P[A]           = "fst" ~> aexpr[(A,B)]   ^^ { case e => Fst(e)    }
+  def snd[A,B] : P[B]           = "snd" ~> aexpr[(A,B)]   ^^ { case e => Snd(e)    }
+  def inl[A,B] : P[Either[A,B]] = "inl" ~> aexpr[A]       ^^ { case e => Inl(e)    }
+  def inr[A,B] : P[Either[A,B]] = "inr" ~> aexpr[B]       ^^ { case e => Inr(e)    }
 
   def tsor[A,B]: P[(A,B)] = "!"~>aexpr[A]~"*:"~!aexpr[B]          ^^ { case t~_~z => Tensor(t,z)       }
   def pair[A,B]: P[(A,B)] = "("~>expr[A]~","~!expr[B]<~!")"       ^^ { case t~_~u => Pair(t,u)         }

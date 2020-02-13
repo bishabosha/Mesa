@@ -27,20 +27,45 @@ object Macros {
           case '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 =>
             '{Tensor[$t1, $t2]($a1, $b1)}::s1
 
-        case Project(_, e) =>
+        case Fst(_) =>
           (stack: @unchecked) match
           case '{ $p1: Tree[$t1] } :: s1 =>
-            '{Project($p1.asInstanceOf[Tree[(Any, Any)]], ${Expr(e: Int & Singleton)}).asInstanceOf[Tree[Any]]} :: s1
+            '{Fst($p1.asInstanceOf[Tree[(Any, Any)]])} :: s1
+
+        case Snd(_) =>
+          (stack: @unchecked) match
+          case '{ $p1: Tree[$t1] } :: s1 =>
+            '{Snd($p1.asInstanceOf[Tree[(Any, Any)]])} :: s1
+
+        case Bang(_) =>
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: s1 =>
+            '{Bang($a1)} :: s1
+
+        case WhyNot(_) =>
+          (stack: @unchecked) match
+          case '{ $v1: Tree[$t1] } :: s1 =>
+            '{WhyNot($v1.asInstanceOf[Tree[Nothing]])} :: s1
+
+        case Inl(_) =>
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: s1 =>
+            '{Inl[$t1, Any]($a1)} :: s1
+
+        case Inr(_) =>
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: s1 =>
+            '{Inr[Any, $t1]($a1)} :: s1
 
         case App(_,_) =>
           (stack: @unchecked) match
           case '{ $f1: Tree[$t1] } :: '{ $x1: Tree[$t2] } :: s1 =>
-            '{App($f1.asInstanceOf[Tree[Any => Any]], $x1.asInstanceOf[Tree[Any]])} :: s1
+            '{App($f1.asInstanceOf[Tree[$t2 => Any]], $x1)} :: s1
 
         case Eval(_,_) =>
           (stack: @unchecked) match
           case '{ $f1: Tree[$t1] } :: '{ $x1: Tree[$t2] } :: s1 =>
-            '{Eval($f1.asInstanceOf[Tree[Any => Any]], $x1.asInstanceOf[Tree[Any]])} :: s1
+            '{Eval($f1.asInstanceOf[Tree[$t2 => Any]], $x1)} :: s1
 
         case Lam(x1,_) =>
           (stack: @unchecked) match
@@ -68,10 +93,6 @@ object Macros {
             '{LetT(${Expr(x)}, ${Expr(z)}, $a1.asInstanceOf[Tree[(Any, Any)]], $b1)} :: s1
 
         case Point     => '{Point}                  :: stack
-        case Bang()    => '{Bang()}                 :: stack
-        case WhyNot()  => '{WhyNot()}               :: stack
-        case Inl()     => '{Inl()}                  :: stack
-        case Inr()     => '{Inr()}                  :: stack
         case Splice(n) => '{Lazy(() => ${args(n)})} :: stack
         case Var(x)    => '{Var(${Expr(x)})}        :: stack
         case Pure(x)   =>  { qctx.error(s"Access to value $x from wrong staging level"); ??? }

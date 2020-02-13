@@ -30,11 +30,12 @@ object Trees {
     case Lam[T,U](x: Name, t: Tree[U])                                                      extends Tree[T => U]
     case Lin[T,U](x: Name, t: Tree[U])                                                      extends Tree[T => U]
     case CaseExpr[L, R, U](e: Tree[Either[L, R]], x: Name, l: Tree[U], y: Name, r: Tree[U]) extends Tree[U]
-    case Project[A,B,I <: Int & Singleton](p: Tree[(A,B)], elem: I)                         extends Tree[Pi[A,B,I]]
-    case Inl[A,B]()                                                                         extends Tree[A => Either[A,B]]
-    case Inr[A,B]()                                                                         extends Tree[B => Either[A,B]]
-    case Bang[T]()                                                                          extends Tree[T => T]
-    case WhyNot[T]()                                                                        extends Tree[Nothing => T]
+    case Fst[A,B](p: Tree[(A,B)])                                                           extends Tree[A]
+    case Snd[A,B](p: Tree[(A,B)])                                                           extends Tree[B]
+    case Inl[A,B](a: Tree[A])                                                               extends Tree[Either[A,B]]
+    case Inr[A,B](b: Tree[B])                                                               extends Tree[Either[A,B]]
+    case Bang[T](t: Tree[T])                                                                extends Tree[T]
+    case WhyNot[T](t: Tree[Nothing])                                                        extends Tree[T]
     case Let[T,U](n: Name, t: Tree[T], u: Tree[U])                                          extends Tree[U]
     case LetT[A,B,U](x: Name, z: Name, s: Tree[(A,B)], t: Tree[U])                          extends Tree[U]
     case Lazy[T](x: () => T)                                                                extends Tree[T]
@@ -49,12 +50,17 @@ object Trees {
     given InterpretableK[Tree] {
       def [T,O](tree: Tree[T]) interpretK(z: O)(f: [t] => (O, Tree[t]) => O): O = {
         @tailrec
-        def inner(z: O, ts: List[Tree[?]]): O = ts match {
+        def inner(z: O, ts: List[ErasedTree]): O = ts match {
           case Nil => z
           case t::ts => t match {
             case Pair(a,b)            => inner(f(z,t), a::b::ts)
-            case Tensor(v,u)          => inner(f(z,t), v::u::ts)
-            case Project(p, _)        => inner(f(z,t), p::ts)
+            case Tensor(a,b)          => inner(f(z,t), a::b::ts)
+            case Fst(p)               => inner(f(z,t), p::ts)
+            case Snd(p)               => inner(f(z,t), p::ts)
+            case Inl(l)               => inner(f(z,t), l::ts)
+            case Inr(r)               => inner(f(z,t), r::ts)
+            case Bang(a)              => inner(f(z,t), a::ts)
+            case WhyNot(v)            => inner(f(z,t), v::ts)
             case App(g,u)             => inner(f(z,t), g::u::ts)
             case Eval(g,u)            => inner(f(z,t), g::u::ts)
             case Lam(_,u)             => inner(f(z,t), u::ts)
@@ -97,9 +103,29 @@ object Trees {
         val z2 = wrapIfComplex(z,z1)
         s"!$v2 *: $z2"::s1
 
-      case Project(p, e) =>
+      case Fst(p) =>
         val p1::s1 = stack
-        s"${List("fst", "snd")(e)} $p1"::s1
+        s"fst $p1"::s1
+
+      case Snd(p) =>
+        val p1::s1 = stack
+        s"snd $p1"::s1
+
+      case Bang(t) =>
+        val t1::s1 = stack
+        s"!$t1"::s1
+
+      case WhyNot(v) =>
+        val v1::s1 = stack
+        s"?$v1"::s1
+
+      case Inl(l) =>
+        val l1::s1 = stack
+        s"inl $l1"::s1
+
+      case Inr(r) =>
+        val r1::s1 = stack
+        s"inr $r1"::s1
 
       case App(f,t) =>
         val f1::t1::s1 = stack
@@ -133,10 +159,6 @@ object Trees {
         s"let !$x *: $z be $t1 in $u1"::s1
 
       case Point     => "*"                   :: stack
-      case Bang()    => "!"                   :: stack
-      case WhyNot()  => "?"                   :: stack
-      case Inl()     => "inl"                 :: stack
-      case Inr()     => "inr"                 :: stack
       case Pure(x)   => s"~(${stringOf(x)})"  :: stack
       case Lazy(_)   => s"~<thunk>"           :: stack
       case Splice(n) => s"~<splice:$n>"       :: stack

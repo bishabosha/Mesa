@@ -44,18 +44,18 @@ object Kernel:
     end stepPi
 
     def stepSigma: State = (s: @unchecked) match
-    case ( Application(Inl(), inl), _, Sigma(e,x,l,_,_) :: ks ) => (l, bind(e, x -> inl), ks)
-    case ( Application(Inr(), inr), _, Sigma(e,_,_,y,r) :: ks ) => (r, bind(e, y -> inr), ks)
-    case ( err                    , _, Sigma(_,_,_,_,_) :: _  ) => typeError(s"expected either (${Inl().show} _) or (${Inr().show} _) but got: ${err.show}")
+    case ( Inl(inl), _, Sigma(e,x,l,_,_) :: ks ) => (l, bind(e, x -> inl), ks)
+    case ( Inr(inr), _, Sigma(e,_,_,y,r) :: ks ) => (r, bind(e, y -> inr), ks)
+    case ( err     , _, Sigma(_,_,_,_,_) :: _  ) => typeError(s"expected either (inl _) or (inr _) but got: ${err.show}")
     end stepSigma
 
     def stepBind: State = (s: @unchecked) match
-    case ( Application(Bang(), effect), e, Bind(f,x,u) :: ks ) => (effect, e, Compute(f,x,u) :: ks)
-    case ( err                        , _, Bind(_,_,_) :: _  ) => typeError(s"expected (!_) but got: ${err.show}")
+    case ( Bang(effect), e, Bind(f,x,u) :: ks ) => (effect, e, Compute(f,x,u) :: ks)
+    case ( err         , _, Bind(_,_,_) :: _  ) => typeError(s"expected (!_) but got: ${err.show}")
     end stepBind
 
     def stepCompute: State = (s: @unchecked) match
-    case ( Lazy(thunk), _, Compute(e,x,u) :: ks ) => (u, bind(e, x -> Pure(thunk())), ks)
+    case ( Lazy(thunk), _, Compute(e,x,u) :: ks ) => (u, bind(e, x -> Pure(thunk())), ks) // this step should be moved to bind, lazy should have ! type
     case ( result     , _, Compute(e,x,u) :: ks ) => (u, bind(e, x -> result)       , ks)
     end stepCompute
 
@@ -65,7 +65,7 @@ object Kernel:
     end stepUnZip
 
     def stepComputeLeft: State = (s: @unchecked) match
-    case ( Lazy(thunk), _, ComputeLeft(e,x,y,next,u) :: ks ) => (u, bind(e, x -> Pure(thunk()), y -> next), ks)
+    case ( Lazy(thunk), _, ComputeLeft(e,x,y,next,u) :: ks ) => (u, bind(e, x -> Pure(thunk()), y -> next), ks) // this step should be moved to unzip, lazy should have ! type, tensor syntax should change
     case ( result     , _, ComputeLeft(e,x,y,next,u) :: ks ) => (u, bind(e, x -> result, y -> next)       , ks)
     end stepComputeLeft
 
@@ -101,6 +101,11 @@ object Kernel:
   private def bind(env: Environment, bindings: (Name, ErasedTree)*): Environment =
     bindings.foldRight(env)((p, env) => if p.head == "_" then env else Closure(p(0), p(1), Nil)::env)
 
+  object Project:
+    def unapply(t: Fst[?,?] | Snd[?,?]): (ErasedTree, Int) = t match
+    case Fst(p) => (p, 0)
+    case Snd(p) => (p, 1)
+
   object Opaque:
     def unapply(t: Pure[?] | Lazy[?] | Splice[?] | Point.type): true = true
 
@@ -126,10 +131,10 @@ object Kernel:
   object Closed:
     def unapply(t: ErasedTree): Boolean = t match
     case (
-      Opaque()                 // has no dependency
-    | Application(Effect(), _) // effects require an enclosing expression to evaluate
-    | Prod()                   // products require an enclosing expression to project
-    | Binder()
+      Opaque() // has no dependency
+    | Effect() // effects require an enclosing expression to evaluate
+    | Prod()   // products require an enclosing expression to project
+    | Binder() // binder requires enclosing application to reduce
     ) => true
     case _ => false
     end unapply
@@ -141,9 +146,6 @@ object Kernel:
   end finalState
 
   private def [T](e: ErasedTree).as: Tree[T] = e.asInstanceOf[Tree[T]]
-
-  def run[T](t: Tree[T]): Unit =
-    println(eval(t).merge)
 
   def reduce[T](t: Tree[T]): Either[TypeError, Tree[T]] =
     try Right(run(start(t)).as)

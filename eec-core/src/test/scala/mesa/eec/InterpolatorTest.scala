@@ -37,24 +37,24 @@ class InterpolatorTest
     assert(eec"""*""" == Point)
 
   @test def bang: Unit =
-    assert(eec"""!*""" == App(Bang(), Point))
+    assert(eec"""!*""" == Bang(Point))
 
   @test def bangSplice: Unit =
     var x = 0
     eec"""!${x = 1}""" match
-    case App(Bang(), Lazy(_)) =>
+    case Bang(Lazy(_)) =>
       assert(x == 0)
     case tree =>
       fail(s"bang with splice was $tree")
 
   @test def whyNot: Unit =
-    assert(eec"""?x""" == App(WhyNot(), Var("x")))
+    assert(eec"""?x""" == WhyNot(Var("x")))
 
   @test def inl: Unit =
-    assert(eec"""inl *""" == App(Inl(), Point))
+    assert(eec"""inl *""" == Inl(Point))
 
   @test def inr: Unit =
-    assert(eec"""inr *""" == App(Inr(), Point))
+    assert(eec"""inr *""" == Inr(Point))
 
   @test def caseexpr: Unit =
     assert(eec"""case x of {inl l.l; inr r.r}""" == CaseExpr(Var("x"), "l", Var("l"), "r", Var("r")))
@@ -66,7 +66,7 @@ class InterpolatorTest
     assert(eec"""let !x *: y be m in y""" == LetT("x", "y", Var("m"), Var("y")))
 
   @test def fst: Unit =
-    assert(eec"""fst x""" == Project(Var("x"), 0))
+    assert(eec"""fst x""" == Fst(Var("x")))
 
   @test def snd: Unit =
-    assert(eec"""snd x""" == Project(Var("x"), 1))
+    assert(eec"""snd x""" == Snd(Var("x")))
