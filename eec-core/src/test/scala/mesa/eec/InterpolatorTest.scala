@@ -31,13 +31,13 @@ class InterpolatorTest
     assert(eec"""(x,x)""" == Pair(Var("x"),Var("x")))
 
   @test def tensor: Unit =
-    assert(eec"""!x *: y""" == Tensor(Var("x"),Var("y")))
+    assert(eec"""!x &: y""" == Tensor(Var("x"),Var("y")))
 
   @test def point: Unit =
-    assert(eec"""*""" == Point)
+    assert(eec"""()""" == Point)
 
   @test def bang: Unit =
-    assert(eec"""!*""" == Bang(Point))
+    assert(eec"""!()""" == Bang(Point))
 
   @test def bangSplice: Unit =
     var x = 0
@@ -51,10 +51,10 @@ class InterpolatorTest
     assert(eec"""?x""" == WhyNot(Var("x")))
 
   @test def inl: Unit =
-    assert(eec"""inl *""" == Inl(Point))
+    assert(eec"""inl ()""" == Inl(Point))
 
   @test def inr: Unit =
-    assert(eec"""inr *""" == Inr(Point))
+    assert(eec"""inr ()""" == Inr(Point))
 
   @test def caseexpr: Unit =
     assert(eec"""case x of {inl l.l; inr r.r}""" == CaseExpr(Var("x"), "l", Var("l"), "r", Var("r")))
@@ -63,7 +63,7 @@ class InterpolatorTest
     assert(eec"""let !x be m in x""" == Let("x", Var("m"), Var("x")))
 
   @test def letT: Unit =
-    assert(eec"""let !x *: y be m in y""" == LetT("x", "y", Var("m"), Var("y")))
+    assert(eec"""let !x &: y be m in y""" == LetT("x", "y", Var("m"), Var("y")))
 
   @test def fst: Unit =
     assert(eec"""fst x""" == Fst(Var("x")))

@@ -118,11 +118,15 @@ object Macros {
     ((scExpr, argsExpr): @unchecked) match {
       case ('{ StringContext(${ExprSeq(parts)}: _*) }, ExprSeq(args)) =>
         val code = encode(parts)
-        parseAll(term[Any], StringReader(code)) match {
-          case Success(matched,_) => reifyErased(matched, args)
-          case f:Failure          => sys.error(f.toString)
-          case e:Error            => sys.error(e.toString)
-        }
+        val reader = StringReader(code)
+        try
+          parseAll(term[Any], reader) match {
+            case Success(matched,_) => reifyErased(matched, args)
+            case f:Failure          => sys.error(f.toString)
+            case e:Error            => sys.error(e.toString)
+          }
+        finally
+          reader.close()
     }
   }
 }

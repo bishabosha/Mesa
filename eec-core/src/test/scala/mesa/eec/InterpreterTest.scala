@@ -7,6 +7,44 @@ import Trees.Tree._
 
 class InterpretorTest
 
+  @test def captureInPair: Unit =
+    val program = eec"""
+    (\f.\dup.
+      f (dup Yes,())
+    )
+    (\p.fst (fst p))
+    (\x.(x,x))
+    """
+    Kernel.reduce(program) match
+    case Right(term) => assert(term == eec"""Yes""")
+    case Left(err)   => throw err
+
+  @test def stateMonad1: Unit =
+    val program = eec"""
+    (\put.\map.\run.
+      run (map (put State) (\_.Yes))
+    )
+    (\x.!() &: x)
+    (\t.\f.let !x &: n be t in !(f x) &: n)
+    (\t.let !_ &: m be t in m)
+    """
+    Kernel.reduce(program) match
+    case Right(term) => assert(term == eec"""State""")
+    case Left(err)   => throw err
+
+  @test def stateMonad2: Unit =
+    val program = eec"""
+    (\put.\map.\eval.
+      eval (map (put State) (\_.Yes))
+    )
+    (\x.!() &: x)
+    (\t.\f.let !x &: n be t in !(f x) &: n)
+    (\t.let !x &: _ be t in x)
+    """
+    Kernel.reduce(program) match
+    case Right(term) => assert(term == eec"""Yes""")
+    case Left(err)   => throw err
+
   @test def spliceIsLazy: Unit =
     var x = 0
     val program = eec"${x == 1}"
@@ -48,7 +86,7 @@ class InterpretorTest
   @test def tensorIsLazy: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    !(let !t be !${xs ::= 0} in *) *: (let !t be !${xs ::= 1} in *)
+    !(let !t be !${xs ::= 0} in ()) &: (let !t be !${xs ::= 1} in ())
     """
     Kernel.reduce(program) match
     case Right(term) =>
@@ -59,13 +97,13 @@ class InterpretorTest
   @test def letTensorEvaluatesOnlyLeft: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    let !_ *: _ be !No *: (let !t be !${xs ::= 0} in *) in
-    *
+    let !_ &: _ be !No &: (let !t be !${xs ::= 0} in ()) in
+    ()
     """
     Kernel.reduce(program) match
     case Right(res) =>
       assert(xs == Nil)
-      assert(res == eec"*")
+      assert(res == eec"()")
     case Left(err) => throw err
 
   @test def sequenceSideEffectsWithBang: Unit =
@@ -108,7 +146,7 @@ class InterpretorTest
   @test def pairIsLazy: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    (let !t be !${xs ::= 0} in *, let !t be !${xs ::= 1} in *)
+    (let !t be !${xs ::= 0} in (), let !t be !${xs ::= 1} in ())
     """
     Kernel.reduce(program) match
     case Right(term) =>
@@ -119,7 +157,7 @@ class InterpretorTest
   @test def fstOnlyEvaluatesLeft: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    fst (Yes, let !x be !${xs ::= 0} in *)
+    fst (Yes, let !x be !${xs ::= 0} in ())
     """
     Kernel.reduce(program) match
     case Right(term) =>
@@ -130,7 +168,7 @@ class InterpretorTest
   @test def sndOnlyEvaluatesRight: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    snd (let !x be !${xs ::= 0} in *, Yes)
+    snd (let !x be !${xs ::= 0} in (), Yes)
     """
     Kernel.reduce(program) match
     case Right(term) =>
@@ -141,7 +179,7 @@ class InterpretorTest
   @test def inlIsLazy: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    inl (let !t be !${xs ::= 0} in *)
+    inl (let !t be !${xs ::= 0} in ())
     """
     Kernel.reduce(program) match
     case Right(term) =>
@@ -152,7 +190,7 @@ class InterpretorTest
   @test def inrIsLazy: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    inr (let !t be !${xs ::= 0} in *)
+    inr (let !t be !${xs ::= 0} in ())
     """
     Kernel.reduce(program) match
     case Right(term) =>
@@ -192,7 +230,7 @@ class InterpretorTest
   @test def caseExprReducesInl: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    case inl (let !t be ${xs ::= 0} in Yes) of { inl l.l; inr _.* }
+    case inl (let !t be ${xs ::= 0} in Yes) of { inl l.l; inr _.() }
     """
     Kernel.reduce(program) match
     case Right(term) =>
@@ -203,7 +241,7 @@ class InterpretorTest
   @test def caseExprReducesInr: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    case inr (let !t be ${xs ::= 0} in Yes) of { inl _.*; inr r.r }
+    case inr (let !t be ${xs ::= 0} in Yes) of { inl _.(); inr r.r }
     """
     Kernel.reduce(program) match
     case Right(term) =>
@@ -214,7 +252,7 @@ class InterpretorTest
   @test def inrIsNotBang: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    case inr ${xs ::= 0} of { inl _.*; inr r.r }
+    case inr ${xs ::= 0} of { inl _.(); inr r.r }
     """
     Kernel.reduce(program) match
     case Right(term) => assert(PartialFunction.cond(term) { case Lazy(_) => xs == Nil })
@@ -223,7 +261,7 @@ class InterpretorTest
   @test def inlIsNotBang: Unit =
     var xs = List.empty[Int]
     val program = eec"""
-    case inl ${xs ::= 0} of { inl l.l; inr _.* }
+    case inl ${xs ::= 0} of { inl l.l; inr _.() }
     """
     Kernel.reduce(program) match
     case Right(term) => assert(PartialFunction.cond(term) { case Lazy(_) => xs == Nil })

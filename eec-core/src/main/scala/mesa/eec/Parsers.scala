@@ -30,7 +30,7 @@ object Parsers extends JavaTokenParsers {
   def lin[T,U]: P[T => U] = "^\\"~>!id~!"."~!expr[U]                     ^^ { case x~_~t     => Lin(x,t)   }
   def let[T,U]: P[U]      = "let"~>"!"~>pat~"be"~!expr[T]~!"in"~!expr[U] ^^ { case x~_~t~_~u => Let(x,t,u) }
 
-  def letT[T,U,V]: P[V] = "let"~>"!"~>pat~"*:"~!pat~!"be"~!expr[(T,U)]~!"in"~!expr[V] ^^ {
+  def letT[T,U,V]: P[V] = "let"~>"!"~>pat~"&:"~!pat~!"be"~!expr[(T,U)]~!"in"~!expr[V] ^^ {
     case x~_~y~_~s~_~t => LetT(x,y,s,t)
   }
 
@@ -48,11 +48,11 @@ object Parsers extends JavaTokenParsers {
   def inl[A,B] : P[Either[A,B]] = "inl" ~> aexpr[A]       ^^ { case e => Inl(e)    }
   def inr[A,B] : P[Either[A,B]] = "inr" ~> aexpr[B]       ^^ { case e => Inr(e)    }
 
-  def tsor[A,B]: P[(A,B)] = "!"~>aexpr[A]~"*:"~!aexpr[B]          ^^ { case t~_~z => Tensor(t,z)     }
+  def tsor[A,B]: P[(A,B)] = "!"~>aexpr[A]~"&:"~!aexpr[B]          ^^ { case t~_~z => Tensor(t,z)     }
   def pair[A,B]: P[(A,B)] = "("~>expr[A]~","~!expr[B]<~!")"       ^^ { case t~_~u => Pair(t,u)       }
   def eval[T,U]: P[U]     = aexpr[T => U] ~ "[" ~! expr[T] <~ "]" ^^ { case f~_~t => Eval(f,t)       }
   def wrap[T]  : P[T]     = "("~>expr[T]<~")"                     ^^ { x          => x               }
-  def unit     : P[Unit]  = "*"                                   ^^ { _          => Point           }
+  def unit     : P[Unit]  = "()"                                  ^^ { _          => Point           }
   def ref[T]   : P[T]     = id                                    ^^ { x          => Var(x)          }
   def splice[T]: P[T]     = "<"~>"""(0|[1-9]\d*)""".r<~">"        ^^ { d          => Splice(d.toInt) }
 

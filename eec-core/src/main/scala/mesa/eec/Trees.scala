@@ -77,8 +77,17 @@ object Trees:
       }
 
       def wrapIfExpr1[U](t: Tree[U], s: String) = t match {
-        case _:Lam[?,?] | _:Lin[?,?] | _:Let[?,?] | _:LetT[?,?,?] | _:CaseExpr[?,?,?] => s"($s)"
-        case _                                                                        => s
+        case (
+            _:Lam[?,?]
+          | _:Lin[?,?]
+          | _:Let[?,?]
+          | _:LetT[?,?,?]
+          | _:CaseExpr[?,?,?]
+          | _:Fst[?,?]
+          | _:Snd[?,?]
+          | _:Inl[?,?]
+          | _:Inr[?,?]) => s"($s)"
+        case _ => s
       }
 
       def (t: Tree[T]) show: String = t.compile[Tree, T, String] ({
@@ -91,31 +100,37 @@ object Trees:
           val v1::z1::s1 = stack
           val v2 = wrapIfComplex(v,v1)
           val z2 = wrapIfComplex(z,z1)
-          s"!$v2 *: $z2"::s1
+          s"!$v2 &: $z2"::s1
 
         case Fst(p) =>
           val p1::s1 = stack
-          s"fst $p1"::s1
+          val p2 = wrapIfComplex(p,p1)
+          s"fst $p2"::s1
 
         case Snd(p) =>
           val p1::s1 = stack
-          s"snd $p1"::s1
+          val p2 = wrapIfComplex(p,p1)
+          s"snd $p2"::s1
 
         case Bang(t) =>
           val t1::s1 = stack
-          s"!$t1"::s1
+          val t2 = wrapIfComplex(t,t1)
+          s"!$t2"::s1
 
         case WhyNot(v) =>
           val v1::s1 = stack
-          s"?$v1"::s1
+          val v2 = wrapIfComplex(v,v1)
+          s"?$v2"::s1
 
         case Inl(l) =>
           val l1::s1 = stack
-          s"inl $l1"::s1
+          val l2 = wrapIfComplex(l,l1)
+          s"inl $l2"::s1
 
         case Inr(r) =>
           val r1::s1 = stack
-          s"inr $r1"::s1
+          val r2 = wrapIfComplex(r,r1)
+          s"inr $r2"::s1
 
         case App(f,t) =>
           val f1::t1::s1 = stack
@@ -138,19 +153,22 @@ object Trees:
 
         case CaseExpr(e,x,l,y,r) =>
           val e1::l1::r1::s1 = stack
-          s"case $e1 of {inl $x.$l1; inr $y.$r1}"::s1
+          val e2 = wrapIfComplex(e, e1)
+          s"case $e2 of {inl $x.$l1; inr $y.$r1}"::s1
 
         case Let(x,t,u) =>
           val t1::u1::s1 = stack
-          s"let !$x be $t1 in $u1"::s1
+          val t2 = wrapIfComplex(t,t1)
+          s"let !$x be $t2 in $u1"::s1
 
         case LetT(x,z,t,u) =>
           val t1::u1::s1 = stack
-          s"let !$x *: $z be $t1 in $u1"::s1
+          val t2 = wrapIfComplex(t,t1)
+          s"let !$x &: $z be $t2 in $u1"::s1
 
-        case Point     => "*"                  :: stack
+        case Point     => "()"                 :: stack
         case Pure(x)   => s"~(${stringOf(x)})" :: stack
-        case Lazy(_)   => s"~<thunk>"          :: stack
+        case Lazy(_)   => s"~<effect>"         :: stack
         case Splice(n) => s"~<splice:$n>"      :: stack
         case Var(x)    => x                    :: stack
 
