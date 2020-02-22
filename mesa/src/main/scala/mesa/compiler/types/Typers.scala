@@ -667,7 +667,7 @@ object Typers {
       if name == Name.Wildcard then {
         body1
       } else if mode == PatAlt then {
-        Err.nameInPattAlt(name)
+        Err.nameInPattAlt(name): Lifted[Tree] // TODO please report
       } else {
         putTermType(name -> body1.tpe)
         Bind(name, body1)(body1.tpe)

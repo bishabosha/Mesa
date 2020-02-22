@@ -12,14 +12,14 @@ import Trees.Tree
 import Tree._
 
 object Macros {
-  def eecImpl(scExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(given qctx: QuoteContext): Expr[Tree[?]] = {
+  def eecImpl(scExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(given qctx: QuoteContext): Expr[Tree[Any]] = {
 
-    def reify[U](t: Tree[U], args: Seq[Expr[Any]]): Expr[Tree[?]] = {
-      import qctx.tasty.{Tree => _, error => _, _, given}
+    def reifyErased[U: Type](t: Tree[U], args: Seq[Expr[Any]]): Expr[Tree[U]] = {
+      import qctx.tasty.{Tree => _, Singleton => _, error => _, _, given}
       val expr = t.compile[Tree, U, Expr[Tree[?]]] {
         case Pair(_,_) =>
           (stack: @unchecked) match
-          case '{ type $t1; $a1: Tree[`$t1`] } :: '{ type $t2; $b1: Tree[`$t2`] } :: s1 =>
+          case '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 =>
             '{Pair[$t1, $t2]($a1, $b1)}::s1
 
         case Tensor(_,_) =>
@@ -27,123 +27,106 @@ object Macros {
           case '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 =>
             '{Tensor[$t1, $t2]($a1, $b1)}::s1
 
+        case Fst(_) =>
+          (stack: @unchecked) match
+          case '{ $p1: Tree[$t1] } :: s1 =>
+            '{Fst($p1.asInstanceOf[Tree[(Any, Any)]])} :: s1
+
+        case Snd(_) =>
+          (stack: @unchecked) match
+          case '{ $p1: Tree[$t1] } :: s1 =>
+            '{Snd($p1.asInstanceOf[Tree[(Any, Any)]])} :: s1
+
+        case Bang(_) =>
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: s1 =>
+            '{Bang($a1)} :: s1
+
+        case WhyNot(_) =>
+          (stack: @unchecked) match
+          case '{ $v1: Tree[$t1] } :: s1 =>
+            '{WhyNot($v1.asInstanceOf[Tree[Nothing]])} :: s1
+
+        case Inl(_) =>
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: s1 =>
+            '{Inl[$t1, Any]($a1)} :: s1
+
+        case Inr(_) =>
+          (stack: @unchecked) match
+          case '{ $a1: Tree[$t1] } :: s1 =>
+            '{Inr[Any, $t1]($a1)} :: s1
+
         case App(_,_) =>
           (stack: @unchecked) match
-          case '{ type $t1; type $t2; $f1: Tree[`$t1` => `$t2`] } :: s1 =>
-            (s1: @unchecked) match
-            case '{ type $t3; $x1: Tree[`$t3`] } :: s2 =>
-              if typeOf[$t3] <:< typeOf[$t1]
-                '{App($f1, $x1.asInstanceOf[Tree[$t1]])}::s2
-              else
-                qctx.error(s"cannot apply argument of ${t3.show} to parameter of type ${t1.show}")
-                Nil
-          case '{ type $t1; $f1: Tree[`$t1`] }::_ =>
-            qctx.error(s"cannot apply to non-function type ${t1.show}")
-            Nil
+          case '{ $f1: Tree[$t1] } :: '{ $x1: Tree[$t2] } :: s1 =>
+            '{App($f1.asInstanceOf[Tree[$t2 => Any]], $x1)} :: s1
 
         case Eval(_,_) =>
           (stack: @unchecked) match
-          case '{ type $t1; type $t2; $f1: Tree[`$t1` => `$t2`] } :: s1 =>
-            (s1: @unchecked) match
-            case '{ type $t3; $x1: Tree[`$t3`] } :: s2 =>
-              if typeOf[$t3] <:< typeOf[$t1]
-                '{Eval($f1, $x1.asInstanceOf[Tree[$t1]])}::s2
-              else
-                qctx.error(s"cannot apply argument of ${t3.show} to parameter of type ${t1.show}")
-                Nil
-          case '{ type $t1; $f1: Tree[`$t1`] }::_ =>
-            qctx.error(s"cannot linearly evaluate non-function type ${t1.show}")
-            Nil
+          case '{ $f1: Tree[$t1] } :: '{ $x1: Tree[$t2] } :: s1 =>
+            '{Eval($f1.asInstanceOf[Tree[$t2 => Any]], $x1)} :: s1
 
         case Lam(x1,_) =>
           (stack: @unchecked) match
           case '{ type $t1; $a1: Tree[`$t1`] } :: s1 =>
-            '{Lam(${Expr(x1)}, $a1)}::s1
+            '{Lam(${Expr(x1)}, $a1)} :: s1
 
         case Lin(x1,_) =>
           (stack: @unchecked) match
           case '{ type $t1; $a1: Tree[`$t1`] } :: s1 =>
-            '{Lin(${Expr(x1)}, $a1)}::s1
+            '{Lin(${Expr(x1)}, $a1)} :: s1
 
         case CaseExpr(_,x,_,y,_) =>
           (stack: @unchecked) match
-          case '{ type $t1; type $t2; $e1: Tree[Either[`$t1`, `$t2`]] } :: s1 =>
-            (s1: @unchecked) match
-            case '{ type $t3; $l1: Tree[`$t3`] } :: s2 =>
-              (s2: @unchecked) match
-              case '{ $r1: Tree[`$t3`] } :: s3 =>
-                '{CaseExpr($e1, ${Expr(x)}, $l1, ${Expr(y)}, $r1)}::s1
-              case _::_ =>
-                qctx.error(s"body of case inr $y does not match case inl $x")
-                Nil
-          case '{ type $t1; $e1: Tree[`$t1`] } :: _ =>
-            qctx.error(s"selector is not Either[?,?], but ${t1.show}")
-            Nil
+          case '{ $e1: Tree[$t1] } :: '{ $l1: Tree[$t2] } :: '{ $r1: Tree[$t3] } :: s1 =>
+            '{CaseExpr($e1.asInstanceOf[Tree[Either[Any,Any]]], ${Expr(x)}, $l1.asInstanceOf[Tree[Any]], ${Expr(y)}, $r1.asInstanceOf[Tree[Any]])} :: s1
 
         case Let(x,_,_) =>
           (stack: @unchecked) match
-          case '{ type $t1; $a1: Tree[`$t1`] } :: '{ type $t2; $b1: Tree[`$t2`] } :: s1 =>
-            '{Let(${Expr(x)}, $a1, $b1)}::s1
+          case '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 =>
+            '{Let(${Expr(x)}, $a1, $b1)} :: s1
 
         case LetT(x,z,_,_) =>
           (stack: @unchecked) match
-          case '{ type $t1; type $t2; $a1: Tree[(`$t1`, `$t2`)] } :: '{ type $t3; $b1: Tree[`$t3`] } :: s1 =>
-            '{LetT(${Expr(x)}, ${Expr(z)}, $a1, $b1)}::s1
+          case '{ $a1: Tree[$t1] } :: '{ $b1: Tree[$t2] } :: s1 =>
+            '{LetT(${Expr(x)}, ${Expr(z)}, $a1.asInstanceOf[Tree[(Any, Any)]], $b1)} :: s1
 
-        case Bang(t) =>
-          (stack: @unchecked) match
-          case '{ type $t1; $a1: Tree[`$t1`] } :: s1 =>
-            '{Bang[$t1]($a1)}::s1
-
-        case WhyNot(t) =>
-          (stack: @unchecked) match
-          case '{ type $t1 <: Nothing; $a1: Tree[`$t1`] } :: s1 =>
-            '{WhyNot($a1)}::s1
-          case '{ type $t1; $a1: Tree[`$t1`] }::_ =>
-            qctx.error(s"cannot apply ${t1.show} to argument of Nothing type")
-            Nil
-
-        case Point     => '{Point} :: stack
-        case Fst()     => '{Fst()} :: stack
-        case Snd()     => '{Snd()} :: stack
-        case Inl()     => '{Inl()} :: stack
-        case Inr()     => '{Inr()} :: stack
-        case Splice(n) => '{lazy val x = ${args(n)}; Value(() => x)} :: stack
-        case Value(x)  =>  { qctx.tasty.error(s"access to value from wrong staging level", rootPosition); ??? }
-        case Var(x)    => '{Var(${Expr(x)})} :: stack
+        case Point     => '{Point}              :: stack
+        case Splice(n) => '{effect(${args(n)})} :: stack
+        case Var(x)    => '{Var(${Expr(x)})}    :: stack
+        case Pure(x)   =>  { qctx.error(s"Access to value $x from wrong staging level"); ??? }
+        case Lazy(_)   =>  { qctx.error(s"Access to thunk from wrong staging level"); ??? }
       }
-      expr.cast[mesa.eec.Trees.Tree[?]]
+      expr.asInstanceOf[Expr[mesa.eec.Trees.Tree[U]]]
     }
 
-    def encode(parts: Seq[Expr[String]])(given QuoteContext): String = {
-      val sb = new StringBuilder()
-
-      def appendPart(part: Expr[String]) = {
+    def encode(parts: Seq[Expr[String]])(given QuoteContext): String =
+      val sb = StringBuilder()
+      def appendPart(part: Expr[String]): Unit =
         val Const(value: String) = part
         sb ++= value
-      }
-
-      def appendHole(index: Int) = {
+      def appendHole(index: Int): Unit =
         sb ++= Hole.encode(index)
-      }
-
-      for ((part, index) <- parts.init.zipWithIndex) {
+      for (part, index) <- parts.init.zipWithIndex do
         appendPart(part)
         appendHole(index)
-      }
       appendPart(parts.last)
-
       sb.toString
-    }
+    end encode
 
     ((scExpr, argsExpr): @unchecked) match {
       case ('{ StringContext(${ExprSeq(parts)}: _*) }, ExprSeq(args)) =>
         val code = encode(parts)
-        parseAll(term[Any], StringReader(code)) match {
-          case Success(matched,_) => reify(matched, args)
-          case f:Failure          => sys.error(f.toString)
-          case e:Error            => sys.error(e.toString)
-        }
+        val reader = StringReader(code)
+        try
+          parseAll(term[Any], reader) match {
+            case Success(matched,_) => reifyErased(matched, args)
+            case f:Failure          => sys.error(f.toString)
+            case e:Error            => sys.error(e.toString)
+          }
+        finally
+          reader.close()
     }
   }
 }

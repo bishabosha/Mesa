@@ -10,7 +10,7 @@ object TypeTraverser with
 
   case class ![A](a: A)
 
-  given BangOps: [A](x: A) extended with
+  extension BangOps on [A](x: A)
     def repeatable : ![A] = new !(x)
 
   def traverseTypesImpl[T: Type](expr: Expr[T])(given qctx: QuoteContext): Expr[Unit] =
@@ -21,12 +21,12 @@ object TypeTraverser with
 
       case f @ '{ type $t; type $u; ($x: `$t`) => ($bodyFn: `$t` => `$u`)(`$x`) } =>
         val arr = if f.unseal.tpe <:< typeOf[$t =>*: $u] then Expr("=>*") else Expr("=>")
-        Expr.open(bodyFn)((body, _) =>
+        unsafe.UnsafeExpr.open(bodyFn)((body, _) =>
           '{ println(s"\\(${${Expr(x.name)}}: ${${Expr(t.show)}}) ${$arr} (${${Expr(body.show)}} : ${${Expr(u.show)}})") }
         )
 
       case '{ type $a; val $x = ($t: ![`$a`]); ($bodyFn: ![`$a`] => ?)(`$x`) } =>
-        Expr.open(bodyFn) { (body, close) =>
+        unsafe.UnsafeExpr.open(bodyFn) { (body, close) =>
           quoted.util.Var(t) { tVar =>
             close(body)(tVar.get) match
             case '{ $body: $b } =>
@@ -36,4 +36,4 @@ object TypeTraverser with
 
       case e => '{ println(s"expr ${${Expr(e.unseal.underlyingArgument.show)}} is of type ${${Expr(summon[Type[T]].show)}}") }
 
-  inline def traverseTypes[T](expr: => T): Unit = ${ traverseTypesImpl('expr) }
+  inline def traverseTypes[T](inline expr: T): Unit = ${ traverseTypesImpl('expr) }
