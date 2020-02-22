@@ -30,7 +30,7 @@ object Parsers extends JavaTokenParsers {
   def lin[T,U]: P[T => U] = "^\\"~>!id~!"."~!expr[U]                     ^^ { case x~_~t     => Lin(x,t)   }
   def let[T,U]: P[U]      = "let"~>"!"~>pat~"be"~!expr[T]~!"in"~!expr[U] ^^ { case x~_~t~_~u => Let(x,t,u) }
 
-  def letT[T,U,V]: P[V] = "let"~>"!"~>pat~"&:"~!pat~!"be"~!expr[(T,U)]~!"in"~!expr[V] ^^ {
+  def letT[T,U,V]: P[V] = "let"~>"!"~>pat~"&:"~!id~!"be"~!expr[(T,U)]~!"in"~!expr[V] ^^ {
     case x~_~y~_~s~_~t => LetT(x,y,s,t)
   }
 
