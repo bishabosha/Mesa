@@ -21,7 +21,7 @@ object Kernel:
     case Effect(e: Environment, x: Name, u: ErasedTree)
     case UnZip(e: Environment, x: Name, y: Name, u: ErasedTree)
 
-  given Show[Continuation] = { case p: Product => p.productPrefix.toLowerCase }
+  given as Show[Continuation] = { case p: Product => p.productPrefix.toLowerCase }
 
   type Environment = List[Env]
   type Stoup       = Option[Stp]
@@ -33,10 +33,10 @@ object Kernel:
 
   private inline def (s: State).continuation: List[Continuation] = s(4)
 
-  given (given m: Mirror.ProductOf[Env], rec: => Show[m.MirroredElemTypes]): Show[Env] =
+  given (using m: Mirror.ProductOf[Env], rec: => Show[m.MirroredElemTypes]) as Show[Env] =
     Tuple.fromProductTyped(_).show
 
-  given (given m: Mirror.ProductOf[Stp], rec: => Show[m.MirroredElemTypes]): Show[Stp] =
+  given (using m: Mirror.ProductOf[Stp], rec: => Show[m.MirroredElemTypes]) as Show[Stp] =
     Tuple.fromProductTyped(_).show
 
   private def typeError(msg: String): Nothing = throw TypeError(msg)

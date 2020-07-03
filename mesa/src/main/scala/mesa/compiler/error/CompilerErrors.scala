@@ -82,7 +82,7 @@ object CompilerErrors {
       }
     }
 
-    def [CC[A] <: Iterable[A], A, O](c: CC[A]) mapE(f: A => Lifted[O])(given factory: Factory[O, CC[O]]): Lifted[CC[O]] = {
+    def [CC[A] <: Iterable[A], A, O](c: CC[A]) mapE(f: A => Lifted[O])(using factory: Factory[O, CC[O]]): Lifted[CC[O]] = {
 
       @tailrec
       def inner(acc: mutable.Builder[O, CC[O]], it: Iterator[A]): Lifted[CC[O]] = {

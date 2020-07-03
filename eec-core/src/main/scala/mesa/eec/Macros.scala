@@ -1,7 +1,6 @@
 package mesa.eec
 
 import quoted._
-import quoted.matching._
 
 import java.io.StringReader
 
@@ -12,10 +11,10 @@ import Trees.Tree
 import Tree._
 
 object Macros {
-  def eecImpl(scExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(given qctx: QuoteContext): Expr[Tree[Any]] = {
+  def eecImpl(scExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(using qctx: QuoteContext): Expr[Tree[Any]] = {
 
     def reifyErased[U: Type](t: Tree[U], args: Seq[Expr[Any]]): Expr[Tree[U]] = {
-      import qctx.tasty.{Tree => _, Singleton => _, error => _, _, given}
+      import qctx.tasty.{Tree => _, Singleton => _, error => _, _, given _}
       val expr = t.compile[Tree, U, Expr[Tree[?]]] {
         case Pair(_,_) =>
           (stack: @unchecked) match
@@ -101,10 +100,9 @@ object Macros {
       expr.asInstanceOf[Expr[mesa.eec.Trees.Tree[U]]]
     }
 
-    def encode(parts: Seq[Expr[String]])(given QuoteContext): String =
+    def encode(parts: Seq[String])(using QuoteContext): String =
       val sb = StringBuilder()
-      def appendPart(part: Expr[String]): Unit =
-        val Const(value: String) = part
+      def appendPart(value: String): Unit =
         sb ++= value
       def appendHole(index: Int): Unit =
         sb ++= Hole.encode(index)
@@ -116,7 +114,7 @@ object Macros {
     end encode
 
     ((scExpr, argsExpr): @unchecked) match {
-      case ('{ StringContext(${ExprSeq(parts)}: _*) }, ExprSeq(args)) =>
+      case (Expr.StringContext(Consts(parts)) , Varargs(args)) =>
         val code = encode(parts)
         val reader = StringReader(code)
         try

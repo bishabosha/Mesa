@@ -1,7 +1,7 @@
 import mesa.eec._
 import mesa.util.Show
 
-def puts[A](a: A)(given Show[A]) =
+def puts[A](a: A)(using Show[A]) =
   println(a.show)
 
 given Show[String] = identity

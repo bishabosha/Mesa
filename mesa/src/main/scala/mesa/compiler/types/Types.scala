@@ -245,7 +245,7 @@ object Types {
       else inner(z, t1 :: Nil, t2 :: Nil)
     }
 
-    def [O, Col](ops: Type) zipWith(t: Type)(f: (Name, Type) => O)(given factory: Factory[O, Col]): Col = {
+    def [O, Col](ops: Type) zipWith(t: Type)(f: (Name, Type) => O)(using factory: Factory[O, Col]): Col = {
 
       val b = ops.zipFold(t)(factory.newBuilder) { (acc, arg, app) =>
         arg match {

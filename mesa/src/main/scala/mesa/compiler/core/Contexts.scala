@@ -40,18 +40,18 @@ object Contexts {
   }
 
   object Mode {
-    inline def mode(given mode: Mode) = mode
+    inline def mode(using mode: Mode) = mode
 
-    def isLPattern(given Mode) =
+    def isLPattern(using Mode) =
       LinearPat == mode
 
-    def isPattern(given Mode) =
+    def isPattern(using Mode) =
       Pat == mode || PatAlt == mode || LinearPat == mode
 
-    def isType(given Mode) =
+    def isType(using Mode) =
       Typing == mode
 
-    def isTerm(given Mode) =
+    def isTerm(using Mode) =
       Term == mode
   }
 
@@ -99,7 +99,7 @@ object Contexts {
   }
 
   object IdGen {
-    def idGen(given gen: IdGen) = gen
+    def idGen(using gen: IdGen) = gen
   }
 
   final case class Sym(id: Id, name: Name)
@@ -143,18 +143,18 @@ object Contexts {
   )
 
   object Context {
-    def ctx(given ctx: Context) = ctx
+    def ctx(using ctx: Context) = ctx
 
-    def resetLocalCtx(given Context): Unit = {
+    def resetLocalCtx(using Context): Unit = {
       ctx.localIdGen.reset
     }
 
-    def removeFromCtx(id: Id)(given Context): Unit = {
+    def removeFromCtx(id: Id)(using Context): Unit = {
       for mapping <- symFor(id) if id != Id.empty do
         ctx.termScope -= mapping
     }
 
-    def rootCtx(given Context) = {
+    def rootCtx(using Context) = {
       @tailrec
       def (ctx: Context) root: Context = ctx match {
         case ctx: RootContext => ctx
@@ -163,7 +163,7 @@ object Contexts {
       ctx.root
     }
 
-    private def firstTermCtx(name: Name)(given Context): Lifted[Context] = {
+    private def firstTermCtx(name: Name)(using Context): Lifted[Context] = {
       @tailrec
       def inner(current: Context): Lifted[Context] = {
         given Context = current
@@ -178,7 +178,7 @@ object Contexts {
       else inner(ctx)
     }
 
-    private def firstTypeCtx(name: Name)(given Context): Lifted[Context] = {
+    private def firstTypeCtx(name: Name)(using Context): Lifted[Context] = {
       @tailrec
       def inner(current: Context): Lifted[Context] = {
         given Context = current
@@ -193,29 +193,29 @@ object Contexts {
       else inner(ctx)
     }
 
-    def lookupType(name: Name)(given Context): Lifted[Type] = {
+    def lookupType(name: Name)(using Context): Lifted[Type] = {
       firstTypeCtx(name).flatMap { ctx =>
         given Context = ctx
         dataType(name)
       }
     }
 
-    def lookupConstructors(data: Name)(given Context): Lifted[List[(Name, Type)]] = {
+    def lookupConstructors(data: Name)(using Context): Lifted[List[(Name, Type)]] = {
       firstTypeCtx(data).flatMap { ctx =>
         given Context = ctx
         constructorsFor(data)
       }
     }
 
-    private def constructorType(name: Name)(given Context): Lifted[Type] =
+    private def constructorType(name: Name)(using Context): Lifted[Type] =
       if isConstructor(name) then termType(name)
       else Err.notACtor(name)
 
-    def lookupConstructorType(ctor: Name)(given Context): Lifted[Type] =
+    def lookupConstructorType(ctor: Name)(using Context): Lifted[Type] =
       inTermCtx(ctor)(constructorType(ctor))
 
     def inTermCtx[O](name: Name)
-                    (onFound: (given Context) => Lifted[O])(given Context): Lifted[O] = {
+                    (onFound: Context ?=> Lifted[O])(using Context): Lifted[O] = {
       for
         ctx1 <- firstTermCtx(name)
         o <- lift {
@@ -225,13 +225,13 @@ object Contexts {
       yield o
     }
 
-    def isLinear(name: Name)(given Context): Boolean =
+    def isLinear(name: Name)(using Context): Boolean =
       ctx.linearScope.exists(_ == name)
 
-    def isData(name: Name)(given Context): Boolean =
+    def isData(name: Name)(using Context): Boolean =
       ctx.dataTypeTable.keySet.contains(name)
 
-    def isDataDeep(name: Name)(given Context): Boolean = {
+    def isDataDeep(name: Name)(using Context): Boolean = {
       @tailrec
       def inner(current: Context): Boolean = {
         given Context = current
@@ -245,13 +245,13 @@ object Contexts {
       inner(ctx)
     }
 
-    def inScope(name: Name)(given Context): Boolean = {
+    def inScope(name: Name)(using Context): Boolean = {
       ctx.termScope
          .collectFirst { case (Sym(_, `name`), _) => () }
          .isDefined
     }
 
-    def typedLinearVariable(given Context): Name = {
+    def typedLinearVariable(using Context): Name = {
       val linearScope = ctx.linearScope
       if linearScope.flatMap(ctx.termTypeTable.get).isEmpty then {
         EmptyName
@@ -260,59 +260,59 @@ object Contexts {
       }
     }
 
-    def termScopeContainsNames(given Context): Boolean = {
+    def termScopeContainsNames(using Context): Boolean = {
       ctx.termScope.collectFirst[Lifted[Context]] {
         case (Sym(_, name), c) if name.nonEmpty => c
       }.isDefined
     }
 
-    def lookIn(id: Id)(given Context): Lifted[Context] = {
+    def lookIn(id: Id)(using Context): Lifted[Context] = {
       ctx.termScope.collectFirst[Lifted[Context]] {
         case (Sym(`id`, _), c) => c
       }.getOrElse(Err.noCtxForId(id))
     }
 
-    def symFor(id: Id)(given Context): Option[(Sym, Context)] = {
+    def symFor(id: Id)(using Context): Option[(Sym, Context)] = {
       ctx.termScope.find(_._1.id == id)
     }
 
-    def lookForInScope(name: Name)(given Context): Lifted[Unit] =
+    def lookForInScope(name: Name)(using Context): Lifted[Unit] =
       if name != Wildcard && !inScope(name) then Err.noVarInScope(name)
       else ()
 
-    def lookForInLinear(name: Name)(given Context): Lifted[Unit] =
+    def lookForInLinear(name: Name)(using Context): Lifted[Unit] =
       if name != Wildcard && !isLinear(name) then Err.noVarInLinearScope(name)
       else ()
 
-    def isConstructor(name: Name)(given Context): Boolean =
+    def isConstructor(name: Name)(using Context): Boolean =
       ctx.constructorNames.contains(name)
 
-    def constructorsFor(name: Name)(given Context): Lifted[List[(Name, Type)]] =
+    def constructorsFor(name: Name)(using Context): Lifted[List[(Name, Type)]] =
       for
         ctors <- ctx.constructorTable
                     .getOrElse[Lifted[mutable.Set[(Name, Type)]]](
                       name, Err.noCtors(name))
       yield ctors.toList
 
-    def contains(name: Name)(given Context) = {
+    def contains(name: Name)(using Context) = {
       name.nonEmpty && {
         isLinearOrInScope(name)
       }
     }
 
-    def containsForLinear(name: Name)(given Context) = {
+    def containsForLinear(name: Name)(using Context) = {
       contains(name) || ctx.linearScope.nonEmpty
     }
 
-    def isLinearOrInScope(name: Name)(given Context) = {
+    def isLinearOrInScope(name: Name)(using Context) = {
       isLinear(name) || inScope(name)
     }
 
-    def containsDataDeep(name: Name)(given Context) = {
+    def containsDataDeep(name: Name)(using Context) = {
       name.nonEmpty && isDataDeep(name)
     }
 
-    def enterScope(id: Id, name: Name)(given Context): Lifted[Context] = {
+    def enterScope(id: Id, name: Name)(using Context): Lifted[Context] = {
       guardContains(name) {
         val newCtx = new Fresh(ctx)
         ctx.termScope += Sym(id, name) -> newCtx
@@ -320,7 +320,7 @@ object Contexts {
       }
     }
 
-    def enterVariable(name: Name)(given Context): Lifted[Unit] = {
+    def enterVariable(name: Name)(using Context): Lifted[Unit] = {
       name.foldWildcard(()) {
         guardContains(_) {
           ctx.termScope += Sym(empty, name) -> new Fresh(ctx)
@@ -329,7 +329,7 @@ object Contexts {
       }
     }
 
-    def enterData(name: Name)(given Context): Lifted[Unit] = {
+    def enterData(name: Name)(using Context): Lifted[Unit] = {
       name.foldWildcard(()) {
         guardContainsData(_) {
           ctx.dataTypeTable += name -> EmptyType
@@ -338,7 +338,7 @@ object Contexts {
       }
     }
 
-    def enterLinear(name: Name)(given Context): Lifted[Unit] = {
+    def enterLinear(name: Name)(using Context): Lifted[Unit] = {
       guardContainsForLinear(name) {
         name.foldEmptyName(()) { name =>
           ctx.linearScope = Some(name)
@@ -347,25 +347,25 @@ object Contexts {
     }
 
     private def guardContainsForLinear[O](name: Name)
-                                         (f: (given Context) => Lifted[O])(given Context) =
+                                         (f: Context ?=> Lifted[O])(using Context) =
       guardContainsImpl(name)(containsForLinear)(f)(Err.shadowLinearMulti)
 
     private def guardContains[O](name: Name)
-                                    (f: (given Context) => Lifted[O])(given Context) =
+                                    (f: Context ?=> Lifted[O])(using Context) =
       guardContainsImpl(name)(contains)(f)(Err.shadowVar)
 
     private def guardContainsData[O](name: Name)
-                                    (f: (given Context) => Lifted[O])(given Context) =
+                                    (f: Context ?=> Lifted[O])(using Context) =
       guardContainsImpl(name)(containsDataDeep)(f)(Err.shadowData)
 
     private def guardContainsImpl[O](name: Name)
-                                    (check: Name => (given Context) => Boolean)
-                                    (f: (given Context) => Lifted[O])
-                                    (msg: Name => CompilerError)(given Context): Lifted[O] =
+                                    (check: Name => Context ?=> Boolean)
+                                    (f: Context ?=> Lifted[O])
+                                    (msg: Name => CompilerError)(using Context): Lifted[O] =
       if check(name) then msg(name)
       else f
 
-    def linkConstructor(name: Name, tpe: Type)(given Context): Unit = {
+    def linkConstructor(name: Name, tpe: Type)(using Context): Unit = {
       import NameOps._
       val ret = tpe.toCurriedList.last.unwrapLinearBody
       dataDefinitionName(ret).foldEmptyName(()) { functor =>
@@ -374,26 +374,26 @@ object Contexts {
       }
     }
 
-    def putTermType(pair: (Name, Type))(given Context): Unit =
+    def putTermType(pair: (Name, Type))(using Context): Unit =
       ctx.termTypeTable += pair
 
-    def termType(name: Name)(given Context): Lifted[Type] =
+    def termType(name: Name)(using Context): Lifted[Type] =
       if name == rootName && (ctx `eq` rootCtx) then rootPkg
       else ctx.termTypeTable.getOrElse[Lifted[Type]](name, Err.noType(name))
 
-    def putDataType(pair: (Name, Type))(given Context): Unit =
+    def putDataType(pair: (Name, Type))(using Context): Unit =
       ctx.dataTypeTable += pair
 
-    def dataType(name: Name)(given Context): Lifted[Type] =
+    def dataType(name: Name)(using Context): Lifted[Type] =
       ctx.dataTypeTable.getOrElse[Lifted[Type]](name, Err.noData(name))
 
-    def (tpe: Type) freshVariables(given Context): Type = {
+    def (tpe: Type) freshVariables(using Context): Type = {
       tpe.replaceVariables {
         _.updateDerivedStr(Synthetic(ctx.localIdGen.fresh(), _))
       }
     }
 
-    def enterBootstrapped(given Context, IdGen): Lifted[Unit] = {
+    def enterBootstrapped(using Context, IdGen): Lifted[Unit] = {
       val root = rootCtx
       if root.termScope.nonEmpty then {
         Err.noFreshScope
@@ -406,7 +406,7 @@ object Contexts {
       }
     }
 
-    def declarePackage(parent: Name, name: Name)(given Context): Lifted[Type] = {
+    def declarePackage(parent: Name, name: Name)(using Context): Lifted[Type] = {
       val parentCtx = ctx match {
         case ctx: RootContext => ctx
         case ctx: Fresh       => ctx.outer

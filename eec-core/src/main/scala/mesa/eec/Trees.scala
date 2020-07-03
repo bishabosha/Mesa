@@ -15,7 +15,7 @@ object Trees:
   private[eec] type ErasedTree = Tree[?]
   private[eec] def [T](e: ErasedTree).as: Tree[T] = e.asInstanceOf[Tree[T]]
 
-  enum Tree[T] derives Eql
+  enum Tree[T] derives Eql:
     case Point                                                                              extends Tree[Unit]
     case Pair[A, B](a: Tree[A], b: Tree[B])                                                 extends Tree[(A,B)]
     case Tensor[A,B](t: Tree[A], z: Tree[B])                                                extends Tree[(A,B)]
@@ -41,7 +41,7 @@ object Trees:
 
     given InterpretableK[Tree]:
 
-      def [T,O](tree: Tree[T]) interpretK(z: O)(f: [t] => (O, Tree[t]) => O): O =
+      extension [T,O](tree: Tree[T]) def interpretK(z: O)(f: [t] => (O, Tree[t]) => O): O =
         @tailrec def inner(z: O, ts: List[ErasedTree]): O = ts match
           case Nil => z
           case t::ts => t match {
@@ -64,12 +64,11 @@ object Trees:
           }
         end inner
         inner(z, tree::Nil)
-      end interpretK
     end given
 
-    given Show[ErasedTree] = summon[Show[Tree[Any]]].asInstanceOf[Show[ErasedTree]]
+    given as Show[ErasedTree] = summon[Show[Tree[Any]]].asInstanceOf[Show[ErasedTree]]
 
-    given [T]: Show[Tree[T]]:
+    given [T] as Show[Tree[T]]:
 
       def wrapIfComplex[U](t: Tree[U], s: String) = t match {
         case Point | _:Var[?] | _:Pure[?] | _:Lazy[?] | _:Pair[?,?] => s

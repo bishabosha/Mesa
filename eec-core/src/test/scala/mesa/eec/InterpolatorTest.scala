@@ -5,7 +5,7 @@ import org.junit.{ Test => test }
 
 import Trees.Tree._
 
-class InterpolatorTest
+class InterpolatorTest:
 
   @test def spliceIsLazy: Unit =
     eec"${1}" match

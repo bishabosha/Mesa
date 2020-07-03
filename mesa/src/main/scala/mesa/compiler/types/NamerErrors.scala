@@ -11,7 +11,7 @@ import TreeOps.given
 import ModeOps.given
 
 object NamerErrors {
-  def namingMissing(tree: Tree)(given Mode) = {
+  def namingMissing(tree: Tree)(using Mode) = {
     CompilerError.Internal(
       s"No implementation for naming in mode ${mode.show} for tree given by ${tree.show}")
   }

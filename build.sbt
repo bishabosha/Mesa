@@ -1,4 +1,4 @@
-val dottyVersion = "0.22.0-RC1"
+val dottyVersion = "0.26.0-bin-SNAPSHOT"
 // val dottyVersion = dottyLatestNightlyBuild.get
 
 lazy val commonSettings = Seq(

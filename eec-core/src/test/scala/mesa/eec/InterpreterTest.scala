@@ -5,7 +5,7 @@ import org.junit.{ Test => test }
 
 import Trees.Tree._
 
-class InterpretorTest
+class InterpretorTest:
 
   @test def captureInPair: Unit =
     val program = eec"""

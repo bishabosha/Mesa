@@ -43,7 +43,7 @@ def failIfUnparsedOrTypedStat: String => Type => Contextual[IdReader[Unit]] =
 def typeCore(f: String => IdReader[Lifted[Tree]])
             (str: String)
             (pt: Type)
-            (given IdGen, Context): Lifted[Tree] =
+            (using IdGen, Context): Lifted[Tree] =
   for
     exp <- f(str)
     tpd <- typeAfterParse(pt)(exp)
@@ -51,7 +51,7 @@ def typeCore(f: String => IdReader[Lifted[Tree]])
 
 def typeAfterParse(pt: Type)
                   (exp: Tree)
-                  (given IdGen, Context): Lifted[Tree] =
+                  (using IdGen, Context): Lifted[Tree] =
   for
     _   <- exp.indexed
     tpd <- exp.typed
@@ -60,7 +60,7 @@ def typeAfterParse(pt: Type)
 def failIfUnparsedOrTyped(f: String => IdReader[Lifted[Tree]])
                          (str: String)
                          (pt: Type)
-                         (given IdGen, Context): Unit = {
+                         (using IdGen, Context): Unit = {
   f(str).fold
     { err => fail(err.show) }
     { tpd =>
@@ -70,7 +70,7 @@ def failIfUnparsedOrTyped(f: String => IdReader[Lifted[Tree]])
 
 def failIfParsed(f: String => IdReader[Lifted[Tree]])
                 (str: String)
-                (given IdGen): Unit = {
+                (using IdGen): Unit = {
   f(str).fold
     { err => () }
     { exp => fail(s"Parsed expr sucessfully:\n${exp.show}") }
