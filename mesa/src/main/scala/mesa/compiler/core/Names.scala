@@ -15,12 +15,12 @@ object Names {
   import NameOps.given
   import DerivedOps.given
 
-  enum Derived derives Eql {
+  enum Derived derives CanEqual {
     case Str(str: String)
     case Synthetic(id: Id, str: String)
   }
 
-  enum Name derives Eql {
+  enum Name derives CanEqual {
     case From(derived: Derived)
     case Comp(derived: Derived)
     case BangTag, TensorTag, IntegerTag, DecimalTag, VoidTag, VoidCompTag,
@@ -50,28 +50,28 @@ object Names {
 
   object NameOps {
 
-    def (name: Name) isOperator = name match {
+    extension (name: Name) def isOperator = name match {
       case From(Str(OpId(_))) | From(Synthetic(_, OpId(_))) => true
       case Comp(Str(OpId(_))) | Comp(Synthetic(_, OpId(_))) => true
       case _                                                => false
     }
 
-    def (name: Name) nonEmpty = name != EmptyName
+    extension (name: Name) def nonEmpty = name != EmptyName
 
-    def [O, U](name: Name) foldEmptyName(empty: => O)(f: Name => U): O | U =
+    extension [O, U](name: Name) def foldEmptyName(empty: => O)(f: Name => U): O | U =
       if name == EmptyName then empty
       else f(name)
 
-    def [O, U](name: Name) foldWildcard(wildcard: => O)(f: Name => U): O | U =
+    extension [O, U](name: Name) def foldWildcard(wildcard: => O)(f: Name => U): O | U =
       if name == Wildcard then wildcard
       else f(name)
 
-    def (name: Name) promoteComp: Name = name match {
+    extension (name: Name) def promoteComp: Name = name match {
       case From(d)  => Comp(d)
       case _        => name
     }
 
-    def (name: Name) updateDerivedStr(f: String => Derived): Option[Name] =
+    extension (name: Name) def updateDerivedStr(f: String => Derived): Option[Name] =
       name match {
         case From(Str(str)) => Some(From(f(str)))
         case Comp(Str(str)) => Some(Comp(f(str)))

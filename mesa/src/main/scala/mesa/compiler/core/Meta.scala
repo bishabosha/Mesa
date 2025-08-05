@@ -20,7 +20,7 @@ object Meta {
 
   import NameOps.given
 
-  enum Name derives Eql {
+  enum Name derives CanEqual {
     case From(str: String)
     case BangTag, TensorTag, IntegerTag, DecimalTag, VoidTag, VoidCompTag,
       BooleanTag, StringTag, CharTag
@@ -28,7 +28,7 @@ object Meta {
     case EmptyName
   }
 
-  enum Constant derives Eql {
+  enum Constant derives CanEqual {
     case StringConstant(str: String)
     case CharConstant(chr: Char)
     case IntegerConstant(bi: BigInt)
@@ -37,7 +37,7 @@ object Meta {
     case False
   }
 
-  enum Tree derives Eql {
+  enum Tree derives CanEqual {
     case PackageDef(pid: Tree, stats: List[Tree])
     case Select(tree: Tree, name: Name)
     case Ident(name: Name)
@@ -66,7 +66,7 @@ object Meta {
     case EmptyTree
   }
 
-  enum Context derives Eql {
+  enum Context derives CanEqual {
     case LinearVariable(name: Name, tpe: String)
     case Term(name: Name, tpe: String)
     case TermScope(name: Name, tpe: String, scope: Seq[Context])
@@ -133,7 +133,7 @@ object Meta {
         linearScopeOpt.toList ++ data.toList ++ defs
       }
 
-      def (ctx: Fresh) hasMembers = {
+      extension (ctx: Fresh) def hasMembers = {
         ctx.termScope.nonEmpty ||
         ctx.termTypeTable.nonEmpty ||
         ctx.linearScope.isDefined

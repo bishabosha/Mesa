@@ -13,7 +13,7 @@ object Constants {
     def CharConstant(c: Char): Constant = c
     val True: Constant  = true
     val False: Constant = false
-    
-    def (c: Constant) asScala: ConstantScala = c
+
+    extension (c: Constant) def asScala: ConstantScala = c
   }
 }

@@ -15,7 +15,7 @@ object CompilerErrors {
 
   type Lifted[O] = O | CompilerError
 
-  enum CompilerError derives Eql {
+  enum CompilerError derives CanEqual {
     case NameCollision(msg: String)
     case LinearScope(msg: String)
     case UnknownIdentifier(msg: String)
@@ -43,46 +43,46 @@ object CompilerErrors {
 
     def lift[O](o: Lifted[O]): Lifted[O] = o
 
-    def [O](o: Lifted[O]) onError(handler: CompilerError => Nothing): O = o match {
+    extension [O](o: Lifted[O]) def onError(handler: CompilerError => Nothing): O = o match {
       case err: CompilerError => handler(err)
       case _                  => unlift(o)
     }
 
-    def [O](o: Lifted[O]) doOnError(handler: CompilerError => Unit): Unit = o match {
+    extension [O](o: Lifted[O]) def doOnError(handler: CompilerError => Unit): Unit = o match {
       case err: CompilerError => handler(err)
       case _                  =>
     }
 
     inline def unlift[O](o: Lifted[O]): O = o.asInstanceOf[O]
 
-    def [O, U](o: Lifted[O]) fold(e: CompilerError => U)(f: O => U): U = o match {
+    extension [O, U](o: Lifted[O]) def fold(e: CompilerError => U)(f: O => U): U = o match {
       case err: CompilerError => e(err)
       case _                  => f(unlift(o))
     }
 
-    def [O, U](o: Lifted[O]) map(f: O => U): Lifted[U] = o match {
+    extension [O, U](o: Lifted[O]) def map(f: O => U): Lifted[U] = o match {
       case err: CompilerError => err
       case _                  => f(unlift(o))
     }
 
-    def [O, U](o: Lifted[O]) foreach(f: O => Unit): Lifted[Unit] = o match {
+    extension [O, U](o: Lifted[O]) def foreach(f: O => Unit): Lifted[Unit] = o match {
       case err: CompilerError => err
       case _                  => f(unlift(o))
     }
 
-    def [O, U](o: Lifted[O]) flatMap(f: O => Lifted[U]): Lifted[U] = o match {
+    extension [O, U](o: Lifted[O]) def flatMap(f: O => Lifted[U]): Lifted[U] = o match {
       case err: CompilerError => err
       case _                  => f(unlift(o))
     }
 
-    def [A, O](c: Option[A]) mapE(f: A => Lifted[O]): Lifted[Option[O]] = c.fold[Lifted[Option[O]]](None) {
+    extension [A, O](c: Option[A]) def mapE(f: A => Lifted[O]): Lifted[Option[O]] = c.fold[Lifted[Option[O]]](None) {
       f(_) match {
         case err: CompilerError => err
         case o                  => Some(unlift(o))
       }
     }
 
-    def [CC[A] <: Iterable[A], A, O](c: CC[A]) mapE(f: A => Lifted[O])(given factory: Factory[O, CC[O]]): Lifted[CC[O]] = {
+    extension [CC[A] <: Iterable[A], A, O](c: CC[A]) def mapE(f: A => Lifted[O])(using factory: Factory[O, CC[O]]): Lifted[CC[O]] = {
 
       @tailrec
       def inner(acc: mutable.Builder[O, CC[O]], it: Iterator[A]): Lifted[CC[O]] = {
@@ -97,7 +97,7 @@ object CompilerErrors {
       inner(factory.newBuilder, c.iterator)
     }
 
-    def [A, O](l: Iterable[A]) foldLeftE(z: O)(f: (O, A) => Lifted[O]): Lifted[O] = {
+    extension [A, O](l: Iterable[A]) def foldLeftE(z: O)(f: (O, A) => Lifted[O]): Lifted[O] = {
 
       @tailrec
       def inner(acc: O, it: Iterator[A]): Lifted[O] =
@@ -112,7 +112,7 @@ object CompilerErrors {
       inner(z, l.iterator)
     }
 
-    def [O](f: => O) recover(opt: PartialFunction[Throwable, CompilerError]): Lifted[O] = {
+    extension [O](f: => O) def recover(opt: PartialFunction[Throwable, CompilerError]): Lifted[O] = {
       try {
         f
       } catch {

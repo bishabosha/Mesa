@@ -17,5 +17,5 @@ package mesa
     println("No valid option specified. See options with -help")
   }
 
-private def (args: Seq[String]) handleInvalid: Unit =
+extension (args: Seq[String]) private def handleInvalid: Unit =
   args.map("" + '"' + _ + '"').foreach(opt => println(s"Ignoring invalid option $opt."))

@@ -2,34 +2,34 @@ package mesa
 package compiler
 package types
 
+import mesa.util.checkAtRuntime
+
+import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.language.implicitConversions
 
-import scala.collection.mutable
-import scala.annotation.tailrec
-
-import Types._
-import TypeOps._
-import Type._
-import core.Names._
-import Name._
-import NameOps._
-import core.Constants._
-import Constant._
-import core.Modifiers._
-import ast._
-import ast.Trees._
-import typed._
-import Tree._
-import TreeOps._
-import error._
-import types.{TyperErrors => Err}
-import CompilerErrors._
-import CompilerErrorOps._
-import core.Contexts._
-import Context._
+import Types.*
+import TypeOps.*
+import Type.*
+import core.Names.*
+import Name.*
+import NameOps.*
+import core.Constants.*
+import Constant.*
+import core.Modifiers.*
+import ast.*
+import ast.Trees.*
+import typed.*
+import Tree.*
+import TreeOps.*
+import error.*
+import types.TyperErrors as Err
+import CompilerErrors.*
+import CompilerErrorOps.*
+import core.Contexts.*
+import Context.*
 import util.{Show, foldMap, eval}
-import Mode._
-
+import Mode.*
 import NameOps.given
 import TypeOps.given
 import CompilerErrorOps.given
@@ -47,22 +47,22 @@ object Typers {
   }
 
   private object Stoup {
-    def stoup(given stoup: Stoup): Stoup = stoup
+    def stoup(using stoup: Stoup): Stoup = stoup
   }
 
   private enum Closure { case Closed, Free }
 
   private object Closure {
-    def closure(given closure: Closure): Closure = closure
+    def closure(using closure: Closure): Closure = closure
 
-    def (tpe: Type) resolveVariables(given Closure) =
+    extension (tpe: Type) def resolveVariables(using Closure) =
       if closure == Free then
         tpe.mapTypeRefs(Variable(_))
       else
         tpe
   }
 
-  def (tree: Tree) typed(given Context): Lifted[Tree] = {
+  extension (tree: Tree) def typed(using Context): Lifted[Tree] = {
     given Stoup = Blank
     given Closure = Free
     val res = tree.typedAsExpr(any)
@@ -71,27 +71,27 @@ object Typers {
     res
   }
 
-  private def (tree: Tree) typedAsExpr(pt: Type)(given Context, Stoup, Closure): Lifted[Tree] = {
+  extension (tree: Tree) private def typedAsExpr(pt: Type)(using Context, Stoup, Closure): Lifted[Tree] = {
     given Mode = Term
     tree.typed(pt)
   }
 
-  private def (tree: Tree) typedAsTyping(pt: Type)(given Context, Stoup, Closure): Lifted[Tree] = {
+  extension (tree: Tree) private def typedAsTyping(pt: Type)(using Context, Stoup, Closure): Lifted[Tree] = {
     given Mode = Typing
     tree.typed(pt)
   }
 
-  private def (tree: Tree) typedAsPattern(pt: Type)(given Context, Stoup, Closure): Lifted[Tree] = {
+  extension (tree: Tree) private def typedAsPattern(pt: Type)(using Context, Stoup, Closure): Lifted[Tree] = {
     given Mode = Pat
     tree.typed(pt)
   }
 
-  private def (tree: Tree) typedAsLinearPattern(pt: Type)(given Context, Stoup, Closure): Lifted[Tree] = {
+  extension (tree: Tree) private def typedAsLinearPattern(pt: Type)(using Context, Stoup, Closure): Lifted[Tree] = {
     given Mode = LinearPat
     tree.typed(pt)
   }
 
-  private def (ts: List[Tree]) sameType(pt: Type): Lifted[Type] = ts match {
+  extension (ts: List[Tree]) private def sameType(pt: Type): Lifted[Type] = ts match {
     case t :: ts =>
       unifiesThen[Lifted[Type]](t.tpe, pt)
         { t1Tpe =>
@@ -105,7 +105,7 @@ object Typers {
 
   private def resolveVariablesCtor(ctor: Name, data: Name, names: List[Name])
                                   (tpe: Type)
-                                  (given Context): Lifted[Type] = {
+                                  (using Context): Lifted[Type] = {
     import TypeOps._
     val assertThere = tpe.foldLeftLifted(()) { (_, t) =>
       dataDefinitionName(t) match {
@@ -217,7 +217,7 @@ object Typers {
 
   private def typedFunctionTerm(args: List[Tree], body: Tree)
                                (id: Id, pt: Type)
-                               (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                               (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     lookIn(id).flatMap { fCtx =>
       given Context = fCtx
       for
@@ -238,7 +238,7 @@ object Typers {
 
   private def typedLinearFunctionTerm(arg: Tree, body: Tree)
                                      (id: Id, pt: Type)
-                                     (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                                     (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     lookIn(id).flatMap { fCtx =>
       given Context = fCtx
       for
@@ -257,12 +257,12 @@ object Typers {
     }
   }
 
-  private def functionTypnt(args1: List[Tree], body1: Tree)(given Mode): Lifted[Type] = {
+  private def functionTypnt(args1: List[Tree], body1: Tree)(using Mode): Lifted[Type] = {
     val argTpe = args1.map(_.tpe)
     FunctionType(argTpe, body1.tpe)
   }
 
-  private def linearFunctionTypnt(arg1: Tree, body1: Tree)(given Mode): Lifted[Type] = {
+  private def linearFunctionTypnt(arg1: Tree, body1: Tree)(using Mode): Lifted[Type] = {
     if arg1.tpe.isValueType then
       Err.noCompArg
     else if body1.tpe.isValueType then
@@ -273,7 +273,7 @@ object Typers {
 
   private def typedFunctionType(args: List[Tree], body: Tree)
                                (id: Id, pt: Type)
-                               (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                               (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       args1 <- args.mapE(_.typed(any))
       body1 <- body.typed(any)
@@ -283,7 +283,7 @@ object Typers {
 
   private def typedLinearFunctionType(arg: Tree, body: Tree)
                                      (id: Id, pt: Type)
-                                     (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                                     (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       arg1  <- arg.typed(any)
       body1 <- body.typed(any)
@@ -308,7 +308,7 @@ object Typers {
 
   private def typedBangTerm(t: Tree)
                            (pt: Type)
-                           (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                           (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       _   <- assertStoupEmpty(Err.illegalStoupBang)
       t1  <- t.typed(any)
@@ -318,7 +318,7 @@ object Typers {
 
   private def typedWhyNotTerm(t: Tree)
                              (pt: Type)
-                             (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                             (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       t1  <- lift {
         given Stoup = Blank
@@ -329,7 +329,7 @@ object Typers {
 
   private def typedTensorTerm(t: Tree, u: Tree)
                              (pt: Type)
-                             (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                             (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       t1 <- lift {
         given Stoup = Blank
@@ -342,7 +342,7 @@ object Typers {
 
   private def typedTagged(arg: Name, tpeTree: Tree)
                          (pt: Type)
-                         (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                         (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for tpeTree1 <- tpeTree.typedAsTyping(pt)
     yield {
       putTermType(arg -> tpeTree1.tpe)
@@ -350,7 +350,7 @@ object Typers {
     }
   }
 
-  private def typeAsTuple(ts: List[Tree], pt: Type)(given Context, Mode, Stoup, Closure): Lifted[List[Tree]] = {
+  private def typeAsTuple(ts: List[Tree], pt: Type)(using Context, Mode, Stoup, Closure): Lifted[List[Tree]] = {
     if pt == any then {
       ts.mapE(_.typed(any))
     } else {
@@ -362,7 +362,7 @@ object Typers {
     }
   }
 
-  private def typedParens(ts: List[Tree])(pt: Type)(given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+  private def typedParens(ts: List[Tree])(pt: Type)(using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     ts.foldMap(unit) { ts =>
       for ts1 <- typeAsTuple(ts, pt)
       yield Parens(ts1)(ts1.map[Type](_.tpe))
@@ -407,7 +407,7 @@ object Typers {
   }
 
   private def typeAsSumPatternArgs(functor: Name, ts: List[Tree], fTpeArgs: List[Type])
-                                  (given Context, Mode, Stoup, Closure): Lifted[List[Tree]] = {
+                                  (using Context, Mode, Stoup, Closure): Lifted[List[Tree]] = {
     if ts.length != fTpeArgs.length then
       Err.sumCtorArgsNotMatchLengthPattern(functor, fTpeArgs.length, ts.length)
     else
@@ -415,7 +415,7 @@ object Typers {
   }
 
   private def typedApplyType(functor: Tree, args: List[Tree])
-                            (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                            (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       functor1 <- functor.typed(any)
       args1    <- args.mapE(_.typed(any))
@@ -426,7 +426,7 @@ object Typers {
   }
 
   private def typedInfixApply(functor: Tree, t: Tree, u: Tree)
-                             (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                             (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       functor1 <- functor.typed(any)
       t1       <- t.typed(any)
@@ -439,7 +439,7 @@ object Typers {
 
   private def typedApplyTerm(fun: Tree, args: List[Tree])
                             (pt: Type)
-                            (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                            (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       fun1  <- fun.typed(any)
       args1 <- lift {
@@ -453,7 +453,7 @@ object Typers {
 
   private def typedEvalTerm(fun: Tree, arg: Tree)
                            (pt: Type)
-                           (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                           (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       fun1 <- lift {
         given Stoup = Blank
@@ -487,14 +487,14 @@ object Typers {
     }
   }
 
-  private def singletonPattern(patt: Tree, selTpe: Type)(given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+  private def singletonPattern(patt: Tree, selTpe: Type)(using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       patt1 <- patt.typedAsPattern(selTpe)
       _     <- assertExhaustiveSingleton(patt1, selTpe)(unifyPattern)
     yield patt1: Tree
   }
 
-  private def singletonLinearPattern(patt: Tree, selTpe: Type)(given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+  private def singletonLinearPattern(patt: Tree, selTpe: Type)(using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       patt1 <- patt.typedAsLinearPattern(selTpe)
       _     <- assertExhaustiveSingleton(patt1, selTpe)(unifyLinearPattern)
@@ -503,7 +503,7 @@ object Typers {
 
   private def typedLet(patt: Tree, t: Tree, u: Tree)
                       (id: Id, pt: Type)
-                      (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                      (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       lCtx  <- lookIn(id)
       t1    <- t.typed(any)
@@ -524,7 +524,7 @@ object Typers {
 
   private def typedLetTensor(x: Tree, z: Tree, s: Tree, t: Tree)
                             (id: Id, pt: Type)
-                            (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                            (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       lCtx   <- lookIn(id)
       s1     <- s.typed(any)
@@ -546,7 +546,7 @@ object Typers {
     yield tensor
   }
 
-  private def typeAsCaseClauses(given Context, Mode, Stoup, Closure):
+  private def typeAsCaseClauses(using Context, Mode, Stoup, Closure):
     (ts: List[Tree], selTpe: Type) =>
     (pt: Type) =>
     (unify: (ctor: Name, ctorTpe: Type, sumTpe: Type) => Lifted[(Name, List[Type])]) => Lifted[List[Tree]]
@@ -569,7 +569,7 @@ object Typers {
     }
   }
 
-  private def typeAsLinearCaseClauses(given Context, Mode, Stoup, Closure):
+  private def typeAsLinearCaseClauses(using Context, Mode, Stoup, Closure):
     (ts: List[Tree], selTpe: Type) =>
     (pt: Type) =>
     (unify: (ctor: Name, ctorTpe: Type, sumTpe: Type) => Lifted[(Name, List[Type])]) => Lifted[List[Tree]]
@@ -592,7 +592,7 @@ object Typers {
     (pt: Type)
     (unify: (ctor: Name, ctorTpe: Type, sumTpe: Type)
               => Lifted[(Name, List[Type])])
-    (given Context, Mode, Stoup, Closure): Lifted[List[Tree]]
+    (using Context, Mode, Stoup, Closure): Lifted[List[Tree]]
   = {
     for
       templates <- templates(selTpe)(unify)
@@ -607,7 +607,7 @@ object Typers {
 
   private def typedCaseExpr(selector: Tree, cases: List[Tree])
                            (pt: Type)
-                           (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                           (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       selector1  <- lift {
         given Stoup = Blank
@@ -620,7 +620,7 @@ object Typers {
 
   private def typedCaseClause(pat: Tree, guard: Tree, body: Tree, selTpe: Type)
                              (id: Id, pt: Type)
-                             (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                             (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     lookIn(id).flatMap { ccCtx =>
       given Context = ccCtx
       for
@@ -633,7 +633,7 @@ object Typers {
 
   private def typedLinearCaseExpr(selector: Tree, cases: List[Tree])
                                  (pt: Type)
-                                 (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                                 (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       selector1 <- selector.typed(any)
       cases1    <- typeAsLinearCaseClauses(cases, selector1.tpe)(pt)(
@@ -644,7 +644,7 @@ object Typers {
 
   private def typedLinearCaseClause(pat: Tree, body: Tree, selTpe: Type)
                                    (id: Id, pt: Type)
-                                   (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                                   (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     lookIn(id).flatMap { ccCtx =>
       given Context = ccCtx
       for
@@ -661,7 +661,7 @@ object Typers {
 
   private def typedBind(name: Name, body: Tree)
                        (pt: Type)
-                       (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                       (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for body1 <- body.typed(pt)
     yield {
       if name == Name.Wildcard then {
@@ -677,7 +677,7 @@ object Typers {
 
   private def typedAlternative(patterns: List[Tree])
                               (pt: Type)
-                              (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                              (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     given Mode = Mode.PatAlt
     for
       patterns1 <- patterns.mapE(_.typed(pt))
@@ -687,7 +687,7 @@ object Typers {
 
   private def typedUnapply(constructor: Name, args: List[Tree])
                           (pt: Type)
-                          (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                          (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       cTpe <- lookupConstructorType(constructor)
       pair <- typeAsDestructor(constructor, cTpe, pt)
@@ -698,7 +698,7 @@ object Typers {
 
   private def typedLinearUnapply(constructor: Name, args: List[Tree])
                                 (pt: Type)
-                                (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                                (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
 
     def assertMaxSingleArg(args: List[Tree]): Lifted[List[Tree]] = args match {
       case _ :: Nil | Nil => args
@@ -714,9 +714,9 @@ object Typers {
     yield Unapply(constructor, args2.flatten.toList)(tpe)
   }
 
-  private def typePackaging(tree: Tree)(given Context): Lifted[(Context, Tree)] = {
+  private def typePackaging(tree: Tree)(using Context): Lifted[(Context, Tree)] = {
 
-    def foldEmptyNamePairs(id: Id, name: Name, tail: List[(Id, Name)])(given Context) = {
+    def foldEmptyNamePairs(id: Id, name: Name, tail: List[(Id, Name)])(using Context) = {
       for
         z <- for {
           next <- lookIn(id)
@@ -733,7 +733,7 @@ object Typers {
       declareInParent(parent, id, name)
     }
 
-    def declareInParent(parent: Tree, id: Id, name: Name)(given Context) = {
+    def declareInParent(parent: Tree, id: Id, name: Name)(using Context) = {
       for
         next <- lookIn(id)
         tpe  <- declarePackage(packageName(parent.tpe), name)
@@ -748,7 +748,7 @@ object Typers {
 
   private def typedPackageDef(pid: Tree, stats: List[Tree])
                              (pt: Type)
-                             (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                             (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       pair <- typePackaging(pid)
       (pkgCtx, pid1) = pair
@@ -760,7 +760,7 @@ object Typers {
   }
 
   private def typedDataDcl(name: Name, args: List[Name], ctors: List[Tree])
-                          (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                          (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     val tpe = AppliedType(name, args.map(Variable(_)))
     putDataType(name -> tpe)
     for ctors1 <- typeAsCtors(ctors)(name, args, tpe)
@@ -768,7 +768,7 @@ object Typers {
   }
 
   private def typedInfixDataDcl(name: Name, left: Name, right: Name, ctors: List[Tree])
-                               (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                               (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     val tpe = InfixAppliedType(name, Variable(left), Variable(right))
     putDataType(name -> tpe)
     for ctors1 <- typeAsCtors(ctors)(name, left :: right :: Nil, tpe)
@@ -777,7 +777,7 @@ object Typers {
 
   private def typeAsCtors(ctors: List[Tree])
                          (dataType: Name, tpeVars: List[Name], ret: Type)
-                         (given Context, Mode, Stoup, Closure): Lifted[List[Tree]] = {
+                         (using Context, Mode, Stoup, Closure): Lifted[List[Tree]] = {
     ctors.mapE {
       case CtorSig(name, args) => typedCtor(name, args)(dataType, tpeVars, ret)
 
@@ -790,7 +790,7 @@ object Typers {
 
   private def typedCtor(constructor: Name, args: List[Tree])
                        (dataType: Name, tpeVars: List[Name], ret: Type)
-                       (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                       (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       args1 <- args.mapE(_.typedAsTyping(any))
       args2 <- args1.mapE { a =>
@@ -817,7 +817,7 @@ object Typers {
 
   private def typedLinearCtor(constructor: Name, arg: Option[Tree])
                              (dataType: Name, tpeVars: List[Name], ret: Type)
-                             (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                             (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     arg.fold {
       putTermType(constructor -> ret)
       linkConstructor(constructor, ret)
@@ -829,7 +829,7 @@ object Typers {
         argT <- resolveVariablesCtor(constructor, dataType, tpeVars)(arg1.tpe)
         cTpe =  LinearFunctionType(argT, ret)
         pair <- typeAsLinearDestructor(constructor, cTpe, ret)
-        (Some(fTpeArg), tpe1) = pair
+        (Some(fTpeArg), tpe1) = pair.checkAtRuntime
         cTpe1 =  LinearFunctionType(fTpeArg, tpe1)
         arg2  <- arg1.withTpe(fTpeArg)
       yield {
@@ -841,7 +841,7 @@ object Typers {
   }
 
   private def typedDefDef(modifiers: Set[Modifier], sig: Tree & Unique, tpeD: Tree, body: Tree)
-                         (given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+                         (using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       tpeD1    <- tpeD.typedAsTyping(any)
       tpe      =  tpeD1.tpe
@@ -862,7 +862,7 @@ object Typers {
     }
   }
 
-  private def mapArgs(args: List[Name], pts: List[Type])(given Context): Lifted[Unit] = {
+  private def mapArgs(args: List[Name], pts: List[Type])(using Context): Lifted[Unit] = {
     args
       .zip(pts)
       .foldLeftE(()) { (_, pair) =>
@@ -874,7 +874,7 @@ object Typers {
       }
   }
 
-  private def mapLinearArg(arg: Name, tpe: Type)(given Context): Lifted[Unit] = tpe match {
+  private def mapLinearArg(arg: Name, tpe: Type)(using Context): Lifted[Unit] = tpe match {
     case t @ LinearFunctionType(argTpe, _) =>
       for
         _ <- assertLinearFuncValid(t)
@@ -886,7 +886,7 @@ object Typers {
     case _ => Err.linearArgNotMatchType(arg)
   }
 
-  private def typedDefSig(name: Name, args: List[Name])(id: Id, pt: Type)(given Context): Lifted[Tree] = {
+  private def typedDefSig(name: Name, args: List[Name])(id: Id, pt: Type)(using Context): Lifted[Tree] = {
     val pts = pt.toCurriedList
     if pts.length <= args.length then
       Err.declArgsNotMatchType(name)
@@ -902,7 +902,7 @@ object Typers {
 
   private def typedLinearSig(name: Name, args: List[Name], linear: Name)
                             (id: Id, pt: Type)
-                            (given Context): Lifted[Tree] = {
+                            (using Context): Lifted[Tree] = {
     val pts = pt.toCurriedList
     if pts.length <= args.length then
       Err.declArgsNotMatchType(name)
@@ -918,18 +918,18 @@ object Typers {
       }
   }
 
-  private def typedSelectType(given Mode): Lifted[Tree] =
+  private def typedSelectType(using Mode): Lifted[Tree] =
     Err.memberSelection
 
-  private def typedSelectTerm(given Mode): Lifted[Tree] =
+  private def typedSelectTerm(using Mode): Lifted[Tree] =
     Err.memberSelection
 
-  private def typedIdentType(name: Name)(id: Id)(given Context): Lifted[Tree] = {
+  private def typedIdentType(name: Name)(id: Id)(using Context): Lifted[Tree] = {
     val tpe = lookupType(name).fold(_ => TypeRef(name))(identity)
     Ident(name)(id, tpe)
   }
 
-  private def typedIdentPat(name: Name)(id: Id, pt: Type)(given Context, Mode): Lifted[Tree] = {
+  private def typedIdentPat(name: Name)(id: Id, pt: Type)(using Context, Mode): Lifted[Tree] = {
     if mode == PatAlt && name != Wildcard then
       Err.nameInPattAlt(name)
     else
@@ -937,7 +937,7 @@ object Typers {
       yield Ident(name)(id, pt)
   }
 
-  private def typedIdentTerm(name: Name)(id: Id)(given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+  private def typedIdentTerm(name: Name)(id: Id)(using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     for
       tpe <- inTermCtx(name) {
         for
@@ -948,30 +948,30 @@ object Typers {
     yield Ident(name)(id, tpe.freshVariables)
   }
 
-  private def assertInScope(name: Name, tpe: Type)(given Context, Stoup, Closure, Mode): Lifted[Unit] = {
+  private def assertInScope(name: Name, tpe: Type)(using Context, Stoup, Closure, Mode): Lifted[Unit] = {
     if isLinear(name) then
       assertStoupIs(name)(Err.illegalStoupDependency)
     else
       assertStoupEmpty(Err.illegalStoupValueIdent(_, name, tpe))
   }
 
-  private def assertStoupEmpty(err: Name => CompilerError)(given Stoup): Lifted[Unit] = stoup match {
+  private def assertStoupEmpty(err: Name => CompilerError)(using Stoup): Lifted[Unit] = stoup match {
     case DependsOn(z) => err(z)
     case _            => ()
   }
 
-  private def assertStoupIs(name: Name)(err: Name => CompilerError)(given Stoup): Lifted[Unit] = stoup match {
+  private def assertStoupIs(name: Name)(err: Name => CompilerError)(using Stoup): Lifted[Unit] = stoup match {
     case DependsOn(`name`) => ()
     case _                 => err(name)
   }
 
   private def assertStoupIsNot(name: Name)(err: Name => CompilerError)
-                              (given Stoup, Context): Lifted[Unit] = stoup match {
+                              (using Stoup, Context): Lifted[Unit] = stoup match {
     case DependsOn(`name`) => err(name)
     case _                 => ()
   }
 
-  private def assertIsLinear(name: Name, tpe: Type)(given Context): Lifted[Unit] = {
+  private def assertIsLinear(name: Name, tpe: Type)(using Context): Lifted[Unit] = {
     if tpe.isValueType && isLinear(name) then
       Err.illegalStoupEntry(name, tpe)
     else
@@ -1014,7 +1014,7 @@ object Typers {
 
   private def assertExhaustiveSingleton(patt1: Tree, selTpe: Type)
                                        (unify: (ctor: Name, ctorTpe: Type, sumTpe: Type) => Lifted[(Name, List[Type])])
-                                       (given Context): Lifted[Unit] = patt1 match {
+                                       (using Context): Lifted[Unit] = patt1 match {
     case _: Ident => ()
 
     case _ =>
@@ -1068,7 +1068,7 @@ object Typers {
 
   def templates(selTpe: Type)
                (unify: (ctor: Name, ctorTpe: Type, sumTpe: Type) => Lifted[(Name, List[Type])])
-               (given Context): Lifted[List[Tree]] = {
+               (using Context): Lifted[List[Tree]] = {
 
     type StackT = List[Tree]
     type StatT  = StackT => StackT
@@ -1100,14 +1100,14 @@ object Typers {
       case selTpes::selTpess => selTpes match {
 
         case Nil =>
-          val program::programs1 = programs
+          val program::programs1 = programs.checkAtRuntime
           val templates = program.foldLeft(List.empty[Tree])(eval)
           inner(templates:::acc, programs1, selTpess)
 
         case selTpe::selTpes => selTpe match {
 
           case Product(ts) =>
-            val program::programs1 = programs
+            val program::programs1 = programs.checkAtRuntime
             val mkParens: StatT = { stack =>
               ts.foldMap(unit::stack) { ts =>
                 val (ts1, stack1) = stack.splitAt(ts.size)
@@ -1121,7 +1121,7 @@ object Typers {
             )
 
           case BaseType(BooleanTag) =>
-            val program::programs1 = programs
+            val program::programs1 = programs.checkAtRuntime
             val putTrue: StatT = { stack =>
               litTrue::stack
             }
@@ -1138,7 +1138,7 @@ object Typers {
           case _ => dataDefinitionName(selTpe) match {
 
             case EmptyName =>
-              val program::programs1 = programs
+              val program::programs1 = programs.checkAtRuntime
               val putIdent: StatT = { stack =>
                 Ident(Wildcard)(Id.empty, selTpe) :: stack
               }
@@ -1149,7 +1149,7 @@ object Typers {
               )
 
             case sumName =>
-              val program :: programs1 = programs
+              val program :: programs1 = programs.checkAtRuntime
               constructorsForSum(sumName, selTpe) match {
                 case err: CompilerError => err
 
@@ -1179,7 +1179,7 @@ object Typers {
     inner(Nil, Nil :: Nil, (selTpe :: Nil) :: Nil)
   }
 
-  private def typedLiteral(constant: Constant)(given Stoup): Lifted[Tree] = {
+  private def typedLiteral(constant: Constant)(using Stoup): Lifted[Tree] = {
     for _ <- assertStoupEmpty(Err.illegalStoupValueLiteral)
     yield constant match
       case True  => litTrue
@@ -1187,7 +1187,7 @@ object Typers {
       case _     => Literal(constant)(constantTpe(constant))
   }
 
-  private def check(typed: Tree)(pt: Type)(given Mode): Lifted[Tree] = {
+  private def check(typed: Tree)(pt: Type)(using Mode): Lifted[Tree] = {
 
     inline def ignoreType(tree: Tree) = tree match
       case EmptyTree | _: TreeSeq => true
@@ -1199,7 +1199,7 @@ object Typers {
       Err.typecheckFail(typed)(typed.tpe, pt)
   }
 
-  private def (tree: Tree) typed(pt: Type)(given Context, Mode, Stoup, Closure): Lifted[Tree] = {
+  extension (tree: Tree) private def typed(pt: Type)(using Context, Mode, Stoup, Closure): Lifted[Tree] = {
     def inner(tree: Tree, pt: Type) = tree match {
       // Types
       case _: Select                if isType     => typedSelectType

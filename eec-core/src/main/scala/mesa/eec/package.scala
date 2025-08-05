@@ -2,4 +2,5 @@ package mesa.eec
 
 import Trees.Tree
 
-inline def (sc: => StringContext) eec (args: => Any*) <: Tree[?] = ${ Macros.eecImpl('sc, 'args) }
+extension (inline sc: StringContext) transparent inline def eec (inline args: Any*): Tree[?] =
+  ${ Macros.eecImpl('sc, 'args) }

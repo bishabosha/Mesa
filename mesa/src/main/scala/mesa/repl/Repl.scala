@@ -58,12 +58,12 @@ private case class LoopState(
 
 private val defaultPrompt = "mesa"
 
-private def (msg: String) wrapErr =
+extension (msg: String) private def wrapErr =
   Console.RED + "[ERROR] " + msg + Console.RESET
 
 def loop(enterPrelude: Boolean): Unit = {
 
-  def (prompt: String) asPrompt: String = s"$prompt${Console.CYAN}>${Console.RESET} "
+  extension (prompt: String) def asPrompt: String = s"$prompt${Console.CYAN}>${Console.RESET} "
 
   @tailrec
   def inner(state: LoopState): Unit = state match {

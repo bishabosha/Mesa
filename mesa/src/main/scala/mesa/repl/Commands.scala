@@ -4,7 +4,7 @@ package repl
 object Commands {
   import Command._
 
-  enum Command derives Eql {
+  enum Command derives CanEqual {
     case AstExpr(code: String)
     case AstTop(code: String)
     case TypeExpr(code: String)
@@ -37,7 +37,7 @@ object Commands {
   def parseCommand(line: String): Command = {
     import Parsers._
 
-    def (s: String) trimOrEmpty: String = Option(s).fold("")(_.trim)
+    extension (s: String) def trimOrEmpty: String = Option(s).fold("")(_.trim)
 
     object Parsers {
       val resetCommand  = """:reset""".r

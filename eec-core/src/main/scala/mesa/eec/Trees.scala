@@ -3,6 +3,7 @@ package mesa.eec
 import mesa.util.StackMachine.{InterpretableK, Program, stack, Statement, Stack}
 import Program.compile
 import mesa.util.Show
+import mesa.util.checkAtRuntime
 
 import annotation.tailrec
 
@@ -10,7 +11,7 @@ object Trees {
 
   type Name = String
 
-  enum Tree[T] derives Eql {
+  enum Tree[+T] derives CanEqual {
     case Point                                                                              extends Tree[Unit]
     case Pair[A, B](a: Tree[A], b: Tree[B])                                                 extends Tree[(A,B)]
     case Var[T](name: Name)                                                                 extends Tree[T]
@@ -38,7 +39,7 @@ object Trees {
   object Tree {
 
     given InterpretableK[Tree] {
-      def [T,O](tree: Tree[T]) interpretK(z: O)(f: [t] => (O, Tree[t]) => O): O = {
+      extension [T](tree: Tree[T]) def interpretK[O](z: O)(f: [t] => (O, Tree[t]) => O): O = {
         @tailrec
         def inner(z: O, ts: List[Tree[?]]): O = ts match {
           case Nil => z
@@ -62,7 +63,7 @@ object Trees {
     }
   }
 
-  given [T]: Show[Tree[T]] {
+  given [T]: Show[Tree[T]] with {
     import Tree._
 
     def wrapIfComplex[U](t: Tree[U], s: String) = t match {
@@ -75,55 +76,55 @@ object Trees {
       case _                                                                        => s
     }
 
-    def (t: Tree[T]) show: String = t.compile[Tree, T, String] {
+    extension (t: Tree[T]) def show: String = t.compile[String] { [U] => (t: Tree[U]) => t match
       case Pair(a,b)  =>
-        val a1::b1::s1 = stack
+        val a1::b1::s1 = stack.checkAtRuntime
         s"($a1, $b1)"::s1
 
       case Tensor(v,z) =>
-        val v1::z1::s1 = stack
+        val v1::z1::s1 = stack.checkAtRuntime
         val v2 = wrapIfComplex(v,v1)
         val z2 = wrapIfComplex(z,z1)
         s"!$v2 *: $z2"::s1
 
       case App(f,t) =>
-        val f1::t1::s1 = stack
+        val f1::t1::s1 = stack.checkAtRuntime
         val f2 = wrapIfExpr1(f,f1)
         val t2 = wrapIfComplex(t,t1)
         s"$f2 $t2"::s1
 
       case Eval(f,t) =>
-        val f1::t1::s1 = stack
+        val f1::t1::s1 = stack.checkAtRuntime
         val f2 = wrapIfExpr1(f, f1)
         s"$f2[$t1]"::s1
 
       case Lam(x,t) =>
-        val t1::s1 = stack
+        val t1::s1 = stack.checkAtRuntime
         s"\\$x.$t1"::s1
 
       case Lin(x,t) =>
-        val t1::s1 = stack
+        val t1::s1 = stack.checkAtRuntime
         s"^\\$x.$t1"::s1
 
       case CaseExpr(e,x,l,y,r) =>
-        val e1::l1::r1::s1 = stack
+        val e1::l1::r1::s1 = stack.checkAtRuntime
         s"case $e1 of {inl $x.$l1; inr $y.$r1}"::s1
 
       case Let(x,t,u) =>
-        val t1::u1::s1 = stack
+        val t1::u1::s1 = stack.checkAtRuntime
         s"let !$x be $t1 in $u1"::s1
 
       case LetT(x,z,t,u) =>
-        val t1::u1::s1 = stack
+        val t1::u1::s1 = stack.checkAtRuntime
         s"let !$x *: $z be $t1 in $u1"::s1
 
       case Bang(t) =>
-        val t1::s1 = stack
+        val t1::s1 = stack.checkAtRuntime
         val t2 = wrapIfComplex(t,t1)
         s"!$t2"::s1
 
       case WhyNot(t) =>
-        val t1::s1 = stack
+        val t1::s1 = stack.checkAtRuntime
         val t2 = wrapIfComplex(t,t1)
         s"?$t2"::s1
 
