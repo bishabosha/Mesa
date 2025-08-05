@@ -36,7 +36,7 @@ object Prelude {
   """
   val source = prelude.linesIterator.map(_.trim).filter(_.nonEmpty).toList
 
-  def importInScope(given Context, IdGen): Lifted[Unit] = {
+  def importInScope(using Context, IdGen): Lifted[Unit] = {
     source.foldLeftE(()) { (_,s) =>
       for
         expr <- parseDef(s)

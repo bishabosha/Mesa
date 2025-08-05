@@ -1,8 +1,9 @@
 package mesa.eec
 
 import quoted._
+import java.util.concurrent.atomic.AtomicInteger
 
-object TypeTraverser with
+object TypeTraverser:
 
   abstract class =>*:[-T,+U] extends (T => U)
 
@@ -10,30 +11,27 @@ object TypeTraverser with
 
   case class ![A](a: A)
 
-  given BangOps: [A](x: A) extended with
-    def repeatable : ![A] = new !(x)
+  given BangOps: AnyRef with
+    extension [A](x: A) def repeatable : ![A] = new !(x)
 
-  def traverseTypesImpl[T: Type](expr: Expr[T])(given qctx: QuoteContext): Expr[Unit] =
-    import qctx.tasty.{Type => TastyType, _,given}
+  private val varnames = AtomicInteger(0)
+  def freshVarName(prefix: String = "x"): String = s"${prefix}${varnames.getAndIncrement()}"
+
+  def traverseTypesImpl[T: Type](expr: Expr[T])(using qctx: Quotes): Expr[Unit] =
+    import qctx.reflect.{TypeRepr => TastyType, _,given}
 
     expr match
-      case '{ \($x: $t =>*: $u) } => traverseTypesImpl(x)
+      case '{ \($x: t =>*: u) } => traverseTypesImpl(x)
 
-      case f @ '{ type $t; type $u; ($x: `$t`) => ($bodyFn: `$t` => `$u`)(`$x`) } =>
-        val arr = if f.unseal.tpe <:< typeOf[$t =>*: $u] then Expr("=>*") else Expr("=>")
-        Expr.open(bodyFn)((body, _) =>
-          '{ println(s"\\(${${Expr(x.name)}}: ${${Expr(t.show)}}) ${$arr} (${${Expr(body.show)}} : ${${Expr(u.show)}})") }
-        )
+      case f @ '{ type t; type u; ((y: `t`) => $bodyFn(y): `u`).apply($x) } =>
+        val arr = if f.asTerm.tpe <:< TastyType.of[t =>*: u] then Expr("=>*") else Expr("=>")
+        '{ println(s"\\(${${Expr(x.asTerm.symbol.name)}}: ${${Expr(Type.show[t])}}) ${$arr} (${${Expr(bodyFn.show)}} : ${${Expr(Type.show[u])}})") }
 
-      case '{ type $a; val $x = ($t: ![`$a`]); ($bodyFn: ![`$a`] => ?)(`$x`) } =>
-        Expr.open(bodyFn) { (body, close) =>
-          quoted.util.Var(t) { tVar =>
-            close(body)(tVar.get) match
-            case '{ $body: $b } =>
-              '{ println(s"let !${${Expr(x.name)}} be (${${Expr(t.show)}} : ![${${Expr(a.show)}}]) in (${${Expr(body.show)}} : ${${Expr(b.show)}})") }
-          }
-        }
+      case '{ type a; val x = ($t: ![`a`]); ($bodyFn: ![`a`] => ?)(`x`) } =>
+        Expr.betaReduce('{ $bodyFn($t) }) match
+          case '{ $body: b } =>
+            '{ println(s"let !${${Expr(freshVarName())}} be (${${Expr(t.show)}} : ![${${Expr(Type.show[a])}}]) in (${${Expr(body.show)}} : ${${Expr(Type.show[b])}})") }
 
-      case e => '{ println(s"expr ${${Expr(e.unseal.underlyingArgument.show)}} is of type ${${Expr(summon[Type[T]].show)}}") }
+      case e => '{ println(s"expr ${${Expr(e.show)}} is of type ${${Expr(Type.show[T])}}") }
 
   inline def traverseTypes[T](expr: => T): Unit = ${ traverseTypesImpl('expr) }

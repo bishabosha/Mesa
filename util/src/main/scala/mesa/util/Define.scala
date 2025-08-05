@@ -4,5 +4,5 @@ package mesa.util
  */
 @FunctionalInterface
 trait Define[O] {
-  def (o: O) define: String
+  extension (o: O) def define: String
 }

@@ -15,6 +15,7 @@ import types.Types._
 import untyped.nt
 import annotation._
 import util.{ Show, eval, foldMap }
+import mesa.util.checkAtRuntime
 
 import Meta.TreeOps.given
 import Names.NameOps.given
@@ -25,7 +26,7 @@ object Trees {
 
   trait Unique(val id: Id) { self: Tree => }
 
-  enum Tree(val tpe: Type) derives Eql {
+  enum Tree(val tpe: Type) derives CanEqual {
     case Select(tree: Tree, name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case Ident(name: Name)(id: Id, tpe: Type) extends Tree(tpe) with Unique(id)
     case PackageDef(pid: Tree, stats: List[Tree])(tpe: Type) extends Tree(tpe)
@@ -111,7 +112,7 @@ object Trees {
 
           case Bind(x,patt) =>
             val statement = { (stack: StackT) =>
-              val patt1::stack1 = stack
+              val patt1::stack1 = stack.checkAtRuntime
               val pattStr = patt match {
                 case (_:(Ident | Parens | Literal) | Unapply(_,Nil)) => patt1
                 case _ => s"($patt1)"
@@ -129,8 +130,8 @@ object Trees {
         .head
     }
 
-    @tailrec
-    def (tree: Tree) uniqId: Id = tree match {
+
+    extension (tree: Tree) @tailrec def uniqId: Id = tree match {
       case Select(t, _)     => t.uniqId
       case PackageDef(t, _) => t.uniqId
       case DefDef(_,s,_,_)  => s.uniqId
@@ -161,7 +162,7 @@ object Trees {
     given uniqName: Conversion[Tree, Name] = {
       case DefSig(name, _)              => name
       case LinearSig(name, _, _)        => name
-      case DefDef(_, sig, _, _)         => sig
+      case DefDef(_, sig, _, _)         => uniqName(sig)
       case Tagged(name, _)              => name
       case Bind(name, _)                => name
       case Ident(name)                  => name
@@ -172,13 +173,13 @@ object Trees {
       case _                            => EmptyName
     }
 
-    def (tree: Tree) linearArg: Name = tree match {
+    extension (tree: Tree) def linearArg: Name = tree match {
       case LinearSig(_, _, linearArg) => linearArg
       case LinearFunction(arg,_)      => arg
       case _                          => EmptyName
     }
 
-    def (t: Tree) toNames: List[Name] = {
+    extension (t: Tree) def toNames: List[Name] = {
       @tailrec
       def toNames(acc: List[Name], t: Tree): List[Name] = t match {
         case Ident(name)        => name :: acc
@@ -188,7 +189,7 @@ object Trees {
       toNames(Nil, t)
     }
 
-    def (t: Tree) toNamePairs: List[(Id, Name)] = {
+    extension (t: Tree) def toNamePairs: List[(Id, Name)] = {
       @tailrec
       def toPairs(acc: List[(Id, Name)], t: Tree): List[(Id, Name)] = t match {
         case t @ Ident(name)        => (t.id, name) :: acc
@@ -198,14 +199,14 @@ object Trees {
       toPairs(Nil, t)
     }
 
-    def (tree: Tree) addModifiers(mods: Set[Modifier]): Tree = tree match {
+    extension (tree: Tree) def addModifiers(mods: Set[Modifier]): Tree = tree match {
       case tree: DefDef =>
         tree.copy(modifiers = (tree.modifiers ++ mods))(tree.tpe)
 
       case _ => tree
     }
 
-    def (tree: Tree) withTpe(tpe: Type): Tree = tree match {
+    extension (tree: Tree) def withTpe(tpe: Type): Tree = tree match {
       case tree: Select           => tree.copy()(tree.id, tpe)
       case tree: Ident            => tree.copy()(tree.id, tpe)
       case tree: PackageDef       => tree.copy()(tpe)

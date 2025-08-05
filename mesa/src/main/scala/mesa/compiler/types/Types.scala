@@ -1,29 +1,33 @@
 package mesa.compiler.types
 
+import mesa.compiler.ast.Trees.*
+import mesa.compiler.core.Names
+import mesa.compiler.error.CompilerErrors.*
+import mesa.util.Define
+import mesa.util.Show
+import mesa.util.StackMachine
+import mesa.util.checkAtRuntime
+import mesa.util.const
+import mesa.util.view
+
+import scala.annotation.tailrec
+import scala.collection.BuildFrom
+import scala.collection.Factory
 import scala.language.implicitConversions
 
-import scala.collection.Factory
-import scala.collection.BuildFrom
-import scala.annotation.tailrec
-
-import mesa.compiler.ast.Trees._
-import Tree._
-import mesa.compiler.core.Names
-import Names._
-import Name._
-import mesa.compiler.error.CompilerErrors._
-import CompilerErrorOps._
-import mesa.util.{Show, Define, StackMachine, view, const}
-import StackMachine._
-import Program._
-
+import Tree.*
+import Names.*
+import Name.*
+import CompilerErrorOps.*
+import StackMachine.*
+import Program.*
 import NameOps.given
 
 object Types {
   import Type._
   import TypeOps._
 
-  enum Type derives Eql {
+  enum Type derives CanEqual {
     case PackageInfo(parent: Type, name: Name)
     case TypeRef(name: Name)
     case Variable(name: Name)
@@ -90,7 +94,7 @@ object Types {
       }
     }
 
-    def (tpe: Type) mapTypeRefs(f: Name => Type): Type = {
+    extension (tpe: Type) def mapTypeRefs(f: Name => Type): Type = {
       tpe.mapLeaves {
         case TypeRef(name)  => f(name)
         case tpe1           => tpe1
@@ -98,28 +102,28 @@ object Types {
     }
 
     given Interpretable[Type] {
-      def [O](tpe: Type) interpret(z: O)(f: (O, Type) => O): O = tpe.foldLeft(z)(f)
+      extension (tpe: Type) def interpret[O](z: O)(f: (O, Type) => O): O = tpe.foldLeft(z)(f)
     }
 
-    def (tpe: Type) mapVariables(f: Name => Type): Type = {
+    extension (tpe: Type) def mapVariables(f: Name => Type): Type = {
       tpe.mapLeaves {
         case Variable(name) => f(name)
         case tpe1           => tpe1
       }
     }
 
-    private[Types] def (tpe: Type) mapLeaves(f: Type => Type): Type = {
-      tpe.compile[Type, Type] {
+    extension (tpe: Type) private[Types] def mapLeaves(f: Type => Type): Type = {
+      tpe.compile[Type] {
         case FunctionType(arg, body) =>
-          val a1 :: a2 :: rest = stack
+          val a1 :: a2 :: rest = stack.checkAtRuntime
           FunctionType(a1, a2) :: rest
 
         case LinearFunctionType(arg, body) =>
-          val a1 :: a2 :: rest = stack
+          val a1 :: a2 :: rest = stack.checkAtRuntime
           LinearFunctionType(a1, a2) :: rest
 
         case InfixAppliedType(tpe, a1, a2) =>
-          val a1 :: a2 :: rest = stack
+          val a1 :: a2 :: rest = stack.checkAtRuntime
           InfixAppliedType(tpe, a1, a2) :: rest
 
         case AppliedType(f, args) =>
@@ -134,7 +138,7 @@ object Types {
       }
     }
 
-    def [O](tpe: Type) foldLeft(z: O)(f: (O, Type) => O): O = {
+    extension [O](tpe: Type) def foldLeft(z: O)(f: (O, Type) => O): O = {
       @tailrec
       def inner(z: O, tpes: List[Type]): O = tpes match {
         case Nil => z
@@ -157,7 +161,7 @@ object Types {
       inner(z, tpe :: Nil)
     }
 
-    def [O](tpe: Type) foldLeftLifted(z: Lifted[O])(f: (O, Type) => Lifted[O]): Lifted[O] = {
+    extension [O](tpe: Type) def foldLeftLifted(z: Lifted[O])(f: (O, Type) => Lifted[O]): Lifted[O] = {
       @tailrec
       def inner(z: Lifted[O], tpes: List[Type]): Lifted[O] = {
         z match {
@@ -187,7 +191,7 @@ object Types {
       inner(z, tpe :: Nil)
     }
 
-    def [O, That](t1: Type) zipFold(t2: Type)(z: O)(f: (O, Type, Type) => O): O = {
+    extension [O, That](t1: Type) def zipFold(t2: Type)(z: O)(f: (O, Type, Type) => O): O = {
 
       @tailrec
       def inner(z: O, args: List[Type], apps: List[Type]): O = args match {
@@ -245,7 +249,7 @@ object Types {
       else inner(z, t1 :: Nil, t2 :: Nil)
     }
 
-    def [O, Col](ops: Type) zipWith(t: Type)(f: (Name, Type) => O)(given factory: Factory[O, Col]): Col = {
+    extension [O, Col](ops: Type) def zipWith(t: Type)(f: (Name, Type) => O)(using factory: Factory[O, Col]): Col = {
 
       val b = ops.zipFold(t)(factory.newBuilder) { (acc, arg, app) =>
         arg match {
@@ -288,7 +292,7 @@ object Types {
       inner(true, arg :: Nil, app :: Nil)
     }
 
-    def (tpe: Type) =:= (other: Type): Boolean = {
+    extension (tpe: Type) def =:= (other: Type): Boolean = {
       tpe   == other        ||
       tpe   == WildcardType ||
       other == WildcardType
@@ -305,7 +309,7 @@ object Types {
       }
     }
 
-    def (tpe: Type) unwrapLinearBody: Type = tpe match {
+    extension (tpe: Type) def unwrapLinearBody: Type = tpe match {
       case LinearFunctionType(_, ret) => ret
       case _                          => tpe
     }
@@ -337,7 +341,7 @@ object Types {
       inner(Nil, tpe)
     }
 
-    def (t: Type) toCurriedList: List[Type] = {
+    extension (t: Type) def toCurriedList: List[Type] = {
       @tailrec
       def inner(acc: List[Type], t: Type): List[Type] = t match {
         case FunctionType(arg, body)  => inner(arg :: acc, body)
@@ -367,10 +371,10 @@ object Types {
       case Nil        => EmptyType
     }
 
-    def (subFrom: Type) unifications(subWith: Type): List[(Name, Type)] =
+    extension (subFrom: Type) def unifications(subWith: Type): List[(Name, Type)] =
       subFrom.zipWith(subWith)((_, _))
 
-    def (tpe: Type) unifyFrom(subFrom: Type)(subWith: Type): Type = {
+    extension (tpe: Type) def unifyFrom(subFrom: Type)(subWith: Type): Type = {
       subFrom.zipFold(subWith)(tpe) { (acc, arg, sub) =>
         arg match {
           case Variable(name) => unifyImpl(acc, name, sub)
@@ -379,20 +383,20 @@ object Types {
       }
     }
 
-    inline def (tpe: Type) unify(subWith: Type) =
+    extension (tpe: Type) inline def unify(subWith: Type) =
       tpe.unifyFrom(tpe)(subWith)
 
-    def (tpe: Type) unifyFromAll(unifications: Iterable[(Name, Type)]): Type = {
+    extension (tpe: Type) def unifyFromAll(unifications: Iterable[(Name, Type)]): Type = {
       unifications.foldLeft(tpe) { (acc, pair) =>
         val (sub, by) = pair
         unifyImpl(acc, sub, by)
       }
     }
 
-    def (tpe: Type) replaceVariable(from: Name)(by: Name): Type =
+    extension (tpe: Type) def replaceVariable(from: Name)(by: Name): Type =
       unifyImpl(tpe, from, Variable(by))
 
-    def (tpe: Type) replaceVariables(f: Name => Option[Name]): Type = {
+    extension (tpe: Type) def replaceVariables(f: Name => Option[Name]): Type = {
       var seen = Set[Name]()
       tpe.foldLeft(tpe) { (acc, tpe) =>
         tpe match {
@@ -405,7 +409,7 @@ object Types {
       }
     }
 
-    def (tpe: Type) isComputationType: Boolean = {
+    extension (tpe: Type) def isComputationType: Boolean = {
       @tailrec
       def inner(tpes: List[Type]): Boolean = tpes match {
         case Nil => true
@@ -431,9 +435,9 @@ object Types {
       inner(tpe :: Nil)
     }
 
-    def (tpe: Type) isValueType = !tpe.isComputationType
+    extension (tpe: Type) def isValueType = !tpe.isComputationType
 
-    private def (tpe: Type) showImpl: String = tpe.compile {
+    extension (tpe: Type) private def showImpl: String = tpe.compile {
       case FunctionType(arg, body)        => fromFunctionType(arg, body)
       case LinearFunctionType(arg, body)  => fromLinearFunctionType(arg, body)
       case InfixAppliedType(op, a1, a2)   => fromInfixAppliedType(op,a1,a2)
@@ -448,7 +452,7 @@ object Types {
     }
 
     private def fromFunctionType(arg: Type, body: Type): Statement[String] = {
-      val a1 :: a2 :: rest = stack
+      val a1 :: a2 :: rest = stack.checkAtRuntime
       val a1Final = arg match {
         case _: (FunctionType | LinearFunctionType)  => s"($a1)"
         case _                                       => a1
@@ -457,7 +461,7 @@ object Types {
     }
 
     private def fromLinearFunctionType(arg: Type, body: Type): Statement[String] = {
-      val a1 :: a2 :: rest = stack
+      val a1 :: a2 :: rest = stack.checkAtRuntime
       val a1Final = arg match {
         case _: (FunctionType | LinearFunctionType)  => s"($a1)"
         case _                                       => a1
@@ -466,7 +470,7 @@ object Types {
     }
 
     private def fromInfixAppliedType(op: Name, a1: Type, a2: Type): Statement[String] = {
-      val b1 :: b2 :: rest = stack
+      val b1 :: b2 :: rest = stack.checkAtRuntime
       val b1Final = a1 match {
         case AppliedType(BangTag, _ :: Nil) => b1
 
@@ -541,7 +545,7 @@ object Types {
     given Show[Type] {
 
       val variables = {
-        val alpha = LazyList('a' to 'z': _*)
+        val alpha = LazyList(('a' to 'z')*)
         val numeric =
           for
             n <- LazyList.from(1)
@@ -550,10 +554,10 @@ object Types {
         alpha.map(_.toString) #::: numeric
       }
 
-      def (xs: Seq[String]) filterVariables(ys: Seq[String]) =
+      extension (xs: Seq[String]) def filterVariables(ys: Seq[String]) =
         xs.filterNot(ys.contains)
 
-      def (tpe: Type) toNames: (Seq[Name], Seq[Name]) = {
+      extension (tpe: Type) def toNames: (Seq[Name], Seq[Name]) = {
         tpe.foldLeft(List.empty[Name]) { (acc, t) =>
           t match {
             // case Variable(n)              => n::acc
@@ -569,7 +573,7 @@ object Types {
         }
       }
 
-      def (tpe: Type) fancyVariables: Type = {
+      extension (tpe: Type) def fancyVariables: Type = {
         import NameOps._
         import Derived._
         val (comp, from) = tpe.toNames
@@ -591,7 +595,7 @@ object Types {
         }
       }
 
-      def (tpe: Type) show: String = {
+      extension (tpe: Type) def show: String = {
         displayString(tpe.fancyVariables)
       }
     }
